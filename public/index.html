@@ -1,0 +1,1497 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TopoShare</title>
+<meta name="description" content="Partage tes voies, prise par prise. Share your routes, hold by hold.">
+<meta name="theme-color" content="#1B2024">
+<link rel="manifest" href="/manifest.webmanifest?v=2">
+<link rel="icon" href="/ts-icon-64.png">
+<link rel="apple-touch-icon" href="/ts-icon-180.png">
+<meta property="og:title" content="TopoShare">
+<meta property="og:description" content="Les betas de la communauté : blocs du spray wall et voies de falaise, prise par prise.">
+<meta property="og:image" content="/ts-icon-512.png">
+<meta name="apple-mobile-web-app-title" content="TopoShare">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; -webkit-text-size-adjust: 100%; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+/* Layout: one-column mobile app — sticky header with gym switcher, wall photo as the working surface (pinch to zoom), bottom tab bar, fullscreen wall overlay. */
+:root {
+  --bg: #ECEEF0;
+  --surface: #FFFFFF;
+  --fg: #1B2024;
+  --muted: #5C6670;
+  --line: #D5D9DD;
+  --accent: #E2501A;
+  --accent-ink: #FFFFFF;
+  --danger: #C62828;
+  --stage: #0D0F11;
+  --h-start: #22C55E;
+  --h-hand: #2F9BFF;
+  --h-foot: #FFD21F;
+  --h-top: #FF2E9A;
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14171A; --surface: #1D2125; --fg: #EDEFF1; --muted: #9AA3AC; --line: #30363C;
+  --accent: #FF6630; --accent-ink: #14171A; --danger: #FF6B6B; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #14171A; --surface: #1D2125; --fg: #EDEFF1; --muted: #9AA3AC; --line: #30363C;
+  --accent: #FF6630; --accent-ink: #14171A; --danger: #FF6B6B; color-scheme: dark }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+body.locked { overflow: hidden; }
+.app { max-width: 720px; margin: 0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+.brand { margin-right: auto; font-family: var(--f-display); font-weight: 800; font-size: 20px; letter-spacing: -0.01em; line-height: 1; white-space: nowrap; }
+.brand span { color: var(--accent); }
+.gymbtn { appearance: none; margin-left: 0; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 12px; padding: 6px 10px; text-align: right; cursor: pointer; display: grid; font: inherit; }
+.gymbtn b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gymbtn small { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.back { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; width: 36px; height: 36px; font-size: 18px; cursor: pointer; flex: none; }
+
+h1, h2 { font-family: var(--f-display); font-weight: 800; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 26px; line-height: 1.1; }
+h2 { font-size: 18px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+.banner { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+
+.filters, .grades { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.filters { padding-block: 14px 4px; }
+.chip { appearance: none; flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 7px 14px; font: 600 14px var(--f-body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.grades .chip { font-family: var(--f-mono); font-weight: 700; padding: 8px 12px; }
+.grades .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.list { display: flex; flex-direction: column; gap: 10px; padding-block: 10px 20px; }
+.card { display: grid; grid-template-columns: 104px 1fr auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px 8px 8px; cursor: pointer; text-align: left; color: inherit; font: inherit; width: 100%; }
+.card.old { opacity: .55; filter: grayscale(.8); }
+.card:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.thumb { width: 104px; aspect-ratio: 3 / 2; border-radius: 9px; overflow: hidden; background: var(--stage); }
+.thumb svg { width: 100%; height: 100%; display: block; }
+.card .meta { min-width: 0; }
+.card .name { font-weight: 700; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .by { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grade { font-family: var(--f-mono); font-weight: 700; font-size: 15px; padding: 5px 9px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.grade.big { font-size: 22px; padding: 6px 12px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--muted); margin-right: 4px; }
+
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); display: grid; gap: 14px; justify-items: center; }
+.empty strong { color: var(--fg); font-family: var(--f-display); font-size: 20px; }
+
+/* pinch-zoom wall surface */
+.wv { position: relative; overflow: hidden; touch-action: none; background: var(--stage); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.wv-layer { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.wv-layer svg { width: 100%; height: 100%; display: block; }
+.wallbox { position: relative; }
+#editWall { width: 100%; max-height: 58vh; }
+.float { position: absolute; z-index: 2; appearance: none; border: 0; background: rgba(13,15,17,.78); color: #fff; font: 700 13px var(--f-body); border-radius: 10px; padding: 8px 11px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.float.tr { right: max(10px, env(safe-area-inset-right, 0px)); top: 10px; }
+.float.tl { left: max(10px, env(safe-area-inset-left, 0px)); top: 10px; }
+.pinchhint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2; background: rgba(13,15,17,.78); color: #fff; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; pointer-events: none; white-space: nowrap; }
+
+/* tools */
+.toolrow { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 8px; }
+.tool, .undo { appearance: none; border: 2px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 12px; padding: 8px 4px; display: grid; justify-items: center; gap: 3px; font: 700 13px var(--f-body); cursor: pointer; }
+.tool[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+.tool .dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid currentColor; }
+.undo { padding-inline: 12px; }
+.undo .ic { font-size: 18px; line-height: 18px; }
+.undo:disabled { opacity: .4; cursor: default; }
+.counts { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.counts b { color: var(--fg); }
+.ins { flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--fg); color: var(--fg); font-weight: 600; }
+.ins button { appearance: none; border: 0; background: var(--fg); color: var(--bg); border-radius: 8px; padding: 6px 10px; font: 700 13px var(--f-body); cursor: pointer; }
+.fs .ins { border-color: #F2F3F5; color: #F2F3F5; } .fs .ins button { background: #F2F3F5; color: #0D0F11; }
+.step { display: grid; gap: 10px; padding-block: 14px 6px; }
+
+form { display: grid; gap: 14px; padding-block: 12px 24px; }
+.field { display: grid; gap: 6px; min-width: 0; }
+input, textarea { font: 16px var(--f-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; box-sizing: border-box; }
+textarea { min-height: 60px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 420px) { .row2 { grid-template-columns: 1fr; } }
+.btn { appearance: none; border: 0; border-radius: 12px; padding: 13px 18px; font: 700 16px var(--f-body); cursor: pointer; background: var(--accent); color: var(--accent-ink); }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.btn.small { padding: 9px 14px; font-size: 14px; }
+.btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.err { color: var(--danger); font-size: 14px; min-height: 1em; }
+
+.dhead { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding-block: 16px 10px; }
+.dhead > div { min-width: 0; }
+.dwall { position: relative; background: var(--stage); cursor: zoom-in; }
+.dwall svg { display: block; width: 100%; height: auto; }
+.desc { padding-block: 4px 0; max-width: 65ch; margin: 0; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); padding-block: 10px 0; }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid; margin-right: 5px; vertical-align: -1px; }
+.seq { font-family: var(--f-mono); font-size: 13px; color: var(--muted); padding-block: 8px 0; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; padding-block: 18px 24px; justify-content: flex-end; }
+
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; padding-block: 10px; }
+.tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 700 15px var(--f-body); padding: 10px; border-radius: 12px; cursor: pointer; }
+.tab[aria-current="page"] { color: var(--fg); background: var(--bg); }
+.tab.plus { background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.tab.plus .pl { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font-size: 18px; line-height: 1; font-weight: 800; }
+.tab.plus[aria-current="page"] { background: var(--accent); color: var(--accent-ink); box-shadow: inset 0 0 0 2px var(--fg); }
+
+/* fullscreen overlay: always dark, it frames a photo */
+.fs { position: fixed; inset: 0; z-index: 30; background: #0D0F11; color: #F2F3F5; display: flex; flex-direction: column; }
+.fs-bar { display: flex; align-items: center; gap: 10px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); padding-bottom: 10px; padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
+.fs-bar .t { min-width: 0; flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-bar .t small { color: #9AA3AC; font-weight: 500; margin-left: 6px; }
+.fs-btn { appearance: none; border: 1px solid #3A4148; background: #1D2125; color: #F2F3F5; border-radius: 10px; padding: 8px 12px; font: 700 14px var(--f-body); cursor: pointer; flex: none; }
+.fs-btn[aria-pressed="true"] { background: #F2F3F5; color: #0D0F11; }
+.fs-btn.go { background: var(--h-start); border-color: var(--h-start); color: #0D0F11; }
+.fs .wv { flex: 1; }
+.fs-foot { padding-top: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); display: grid; gap: 8px; }
+.fs .tool, .fs .undo { background: #1D2125; border-color: #30363C; color: #F2F3F5; }
+.fs .tool[aria-pressed="true"] { border-color: #F2F3F5; box-shadow: inset 0 0 0 1px #F2F3F5; }
+.fs .counts { color: #9AA3AC; } .fs .counts b { color: #F2F3F5; }
+
+/* bottom sheet */
+.sheet-bg { position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); color: var(--fg); width: 100%; max-width: 720px; max-height: 88vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding-block: 18px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px; }
+.sheet section { display: grid; gap: 10px; }
+.gymlist { display: grid; gap: 8px; }
+.gymrow { appearance: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 12px; padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; }
+.gymrow[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.gymrow small { color: var(--muted); }
+.walllist { display: grid; gap: 6px; font-size: 14px; color: var(--muted); }
+.walllist div { display: flex; justify-content: space-between; gap: 8px; }
+.note { font-size: 13px; color: var(--muted); }
+.filebtn { position: relative; overflow: hidden; display: inline-flex; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(90px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; z-index: 40; max-width: calc(100% - 32px); text-align: center; }
+.thumb.tall { width: 72px; aspect-ratio: 3 / 4; }
+.card.route { grid-template-columns: 72px 1fr auto; }
+#oeWall { width: 100%; max-height: 64vh; }
+.pick { display: grid; justify-items: center; gap: 10px; text-align: center; border: 2px dashed var(--line); border-radius: 16px; padding: 32px 16px; color: var(--muted); position: relative; cursor: pointer; }
+.pick strong { color: var(--fg); font-family: var(--f-display); font-size: 19px; }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; }
+.rp { display: grid; gap: 10px; }
+.rp-cap { text-align: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; min-width: 0; }
+.rp-cap small { display: block; color: #9AA3AC; font-weight: 500; font-size: 13px; }
+.rp-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.rp-btns .fs-btn { font-size: 17px; padding: 16px 12px; border-radius: 14px; }
+.rp-btns .go { font-size: 19px; }
+.rp-prog { height: 4px; background: #30363C; margin-inline: max(14px, env(safe-area-inset-left, 0px)) max(14px, env(safe-area-inset-right, 0px)); border-radius: 2px; overflow: hidden; }
+.rp-prog i { display: block; height: 100%; width: 0; background: var(--h-start); border-radius: 2px; }
+.rp-hint { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 2fr 3fr; pointer-events: none; }
+.rp-hint span { display: grid; place-items: center; color: #fff; font: 800 18px var(--f-body); text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+.rp-hint span:first-child { background: rgba(13,15,17,.45); border-right: 2px dashed rgba(255,255,255,.5); }
+.rp-hint span:last-child { background: rgba(34,197,94,.22); }
+@media (prefers-reduced-motion: no-preference) { .rp-prog i { transition: width .3s ease; } .rp-hint { transition: opacity .5s ease; } }
+.fs-btn:disabled { opacity: .35; }
+.legend .sq { border-radius: 3px; background: #fff; border-color: #222; }
+@media (prefers-reduced-motion: no-preference) { .card { transition: transform .12s; } .card:active { transform: scale(.985); } }
+.acct { appearance: none; flex: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--fg); display: grid; place-items: center; cursor: pointer; font: 800 15px var(--f-body); padding: 0; }
+.acct.on { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.acct.lang { font: 800 12px var(--f-mono); letter-spacing: .02em; }
+.langlist { display: grid; gap: 8px; }
+.acct svg { width: 18px; height: 18px; }
+.fb-link { appearance: none; border: 0; background: none; color: var(--muted); font: 600 14px var(--f-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 6px 0 20px; display: block; margin: 0 auto; }
+.splash { position: fixed; inset: 0; z-index: 100; background: #1B2024; color: #ECEEF0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 24px; }
+.splash img { width: 132px; height: 132px; border-radius: 30px; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+.splash h1 { font-family: var(--f-display); font-weight: 800; font-size: 38px; letter-spacing: -.01em; color: #FFFFFF; margin: 6px 0 0; }
+.splash h1 span { color: #FF6630; }
+.splash p { margin: 0; font-size: 16px; color: #ECEEF0; }
+.splash p.en { font-size: 14px; color: #9AA3AC; margin-top: -8px; }
+.splash.out { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) { .splash { transition: opacity .45s ease; } .splash img { animation: pop .6s cubic-bezier(.2,1.3,.4,1) both; } }
+@keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.login-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.login-list li { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; }
+.login-list li::before { content: "✓"; width: 24px; height: 24px; border-radius: 50%; background: var(--h-start); color: #0D0F11; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.gbtn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.gbtn svg { width: 20px; height: 20px; background: #fff; border-radius: 50%; padding: 3px; box-sizing: content-box; }
+</style>
+</head>
+<body>
+<div class="splash" id="splash" aria-hidden="true"><img src="/ts-icon-512.png" alt=""><h1>Topo<span>Share</span></h1><p>Partage tes voies, prise par prise.</p><p class="en" lang="en">Share your routes, hold by hold.</p></div>
+<script src="/i18n.js"></script>
+
+<div class="app">
+  <header class="top gut">
+    <button class="back" id="backBtn" hidden aria-label="Retour à la liste">←</button>
+    <div class="brand">Topo<span>Share</span></div>
+    <button class="acct lang" id="langBtn" type="button" aria-label="Langue">FR</button>
+    <button class="acct" id="acctBtn" type="button" aria-label="Se connecter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></button>
+    <button class="gymbtn" id="gymBtn" type="button" aria-label="Changer de salle"><b id="gymName">Chargement…</b><small id="gymSub"></small></button>
+  </header>
+
+  <!-- LIST -->
+  <section id="vList">
+    <div class="gut">
+      <div class="banner" id="offline" hidden>Impossible de joindre la base. Vérifiez votre connexion puis rechargez la page.</div>
+      <div class="filters" role="group" aria-label="Filtrer" id="filters"></div>
+      <div class="list" id="list" aria-live="polite"></div>
+      <button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button>
+    </div>
+  </section>
+
+  <!-- CREATE -->
+  <section id="vCreate" hidden>
+    <div class="gut step">
+      <h1 id="eTitle">Tracer un bloc</h1>
+      <div class="note">Pincez pour zoomer, glissez pour vous déplacer. Touchez les prises dans l'ordre de la montée : les mains sont numérotées au fur et à mesure.</div>
+    </div>
+    <div class="wallbox">
+      <div class="wv" id="editWall"></div>
+      <button class="float tr" type="button" id="editFull">⤢ Plein écran</button>
+    </div>
+    <div class="gut step">
+      <div class="toolrow" data-tools></div>
+      <div class="counts" data-counts></div>
+    </div>
+    <div class="gut">
+      <form id="form" novalidate>
+        <div class="row2">
+          <div class="field"><label class="label" for="fName">Nom du bloc</label><input id="fName" maxlength="40" placeholder="ex. La réglette du lundi" autocomplete="off"></div>
+          <div class="field"><label class="label" for="fSetter">Ouvreur</label><input id="fSetter" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
+        </div>
+        <div class="field"><span class="label" id="gLbl">Cotation</span><div class="grades" id="grades" role="group" aria-labelledby="gLbl"></div></div>
+        <div class="field"><label class="label" for="fDesc">Consignes (optionnel)</label><textarea id="fDesc" maxlength="240" placeholder="ex. Assis départ, pieds marqués uniquement"></textarea></div>
+        <div class="err" id="fErr"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn" type="submit" id="fSave">Publier le bloc</button>
+          <button class="btn ghost" type="button" id="fDraft">Garder en brouillon</button>
+          <button class="btn ghost" type="button" id="fReset">Effacer les prises</button>
+          <button class="btn ghost" type="button" id="fCancel" hidden>Fermer sans publier</button>
+          <button class="btn danger small" type="button" id="fDelDraft" hidden>Supprimer le brouillon</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- DETAIL -->
+  <section id="vDetail" hidden>
+    <div class="gut dhead">
+      <div>
+        <h1 id="dName"></h1>
+        <div id="dBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div>
+      </div>
+      <div class="grade big" id="dGrade"></div>
+    </div>
+    <div class="gut" id="dOld" hidden><div class="banner" style="margin:0 0 12px">Ce bloc était tracé sur un ancien mur, démonté depuis. Il reste consultable en archive.</div></div>
+    <div class="dwall" id="dWall" role="button" tabindex="0" aria-label="Voir le bloc en plein écran">
+      <button class="float tr" type="button" tabindex="-1">⤢ Plein écran</button>
+    </div>
+    <div class="gut">
+      <div class="legend">
+        <span><i style="border-color:var(--h-start)"></i>Départ</span>
+        <span><i style="border-color:var(--h-hand)"></i>Mains, dans l'ordre</span>
+        <span><i style="border-color:var(--h-foot)"></i>Pieds</span>
+        <span><i style="border-color:var(--h-top)"></i>Top</span>
+      </div>
+      <div class="seq" id="dSeq"></div>
+      <p class="desc" id="dDesc"></p>
+      <div class="actions">
+        <button class="btn" id="dReplay" type="button">▶ Répéter le bloc</button>
+        <span style="flex:1"></span>
+        <button class="btn ghost small" id="dEdit" type="button" hidden>Modifier le bloc</button>
+        <button class="btn danger small" id="dDel" type="button" hidden>Supprimer ce bloc</button>
+        <button class="btn danger small" id="dDelOk" type="button" hidden>Confirmer la suppression</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- OUTDOOR: route list -->
+  <section id="oList" hidden>
+    <div class="gut"><div class="list" id="oListEl" aria-live="polite"></div><button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button></div>
+  </section>
+
+  <!-- OUTDOOR: one route -->
+  <section id="oVoie" hidden>
+    <div class="gut dhead">
+      <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div></div>
+      <div class="grade big" id="ovGrade"></div>
+    </div>
+    <div class="gut"><div class="filters" id="ovMethods" role="group" aria-label="Afficher" style="padding-top:0"></div></div>
+    <div class="dwall" id="ovWall" role="button" tabindex="0" aria-label="Voir la voie en plein écran"><button class="float tr" type="button" tabindex="-1">⤢ Plein écran</button></div>
+    <div class="gut">
+      <div class="legend">
+        <span><i class="sq"></i>Point d'ancrage</span>
+        <span><i style="border-color:var(--h-hand)"></i>Main</span>
+        <span><i style="border-color:var(--h-foot)"></i>Pied</span>
+      </div>
+      <div class="seq" id="ovSeq"></div>
+      <p class="desc" id="ovNote"></p>
+      <div class="actions" id="ovActions" style="justify-content:flex-start"></div>
+    </div>
+  </section>
+
+  <!-- OUTDOOR: route / method editor -->
+  <section id="oEdit" hidden>
+    <div class="gut step"><h1 id="oeTitle"></h1><div class="note" id="oeHint"></div></div>
+    <div class="gut" id="oePick" hidden>
+      <label class="pick"><strong>Photographier la voie</strong><span>Cadrez la voie entière, du pied au relais, bien de face. Une photo par voie : c'est ce qui la rend lisible.</span><span class="btn">Prendre ou choisir une photo</span><input type="file" accept="image/*" id="oeFile"></label>
+      <div class="err" id="oePickErr" style="padding-top:8px"></div>
+    </div>
+    <div id="oeWork">
+      <div class="wallbox"><div class="wv" id="oeWall"></div><button class="float tr" type="button" id="oeFull">⤢ Plein écran</button></div>
+      <div class="gut step"><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
+      <div class="gut">
+        <form id="oForm" novalidate>
+          <div id="oeRouteF" style="display:grid;gap:14px">
+            <div class="field"><label class="label" for="oName">Nom de la voie</label><input id="oName" maxlength="50" placeholder="ex. Le marché de l'angoisse" autocomplete="off"></div>
+            <div class="field"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
+          </div>
+          <div id="oeMethF" style="display:grid;gap:14px">
+            <div class="field"><label class="label" for="oClimber">Grimpeur</label><input id="oClimber" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
+            <div class="field"><label class="label" for="oNote">Notes de méthode (optionnel)</label><textarea id="oNote" maxlength="400" placeholder="ex. Repos genou après le 3e point, crux entre le 4e et le 5e"></textarea></div>
+          </div>
+          <div class="err" id="oErr"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn" type="submit" id="oSave">Enregistrer</button>
+            <button class="btn ghost" type="button" id="oCancel">Annuler</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs"><div class="in">
+  <button class="tab" id="tabList" aria-current="page">Salle</button>
+  <button class="tab" id="tabOut">Falaise</button>
+  <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau bloc</span></button>
+</div></nav>
+
+<!-- FULLSCREEN -->
+<div class="fs" id="fs" hidden role="dialog" aria-modal="true" aria-label="Mur en plein écran">
+  <div class="fs-bar">
+    <div class="t" id="fsTitle"></div>
+    <button class="fs-btn" id="fsDim" type="button" aria-pressed="false" hidden>Faire ressortir</button>
+    <button class="fs-btn go" id="fsClose" type="button">Fermer</button>
+  </div>
+  <div class="rp-prog" id="rpProg" hidden><i id="rpFill"></i></div>
+  <div class="wv" id="fsWall"><div class="rp-hint" id="rpHint" hidden aria-hidden="true"><span>◀ Revenir</span><span>Avancer ▶</span></div></div>
+  <div class="fs-foot" id="fsFoot">
+    <div id="fsIn" style="display:grid;gap:8px"><div class="toolrow" data-tools></div><div class="counts" data-counts></div></div>
+    <div id="fsOut" style="display:grid;gap:8px" hidden><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
+    <div id="fsReplay" class="rp" hidden>
+      <div class="rp-cap" id="rpCap" aria-live="polite"></div>
+      <div class="rp-btns"><button class="fs-btn" id="rpPrev" type="button">◀ Précédent</button><button class="fs-btn go" id="rpNext" type="button">Suivant ▶</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET -->
+<div class="sheet-bg" id="sheetBg" hidden>
+  <div class="sheet gut" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheet"></div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="/config.js"></script>
+<script src="/firebase-shim.js"></script>
+<script>
+const GRADES = ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8a+","8b","8b+","8c","8c+","9a","9a+","9b","9b+","9c"];
+const TYPES = {
+  start: { label: "Départ", color: "var(--h-start)", r: 34, max: 2 },
+  hand:  { label: "Main",   color: "var(--h-hand)",  r: 30 },
+  foot:  { label: "Pied",   color: "var(--h-foot)",  r: 22 },
+  top:   { label: "Top",    color: "var(--h-top)",   r: 34, max: 2 },
+};
+const FILTERS = [
+  { id: "all", label: "Tous", test: () => true },
+  { id: "low", label: "5a → 5c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= 0 && i < GRADES.indexOf("6a"); } },
+  { id: "mid", label: "6a → 6c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= GRADES.indexOf("6a") && i < GRADES.indexOf("7a"); } },
+  { id: "high", label: "7a et +", test: b => GRADES.indexOf(b.grade) >= GRADES.indexOf("7a") },
+  { id: "mine", label: "Mes blocs", test: b => state.me && b.authorId === state.me },
+  { id: "drafts", label: "Mes brouillons", test: () => true },
+  { id: "old", label: "Archives", test: () => true },
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+const state = {
+  view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, current: null, me: null,
+  db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
+};
+
+/* ---------- data helpers ---------- */
+const gym = () => state.gyms.find(g => g.id === state.gymId);
+const wallsOf = gid => state.walls.filter(w => w.gymId === gid).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+const activeWall = (gid = state.gymId) => wallsOf(gid).find(w => w.active) || null;
+const wallById = id => state.walls.find(w => w.id === id);
+const isArchived = b => { const w = activeWall(); return !w || b.wallId !== w.id; };
+const day = t => t ? new Date(t).toLocaleDateString(TS_I18N.locale(), { day: "numeric", month: "short", year: "numeric" }) : "";
+const ago = t => { if (!t) return ""; const d = (Date.now() - t) / 864e5; if (d < 1) return "aujourd'hui"; if (d < 2) return "hier"; if (d < 30) return `il y a ${Math.floor(d)} j`; return new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }); };
+
+/* ---------- wall drawing ---------- */
+function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1, hi = [] } = {}) {
+  const W = wall.w, H = wall.h, k = W / 1800, sw = 7 * k;
+  const R = h => (TYPES[h.t] || TYPES.hand).r * k;
+  const P = h => [h.x * W, h.y * H];
+  let under = "", rings = "", badges = "", holes = "";
+  // move order: starts (centroid) → hands in tap order → tops (centroid)
+  if (!mini) {
+    const cen = arr => arr.length ? { x: arr.reduce((s, h) => s + h.x, 0) / arr.length, y: arr.reduce((s, h) => s + h.y, 0) / arr.length, t: arr[0].t, r: arr.length > 1 ? 0 : 1 } : null;
+    const seq = [cen(holds.filter(h => h.t === "start")), ...holds.filter(h => h.t === "hand"), cen(holds.filter(h => h.t === "top"))].filter(Boolean);
+    for (let i = 0; i < seq.length - 1; i++) {
+      const [ax, ay] = P(seq[i]), [bx, by] = P(seq[i + 1]);
+      const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy); if (L < 1) continue;
+      const ux = dx / L, uy = dy / L, ra = seq[i].r === 0 ? 4 : R(seq[i]) + 6 * k, rb = R(seq[i + 1]) + 10 * k;
+      if (L <= ra + rb) continue;
+      const x1 = ax + ux * ra, y1 = ay + uy * ra, x2 = bx - ux * rb, y2 = by - uy * rb;
+      under += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.6)" stroke-width="${8 * k}" stroke-linecap="round"/>`
+             + `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${3.5 * k}" stroke-dasharray="${14 * k} ${9 * k}" stroke-linecap="round" marker-end="url(#${uid}a)"/>`;
+    }
+  }
+  let n = 0;
+  for (const h of holds) {
+    const t = TYPES[h.t] || TYPES.hand, [cx, cy] = P(h), r = R(h);
+    holes += `<circle cx="${cx}" cy="${cy}" r="${r + 8 * k}" fill="#000"/>`;
+    rings += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${sw + 5 * k}"/>`
+          +  `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${sw}"/>`;
+    if (h.t === "start") rings += `<circle cx="${cx}" cy="${cy}" r="${r + 11 * k}" fill="none" stroke="${t.color}" stroke-width="${3 * k}"/>`;
+    if (holds.indexOf(h) === mark) rings += markRing(cx, cy, r + 18 * k, k);
+    if (hi.includes(h)) badges += `<circle cx="${cx}" cy="${cy}" r="${r + 15 * k}" fill="none" stroke="#fff" stroke-width="${5 * k}"/>`;
+    if (mini) continue;
+    const bx = cx + r * 0.78, by = cy - r * 0.78, br = 17 * k;
+    const badge = (txt, col, ink) => `<circle cx="${bx}" cy="${by}" r="${br}" fill="${col}" stroke="rgba(0,0,0,.6)" stroke-width="${3 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 17 : 21) * k}" fill="${ink}">${txt}</text>`;
+    if (h.t === "hand") badges += badge(String(++n), "var(--h-hand)", "#fff");
+    else if (h.t === "start") badges += badge("D", "var(--h-start)", "#0D0F11");
+    else if (h.t === "top") badges += badge("T", "var(--h-top)", "#fff");
+  }
+  const defs = `<defs><marker id="${uid}a" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="1"/></marker>${dim && holds.length ? `<mask id="${uid}m"><rect width="${W}" height="${H}" fill="#fff"/>${holes}</mask>` : ""}</defs>`;
+  const shade = dim && holds.length ? `<rect width="${W}" height="${H}" fill="rgba(0,0,0,.55)" mask="url(#${uid}m)"/>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${mini ? "slice" : "meet"}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Photo du mur avec ${holds.length} prises marquées">${defs}<image href="${esc(BT.img(wall.image))}" width="${W}" height="${H}"/>${shade}${under}${rings}${badges}</svg>`;
+}
+function seqText(holds) {
+  const c = t => holds.filter(h => h.t === t).length, hands = c("hand"), feet = c("foot");
+  return `${hands} move${hands > 1 ? "s" : ""}${feet ? ` · ${feet} pied${feet > 1 ? "s" : ""} imposé${feet > 1 ? "s" : ""}` : " · pieds libres"}`;
+}
+
+/* ---------- pinch / pan / tap surface ---------- */
+class WallView {
+  constructor(el, { onTap = null, dblZoom = false } = {}) {
+    Object.assign(this, { el, onTap, dblZoom, max: 6, s: 1, ox: 0, oy: 0, bw: 0, bh: 0, aspect: 1.5, pts: new Map(), lastTap: null });
+    this.layer = document.createElement("div"); this.layer.className = "wv-layer"; el.prepend(this.layer);
+    el.addEventListener("pointerdown", e => this.down(e));
+    el.addEventListener("pointermove", e => this.move(e));
+    el.addEventListener("pointerup", e => this.up(e));
+    el.addEventListener("pointercancel", e => this.up(e, true));
+    el.addEventListener("wheel", e => { e.preventDefault(); const p = this.loc(e); this.zoomAt(p.x, p.y, this.s * Math.exp(-e.deltaY * 0.0018)); }, { passive: false });
+    new ResizeObserver(() => this.layout()).observe(el);
+  }
+  set(svg, aspect, reset) { this.layer.innerHTML = svg; if (aspect !== this.aspect || reset) { this.aspect = aspect; this.layout(true); } }
+  layout(reset) {
+    const cw = this.el.clientWidth, ch = this.el.clientHeight; if (!cw || !ch) return;
+    let bw = cw, bh = cw / this.aspect; if (bh > ch) { bh = ch; bw = ch * this.aspect; }
+    const ratio = this.bw ? bw / this.bw : 1;
+    this.bw = bw; this.bh = bh; this.layer.style.width = bw + "px"; this.layer.style.height = bh + "px";
+    if (reset) this.s = 1; else { this.ox *= ratio; this.oy *= ratio; }
+    this.clamp(); this.apply();
+  }
+  clamp() {
+    const cw = this.el.clientWidth, ch = this.el.clientHeight, w = this.bw * this.s, h = this.bh * this.s;
+    this.ox = w <= cw ? (cw - w) / 2 : Math.min(0, Math.max(cw - w, this.ox));
+    this.oy = h <= ch ? (ch - h) / 2 : Math.min(0, Math.max(ch - h, this.oy));
+  }
+  apply() { this.layer.style.transform = `translate(${this.ox}px,${this.oy}px) scale(${this.s})`; this.el.dataset.zoomed = this.s > 1.02 ? "1" : ""; }
+  zoomAt(px, py, ns) {
+    ns = Math.min(this.max, Math.max(1, ns)); const u = (px - this.ox) / this.s, v = (py - this.oy) / this.s;
+    this.s = ns; this.ox = px - u * ns; this.oy = py - v * ns; this.clamp(); this.apply();
+  }
+  reset() { this.s = 1; this.clamp(); this.apply(); }
+  focus(nx, ny, s) {
+    const cw = this.el.clientWidth, ch = this.el.clientHeight; if (!this.bw) return;
+    this.s = Math.min(this.max, Math.max(1, s)); this.ox = cw / 2 - nx * this.bw * this.s; this.oy = ch / 2 - ny * this.bh * this.s; this.clamp();
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) { this.layer.style.transition = "transform .35s ease"; clearTimeout(this._ft); this._ft = setTimeout(() => this.layer.style.transition = "", 380); }
+    this.apply();
+  }
+  loc(e) { const r = this.el.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  down(e) {
+    if (e.target.closest("button")) return;
+    this.el.setPointerCapture?.(e.pointerId);
+    this.pts.set(e.pointerId, this.loc(e));
+    if (this.pts.size === 1) { const p = this.loc(e); this.g = { x: p.x, y: p.y, t: Date.now(), ox: this.ox, oy: this.oy, moved: false, multi: false }; }
+    if (this.pts.size === 2) {
+      const [a, b] = [...this.pts.values()];
+      this.g.multi = true;
+      this.pin = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: this.s, ox: this.ox, oy: this.oy };
+    }
+  }
+  move(e) {
+    if (!this.pts.has(e.pointerId)) return;
+    this.pts.set(e.pointerId, this.loc(e));
+    if (this.pts.size >= 2 && this.pin) {
+      const [a, b] = [...this.pts.values()], p = this.pin;
+      const d = Math.hypot(a.x - b.x, a.y - b.y), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const ns = Math.min(this.max, Math.max(1, p.s * d / p.d)), u = (p.mx - p.ox) / p.s, v = (p.my - p.oy) / p.s;
+      this.s = ns; this.ox = mx - u * ns; this.oy = my - v * ns; this.clamp(); this.apply();
+    } else if (this.g) {
+      const p = this.loc(e), dx = p.x - this.g.x, dy = p.y - this.g.y;
+      if (!this.g.moved && Math.hypot(dx, dy) > 8) this.g.moved = true;
+      if (this.g.moved) { this.ox = this.g.ox + dx; this.oy = this.g.oy + dy; this.clamp(); this.apply(); }
+    }
+  }
+  up(e, cancel) {
+    if (!this.pts.has(e.pointerId)) return;
+    this.pts.delete(e.pointerId);
+    if (this.pts.size === 1) { // finished a pinch, keep panning with the remaining finger
+      const p = [...this.pts.values()][0]; this.pin = null;
+      this.g = { x: p.x, y: p.y, t: 0, ox: this.ox, oy: this.oy, moved: true, multi: true }; return;
+    }
+    if (this.pts.size || !this.g) return;
+    const g = this.g; this.g = null;
+    if (cancel || g.moved || g.multi || Date.now() - g.t > 600) return;
+    const p = this.loc(e);
+    if (this.dblZoom) {
+      const now = Date.now();
+      if (this.lastTap && now - this.lastTap.t < 320 && Math.hypot(p.x - this.lastTap.x, p.y - this.lastTap.y) < 30) {
+        this.zoomAt(p.x, p.y, this.s > 1.5 ? 1 : 2.5); this.lastTap = null; return;
+      }
+      this.lastTap = { t: now, x: p.x, y: p.y };
+    }
+    if (this.onAnyTap) { this.onAnyTap(p.x / this.el.clientWidth); return; }
+    if (this.onTap) {
+      const nx = (p.x - this.ox) / (this.s * this.bw), ny = (p.y - this.oy) / (this.s * this.bh);
+      if (nx >= 0 && nx <= 1 && ny >= 0 && ny <= 1) this.onTap(nx, ny);
+    }
+  }
+}
+
+/* ---------- ordered editing: remove a hold, the next one takes its place ---------- */
+function insRemove(ed, list, i) { list.splice(i, 1); ed.lastIdx = null; ed.insertAt = i < list.length ? i : null; }
+function insAdd(ed, list, item) {
+  const i = ed.insertAt != null && ed.insertAt <= list.length ? ed.insertAt : list.length;
+  list.splice(i, 0, item); ed.lastIdx = i;
+  ed.insertAt = ed.insertAt != null && i + 1 < list.length ? i + 1 : null;
+}
+function insUndo(ed, list) {
+  if (ed.lastIdx != null && ed.lastIdx < list.length) { list.splice(ed.lastIdx, 1); ed.insertAt = ed.lastIdx < list.length ? ed.lastIdx : null; ed.lastIdx = null; }
+  else { list.pop(); ed.insertAt = null; }
+}
+function insBanner(ed, what) {
+  if (ed.insertAt == null) return "";
+  return `<span class="ins"><span>${what}</span><button type="button" data-endins>Reprendre à la fin</button></span>`;
+}
+const markRing = (cx, cy, r, k) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="${4 * k}" stroke-dasharray="${9 * k} ${6 * k}"/>`;
+
+/* ---------- editor ---------- */
+const editView = new WallView($("editWall"), { onTap: (x, y) => tapHold(x, y) });
+const fsView = new WallView($("fsWall"), { dblZoom: true });
+function tapHold(x, y) {
+  const w = activeWall(); if (!w) return;
+  const k = w.w / 1800, px = x * w.w, py = y * w.h;
+  const hit = state.holds.findIndex(h => Math.hypot(h.x * w.w - px, h.y * w.h - py) <= (TYPES[h.t].r + 8) * k);
+  if (hit >= 0) insRemove(state, state.holds, hit);
+  else {
+    const t = TYPES[state.tool];
+    if (t.max && state.holds.filter(h => h.t === state.tool).length >= t.max) { toast(`${t.max} prises « ${t.label} » maximum`); return; }
+    insAdd(state, state.holds, { x: +x.toFixed(4), y: +y.toFixed(4), t: state.tool });
+    if (state.tool === "start") { state.tool = "hand"; toast("Départ posé. Touchez maintenant les mains dans l'ordre."); }
+  }
+  $("fErr").textContent = "";
+  renderEditor(); saveDraft();
+}
+function renderTools() {
+  const undoOff = state.holds.length ? "" : "disabled";
+  const html = Object.entries(TYPES).map(([k, t]) =>
+    `<button type="button" class="tool" data-t="${k}" aria-pressed="${state.tool === k}"><span class="dot" style="border-color:${t.color}"></span>${t.label}</button>`).join("")
+    + `<button type="button" class="undo" data-undo ${undoOff} aria-label="Annuler la dernière prise"><span class="ic">↶</span>Annuler</button>`;
+  document.querySelectorAll("[data-tools]").forEach(el => { el.innerHTML = html; });
+  const c = k => state.holds.filter(h => h.t === k).length;
+  const nb = state.insertAt == null ? 0 : state.holds.slice(0, state.insertAt).filter(h => h.t === "hand").length;
+  const counts = `<span>Départ <b>${c("start")}</b></span><span>Moves <b>${c("hand")}</b></span><span>Pieds <b>${c("foot")}</b></span><span>Top <b>${c("top")}</b></span>`
+    + insBanner(state, nb ? `Prochaine prise insérée après le move ${nb}` : "Prochaine prise insérée au début du bloc");
+  document.querySelectorAll("[data-counts]").forEach(el => el.innerHTML = counts);
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-tools] .tool"); if (t) { state.tool = t.dataset.t; renderTools(); return; }
+  const u = e.target.closest("[data-undo]"); if (u) { insUndo(state, state.holds); renderEditor(); saveDraft(); return; }
+  if (e.target.closest("[data-endins]")) { if (state.view === "oedit" || state.fsMode === "oedit") { if (state.oe) { state.oe.insertAt = null; renderOE(); } } else { state.insertAt = null; renderEditor(); } }
+});
+function renderEditor() {
+  const w = activeWall();
+  if (!w) { editView.set(`<div style="color:#9AA3AC;padding:40px 16px;text-align:center">Ajoutez d'abord une photo du mur de cette salle.</div>`, 1.5); renderTools(); return; }
+  $("editWall").style.aspectRatio = `${w.w} / ${w.h}`;
+  const svg = wallSVG(w, state.holds, { uid: "e", mark: state.insertAt == null ? -1 : state.insertAt - 1 });
+  editView.set(svg, w.w / w.h);
+  if (state.fsMode === "edit") fsView.set(wallSVG(w, state.holds, { uid: "f", mark: state.insertAt == null ? -1 : state.insertAt - 1 }), w.w / w.h);
+  renderTools();
+}
+function renderGrades() {
+  $("grades").innerHTML = GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${state.grade === g}">${g}</button>`).join("");
+}
+$("grades").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.grade = b.dataset.g; renderGrades(); saveDraft(); });
+function clearEditor(wipe = true) {
+  state.edit = { kind: "new" }; state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null;
+  $("fName").value = ""; $("fDesc").value = ""; $("fErr").textContent = "";
+  if (wipe) lsSet("pan-draft", ""); renderEditorChrome(); renderEditor();
+}
+function fillEditor(src) {
+  state.holds = (src.holds || []).map(h => ({ ...h }));
+  $("fName").value = src.name || ""; $("fDesc").value = src.desc || "";
+  if (src.setter) $("fSetter").value = src.setter;
+  state.grade = src.grade || state.grade;
+  state.tool = state.holds.some(h => h.t === "start") ? "hand" : "start";
+  state.insertAt = state.lastIdx = null; $("fErr").textContent = ""; renderGrades();
+}
+function startEdit(kind, id) {
+  const src = kind === "draft" ? state.drafts.find(d => d.id === id) : state.blocs.find(b => b.id === id);
+  if (!src) { toast("Introuvable"); return; }
+  const w = activeWall();
+  if (!w || src.wallId !== w.id) { toast("Ce bloc est sur un ancien mur : il ne peut plus être modifié."); return; }
+  if (state.edit.kind === "new") saveDraft();
+  state.edit = { kind, id }; fillEditor(src); renderEditorChrome(); go("create");
+}
+function renderEditorChrome() {
+  const k = state.edit.kind, src = k === "draft" ? state.drafts.find(d => d.id === state.edit.id) : k === "bloc" ? state.blocs.find(b => b.id === state.edit.id) : null;
+  $("eTitle").textContent = k === "bloc" ? `Modifier « ${src?.name || "bloc"} »` : k === "draft" ? "Reprendre le brouillon" : "Tracer un bloc";
+  $("fSave").textContent = k === "bloc" ? "Enregistrer les modifications" : "Publier le bloc";
+  $("fDraft").hidden = k === "bloc";
+  $("fDraft").textContent = k === "draft" ? "Mettre à jour le brouillon" : "Garder en brouillon";
+  $("fCancel").hidden = k === "new";
+  $("fCancel").textContent = k === "bloc" ? "Annuler les modifications" : "Fermer sans publier";
+  $("fReset").hidden = k === "bloc";
+  $("fDelDraft").hidden = k !== "draft";
+}
+$("fReset").addEventListener("click", () => { state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null; renderEditor(); saveDraft(); });
+$("fCancel").addEventListener("click", () => { const k = state.edit; clearEditor(false); restoreLocal(); if (k.kind === "bloc") openDetail(k.id); else go("list"); });
+$("fDelDraft").addEventListener("click", async () => {
+  if ($("fDelDraft").dataset.armed !== "1") { $("fDelDraft").dataset.armed = "1"; $("fDelDraft").textContent = "Confirmer la suppression"; return; }
+  try { await draftsCol().doc(state.edit.id).delete(); toast("Brouillon supprimé"); clearEditor(); go("list"); } catch { toast("Suppression impossible"); }
+  delete $("fDelDraft").dataset.armed; $("fDelDraft").textContent = "Supprimer le brouillon";
+});
+const draftsCol = () => state.db.collection("data/users/" + state.me);
+function payload() {
+  return { name: $("fName").value.trim(), grade: state.grade, setter: $("fSetter").value.trim(), desc: $("fDesc").value.trim(), holds: state.holds };
+}
+$("fDraft").addEventListener("click", async () => {
+  const w = activeWall();
+  if (!w) return;
+  if (!state.me) { askLogin("fErr", "garder un brouillon"); return; }
+  if (!state.holds.length && !$("fName").value.trim()) { $("fErr").textContent = "Le brouillon est vide : posez au moins une prise."; return; }
+  const p = payload(); if (!p.name) p.name = "Brouillon du " + new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  $("fDraft").disabled = true;
+  try {
+    if (state.edit.kind === "draft") await draftsCol().doc(state.edit.id).update({ ...p, updatedAt: Date.now() });
+    else { const ref = await draftsCol().add({ ...p, kind: "draft", gymId: state.gymId, wallId: w.id, createdAt: Date.now(), updatedAt: Date.now() }); lsSet("pan-draft", ""); state.edit = { kind: "draft", id: ref.id }; }
+    $("fName").value = p.name; $("fErr").textContent = ""; renderEditorChrome();
+    toast("Brouillon enregistré. Retrouvez-le dans « Mes brouillons ».");
+  } catch { $("fErr").textContent = "Le brouillon n'a pas pu être enregistré. Réessayez."; }
+  finally { $("fDraft").disabled = false; }
+});
+$("form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const p = payload(), w = activeWall();
+  const n = k => state.holds.filter(h => h.t === k).length;
+  let msg = "";
+  if (!w) msg = "Cette salle n'a pas encore de photo du mur.";
+  else if (!n("start")) msg = "Ajoutez au moins une prise de départ.";
+  else if (!n("top")) msg = "Ajoutez la prise du top.";
+  else if (state.holds.length < 3) msg = "Un bloc compte au moins 3 prises.";
+  else if (!p.name) msg = "Donnez un nom au bloc.";
+  else if (!p.setter) msg = "Indiquez le nom de l'ouvreur.";
+  else if (!state.me) { askLogin("fErr", "publier"); return; }
+  $("fErr").textContent = msg; if (msg) return;
+  $("fSave").disabled = true;
+  const ed = state.edit;
+  try {
+    lsSet("pan-setter", p.setter);
+    let id;
+    if (ed.kind === "bloc") { await state.db.collection("blocs").doc(ed.id).update({ ...p, updatedAt: Date.now() }); id = ed.id; }
+    else {
+      const ref = await state.db.collection("blocs").add({ ...p, gymId: state.gymId, wallId: w.id, authorId: state.me || null, createdAt: Date.now() });
+      id = ref.id;
+      if (ed.kind === "draft") { try { await draftsCol().doc(ed.id).delete(); } catch {} }
+    }
+    clearEditor(); restoreLocal();
+    toast(ed.kind === "bloc" ? "Modifications enregistrées" : "Bloc publié"); openDetail(id);
+  } catch (err) {
+    $("fErr").textContent = err && (err.code === "permission_denied" || err.code === "permission-denied") ? "Enregistrement refusé : vous n'avez pas les droits d'écriture sur ce pan." : "Enregistrement impossible pour l'instant. Réessayez dans un instant.";
+  } finally { $("fSave").disabled = false; }
+});
+function restoreLocal() { loadDraft(); renderGrades(); renderEditor(); }
+function saveDraft() { if (state.edit.kind !== "new") return; lsSet("pan-draft", JSON.stringify({ wallId: activeWall()?.id, holds: state.holds, name: $("fName").value, desc: $("fDesc").value, grade: state.grade })); }
+function loadDraft() {
+  try { const d = JSON.parse(lsGet("pan-draft") || "null"); const w = activeWall();
+    if (d && w && d.wallId === w.id) { state.holds = d.holds || []; $("fName").value = d.name || ""; $("fDesc").value = d.desc || ""; if (d.grade) state.grade = d.grade; state.tool = state.holds.some(h => h.t === "start") ? "hand" : "start"; }
+  } catch {}
+}
+["fName", "fDesc"].forEach(id => $(id).addEventListener("input", saveDraft));
+$("editFull").addEventListener("click", () => openFs("edit"));
+
+/* ---------- fullscreen ---------- */
+function openFs(mode) {
+  state.fsMode = mode; $("fs").hidden = false; document.body.classList.add("locked");
+  $("fsFoot").hidden = !["edit", "oedit", "replay", "breplay"].includes(mode); $("fsDim").hidden = mode !== "view";
+  $("fsIn").hidden = mode !== "edit"; $("fsOut").hidden = mode !== "oedit"; $("fsReplay").hidden = mode !== "replay" && mode !== "breplay";
+  fsView.onTap = mode === "edit" ? (x, y) => tapHold(x, y) : mode === "oedit" ? (x, y) => oTap(x, y) : null;
+  const isRp = mode === "replay" || mode === "breplay";
+  fsView.dblZoom = !isRp && mode !== "edit" && mode !== "oedit";
+  fsView.onAnyTap = isRp ? fx => { if (fx > 0.4) { if (!$("rpNext").disabled) rpStep(1); } else if (!$("rpPrev").disabled) rpStep(-1); } : null;
+  $("rpProg").hidden = !isRp;
+  clearTimeout(state.hintT); $("rpHint").hidden = !isRp; $("rpHint").style.opacity = "1";
+  if (isRp) state.hintT = setTimeout(() => { $("rpHint").style.opacity = "0"; state.hintT = setTimeout(() => $("rpHint").hidden = true, 500); }, 2200);
+  fsView.max = state.mode === "out" ? 8 : 6;
+  if (mode === "oedit") { $("fsTitle").innerHTML = `${state.oe?.kind === "route" ? "Points d'ancrage" : "Ma méthode"} <small>pincez pour zoomer</small>`; $("fsClose").textContent = "Terminé"; renderOE(); fsView.layout(true); return; }
+  if (mode === "breplay") { $("fsClose").textContent = "Fermer"; state.rp = 0; renderBReplay(); fsView.layout(true); setTimeout(focusB, 60); return; }
+  if (mode === "oview" || mode === "replay") { $("fsClose").textContent = "Fermer"; state.rp = 0; renderOFs(); fsView.layout(true); if (mode === "replay") setTimeout(focusStep, 60); return; }
+  if (mode === "edit") { $("fsTitle").innerHTML = `Tracer <small>pincez pour zoomer</small>`; $("fsClose").textContent = "Terminé"; renderEditor(); fsView.layout(true); }
+  else { renderFsView(); fsView.layout(true); $("fsClose").textContent = "Fermer"; }
+}
+function renderFsView() {
+  const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId); if (!b || !w) return;
+  $("fsTitle").innerHTML = `${esc(b.name)} <small>${esc(b.grade)}</small>`;
+  $("fsDim").setAttribute("aria-pressed", String(state.fsDim));
+  fsView.set(wallSVG(w, b.holds || [], { uid: "v", dim: state.fsDim }), w.w / w.h);
+}
+$("fsDim").addEventListener("click", () => { state.fsDim = !state.fsDim; renderFsView(); });
+function closeFs() { const m = state.fsMode; $("fs").hidden = true; state.fsMode = null; document.body.classList.remove("locked"); if (state.view === "create") renderEditor(); if (m === "oedit") renderOE(); }
+$("fsClose").addEventListener("click", closeFs);
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("fs").hidden) closeFs(); else if (!$("sheetBg").hidden) closeSheet(); } });
+
+/* ---------- list ---------- */
+function renderFilters() {
+  const hasOld = state.blocs.some(isArchived);
+  $("filters").innerHTML = FILTERS.filter(f => (f.id !== "mine" || state.me) && (f.id !== "old" || hasOld) && (f.id !== "drafts" || myDrafts().length)).map(f =>
+    `<button class="chip" data-f="${f.id}" aria-pressed="${state.filter === f.id}">${f.label}${f.id === "drafts" ? ` (${myDrafts().length})` : ""}</button>`).join("");
+}
+$("filters").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.filter = b.dataset.f; renderFilters(); renderList(); });
+function renderList() {
+  renderFilters();
+  if (!state.loaded) { $("list").innerHTML = `<div class="empty">Chargement des blocs…</div>`; return; }
+  if (!gym()) { $("list").innerHTML = `<div class="empty"><strong>Choisissez votre salle</strong><span>Sélectionnez une salle existante ou ajoutez la vôtre avec une photo de son mur.</span><button class="btn" type="button" data-open-sheet>Choisir une salle</button></div>`; return; }
+  if (state.filter === "drafts") { renderDraftList(); return; }
+  const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
+  const pool = state.blocs.filter(b => f.id === "old" ? isArchived(b) : !isArchived(b));
+  const rows = pool.filter(f.test);
+  if (!activeWall()) { $("list").innerHTML = `<div class="empty"><strong>Pas encore de photo du mur</strong><span>Prenez le pan en photo pour que la salle puisse tracer ses blocs.</span><button class="btn" type="button" data-open-sheet>Ajouter la photo du mur</button></div>`; return; }
+  if (!pool.length && f.id !== "old") { $("list").innerHTML = `<div class="empty"><strong>Aucun bloc sur ce mur</strong><span>Tracez le premier : touchez les prises dans l'ordre, choisissez la cotation, publiez. Il apparaîtra ici pour toute la salle.</span><button class="btn" type="button" onclick="go('create')">Tracer le premier bloc</button></div>`; return; }
+  if (!rows.length) { $("list").innerHTML = `<div class="empty">Aucun bloc pour ce filtre.</div>`; return; }
+  $("list").innerHTML = rows.map(b => {
+    const w = wallById(b.wallId), old = isArchived(b);
+    return `<button class="card${old ? " old" : ""}" data-id="${esc(b.id)}">
+      <div class="thumb">${w ? wallSVG(w, b.holds || [], { mini: true, uid: "t" + b.id.replace(/\W/g, "") }) : ""}</div>
+      <div class="meta"><div class="name">${esc(b.name)}</div>
+        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div></div>
+      <div class="grade">${esc(b.grade)}</div>
+    </button>`; }).join("");
+}
+const myDrafts = () => state.drafts.filter(d => d.gymId === state.gymId).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+function renderDraftList() {
+  const rows = myDrafts();
+  if (!rows.length) { state.filter = "all"; renderList(); return; }
+  $("list").innerHTML = `<div class="note">Visibles par vous seul. Touchez un brouillon pour le terminer et le publier.</div>` + rows.map(d => {
+    const w = wallById(d.wallId), old = !activeWall() || d.wallId !== activeWall().id;
+    return `<button class="card${old ? " old" : ""}" data-draft="${esc(d.id)}">
+      <div class="thumb">${w ? wallSVG(w, d.holds || [], { mini: true, uid: "dr" + d.id.replace(/\W/g, "") }) : ""}</div>
+      <div class="meta"><div class="name">${esc(d.name)}</div>
+        <div class="by"><span class="tag">${old ? "Ancien mur" : "Brouillon"}</span>${(d.holds || []).length} prises · ${ago(d.updatedAt || d.createdAt)}</div></div>
+      <div class="grade" style="background:var(--line);color:var(--fg)">${esc(d.grade || "?")}</div>
+    </button>`; }).join("");
+}
+$("list").addEventListener("click", e => {
+  const d = e.target.closest("[data-draft]"); if (d) { startEdit("draft", d.dataset.draft); return; }
+  const c = e.target.closest(".card"); if (c) openDetail(c.dataset.id);
+});
+document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet]")) openSheet(); });
+
+/* ---------- detail ---------- */
+function openDetail(id) { state.current = id; go("detail"); }
+function renderDetail() {
+  const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
+  const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
+  if (!b || !w) { $("dName").textContent = "Bloc introuvable"; $("dBy").textContent = "Il a peut-être été supprimé."; $("dGrade").textContent = ""; $("dSeq").textContent = ""; $("dDesc").hidden = true; wallEl.hidden = true; $("dDel").hidden = $("dDelOk").hidden = $("dEdit").hidden = $("dReplay").hidden = true; $("dOld").hidden = true; return; }
+  wallEl.hidden = false;
+  $("dName").textContent = b.name; $("dGrade").textContent = b.grade;
+  $("dBy").textContent = `Ouvert par ${b.setter || "un grimpeur"} · ${day(b.createdAt)}${b.updatedAt ? ` · modifié le ${day(b.updatedAt)}` : ""}`;
+  $("dOld").hidden = !isArchived(b);
+  wallEl.innerHTML = wallSVG(w, b.holds || [], { uid: "d" }); wallEl.appendChild(btn);
+  $("dSeq").textContent = seqText(b.holds || []);
+  $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
+  const own = state.me && b.authorId === state.me;
+  $("dDel").hidden = !(own || isAdmin()); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
+}
+$("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
+$("dReplay").addEventListener("click", () => openFs("breplay"));
+
+/* ---------- bloc replay: départ → mains dans l'ordre → top ---------- */
+function blocSteps(holds) {
+  const starts = holds.filter(h => h.t === "start"), hands = holds.filter(h => h.t === "hand"), tops = holds.filter(h => h.t === "top");
+  return [{ kind: "start", pts: starts }, ...hands.map((h, i) => ({ kind: "hand", n: i + 1, pts: [h] })), { kind: "top", pts: tops }].filter(st => st.pts.length);
+}
+function renderBReplay() {
+  const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId); if (!b || !w) return;
+  const holds = b.holds || [], steps = blocSteps(holds);
+  state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
+  const st = steps[state.rp], handsShown = steps.slice(0, state.rp + 1).filter(x => x.kind === "hand").flatMap(x => x.pts);
+  const vis = holds.filter(h => h.t === "start" || h.t === "foot" || handsShown.includes(h) || (h.t === "top" && st.kind === "top"));
+  $("fsTitle").innerHTML = `${esc(b.name)} <small>${esc(b.grade)}</small>`;
+  fsView.set(wallSVG(w, vis, { uid: "br", hi: st.pts }), w.w / w.h);
+  const total = holds.filter(h => h.t === "hand").length;
+  const label = st.kind === "start" ? `Départ${st.pts.length > 1 ? " · 2 mains" : ""}` : st.kind === "top" ? "Top" : `Move ${st.n} / ${total}`;
+  $("rpCap").innerHTML = `${label}<small>étape ${state.rp + 1} / ${steps.length}${st.kind === "start" && holds.some(h => h.t === "foot") ? " · pieds imposés en jaune" : ""}</small>`;
+  rpChrome(state.rp, steps.length);
+}
+function focusB() {
+  const b = state.blocs.find(x => x.id === state.current); if (!b) return;
+  const st = blocSteps(b.holds || [])[state.rp]; if (!st) return;
+  const x = st.pts.reduce((a, p) => a + p.x, 0) / st.pts.length, y = st.pts.reduce((a, p) => a + p.y, 0) / st.pts.length;
+  fsView.focus(x, y, Math.max(fsView.s, 2));
+}
+$("dWall").addEventListener("click", () => openFs("view"));
+$("dWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("view"); } });
+$("dDel").addEventListener("click", () => { $("dDel").hidden = true; $("dDelOk").hidden = false; });
+$("dDelOk").addEventListener("click", async () => { try { await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
+
+/* ---------- gyms & walls sheet ---------- */
+function openSheet(panel = "main") { state.sheet = panel; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
+function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; if ($("fs").hidden) document.body.classList.remove("locked"); }
+$("sheetBg").addEventListener("click", e => { if (e.target === $("sheetBg")) closeSheet(); });
+$("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "sectors" : "main"));
+function renderSheet() {
+  if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
+  if (state.sheet === "account" || state.sheet === "feedback" || state.sheet === "login") return renderAcctSheet();
+  if (state.sheet === "lang") {
+    const s = $("sheet");
+    s.innerHTML = `<h2 id="sheetTitle">Langue</h2><div class="langlist" data-nt>${Object.entries(TS_I18N.langs).map(([k, l]) => `<button class="gymrow" type="button" data-lang="${k}" aria-current="${TS_I18N.lang === k}" lang="${k}"><span><b>${l}</b></span><small>${k.toUpperCase()}</small></button>`).join("")}</div><button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
+    return;
+  }
+  const s = $("sheet"), g = gym(), aw = activeWall(), noAssets = !state.assets;
+  const photoNote = noAssets ? `<div class="note">L'envoi de photos n'est pas disponible avec votre accès à cette page.</div>` : "";
+  if (state.sheet === "newgym") {
+    s.innerHTML = `<h2 id="sheetTitle">Ajouter une salle</h2>
+      <div class="field"><label class="label" for="ngName">Nom de la salle</label><input id="ngName" maxlength="40" placeholder="ex. Altissimo" autocomplete="off"></div>
+      <div class="field"><label class="label" for="ngCity">Ville</label><input id="ngCity" maxlength="30" placeholder="ex. Albi" autocomplete="off"></div>
+      <div class="field"><label class="label" for="ngWall">Nom du mur</label><input id="ngWall" maxlength="30" value="Spray wall" autocomplete="off"></div>
+      <div class="note">Prenez le mur bien de face, en entier, avec un bon éclairage. La photo devient le support de tous les blocs.</div>
+      ${photoNote}<div class="err" id="sErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn filebtn" ${noAssets ? 'style="opacity:.45"' : ""}>Photographier le mur et créer<input type="file" accept="image/*" id="ngFile" ${noAssets ? "disabled" : ""}></label><button class="btn ghost" type="button" data-sheet="main">Annuler</button></div>`;
+    $("ngFile")?.addEventListener("change", async e => {
+      const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+      const name = $("ngName").value.trim(), city = $("ngCity").value.trim(), wname = $("ngWall").value.trim() || "Spray wall";
+      if (!name) { $("sErr").textContent = "Donnez un nom à la salle."; return; }
+      $("sErr").textContent = "Envoi de la photo…";
+      try {
+        const ph = await uploadPhoto(file);
+        const gref = await state.db.collection("gyms").add({ name, city, createdAt: Date.now() });
+        await state.db.collection("walls").add({ gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
+        switchGym(gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
+      } catch (err) { $("sErr").textContent = "La création a échoué. Vérifiez la photo et réessayez."; }
+    });
+    return;
+  }
+  if (state.sheet === "rewall") {
+    const n = state.blocs.filter(b => !isArchived(b)).length;
+    s.innerHTML = `<h2 id="sheetTitle">Le mur a été remonté</h2>
+      <p class="note" style="margin:0">Une nouvelle photo remplace la précédente. ${n ? `Les <b>${n} bloc${n > 1 ? "s" : ""}</b> actuel${n > 1 ? "s" : ""} passeront en archives, grisés mais consultables.` : "Il n'y a aucun bloc à archiver."}</p>
+      <div class="field"><label class="label" for="rwName">Nom du mur</label><input id="rwName" maxlength="30" value="${esc(aw?.name || "Spray wall")}" autocomplete="off"></div>
+      <div class="note">Prenez le mur bien de face, en entier, avec un bon éclairage.</div>
+      ${photoNote}<div class="err" id="sErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn filebtn" ${noAssets ? 'style="opacity:.45"' : ""}>Photographier le nouveau mur<input type="file" accept="image/*" id="rwFile" ${noAssets ? "disabled" : ""}></label><button class="btn ghost" type="button" data-sheet="main">Annuler</button></div>`;
+    $("rwFile")?.addEventListener("change", async e => {
+      const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+      $("sErr").textContent = "Envoi de la photo…";
+      try {
+        const ph = await uploadPhoto(file);
+        await state.db.collection("walls").add({ gymId: state.gymId, name: $("rwName").value.trim() || "Spray wall", image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
+        for (const w of wallsOf(state.gymId)) if (w.active) await state.db.collection("walls").doc(w.id).update({ active: false, retiredAt: Date.now() });
+        clearEditor(); closeSheet(); toast("Nouveau mur en place. Les anciens blocs sont archivés.");
+      } catch { $("sErr").textContent = "Le changement de mur a échoué. Réessayez."; }
+    });
+    return;
+  }
+  const walls = g ? wallsOf(g.id) : [];
+  s.innerHTML = `<h2 id="sheetTitle">Salles</h2>
+    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
+    <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
+    ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
+      <div class="walllist">${walls.length ? walls.map(w => `<div><span>${esc(w.name)} · photo du ${day(w.createdAt)}</span><b style="color:${w.active ? "var(--fg)" : "var(--muted)"}">${w.active ? "Actuel" : "Démonté"}</b></div>`).join("") : "<div>Aucune photo du mur.</div>"}</div>
+      <button class="btn small" type="button" data-sheet="rewall">${aw ? "Le mur a été remonté : nouvelle photo" : "Ajouter la photo du mur"}</button></section>` : ""}
+    <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
+}
+$("sheet").addEventListener("click", e => {
+  const p = e.target.closest("[data-sheet]"); if (p) { state.sheet = p.dataset.sheet; renderSheet(); return; }
+  if (e.target.closest("[data-close-sheet]")) { closeSheet(); return; }
+  const gb = e.target.closest("[data-gym]"); if (gb) { switchGym(gb.dataset.gym); closeSheet(); }
+});
+async function prepPhoto(file) {
+  const url = URL.createObjectURL(file), img = new Image(); img.src = url; await img.decode();
+  const sc = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
+  const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+  URL.revokeObjectURL(url);
+  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.84));
+  return { blob, w, h, preview: URL.createObjectURL(blob) };
+}
+async function uploadPhoto(file) {
+  if (!state.assets || !state.db) throw new Error("unavailable");
+  const p = await prepPhoto(file);
+  const a = await state.assets.upload(p.blob);
+  return { url: a.url, w: p.w, h: p.h };
+}
+
+/* ---------- navigation ---------- */
+const VIEWS = { list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+function go(v) {
+  state.view = v; state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode);
+  for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
+  $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
+  $("tabList").setAttribute("aria-current", state.mode === "in" && v !== "create" ? "page" : "false");
+  $("tabOut").setAttribute("aria-current", state.mode === "out" && v !== "oedit" ? "page" : "false");
+  $("tabCreate").setAttribute("aria-current", v === "create" || v === "oedit" ? "page" : "false");
+  $("tabCreateLbl").textContent = state.mode === "out" ? "Nouvelle voie" : (state.edit.kind !== "new" || state.holds.length ? "Bloc en cours" : "Nouveau bloc");
+  renderHeader();
+  if (v === "olist") renderOList();
+  if (v === "ovoie") renderVoie();
+  if (v === "oedit") { renderOE(); oView.layout(true); }
+  if (v === "list") renderList();
+  if (v === "create") { renderEditor(); editView.layout(true); }
+  if (v === "detail") renderDetail();
+  window.scrollTo(0, 0);
+}
+$("tabList").onclick = () => go("list");
+$("tabOut").onclick = () => go("olist");
+$("tabCreate").onclick = () => {
+  if (!state.me && !state.loginShown) { state.loginShown = true; setTimeout(() => promptLogin(state.mode === "out" ? "ajouter une voie" : "publier un bloc"), 150); }
+  state.mode === "out" ? startRoute() : go("create");
+};
+$("backBtn").onclick = () => { if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
+let tt; function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
+
+function renderHeader() {
+  if (state.mode === "out") {
+    const sc = secteur();
+    $("gymName").textContent = sc ? sc.name : (state.oLoaded ? "Choisir un secteur" : "Chargement…");
+    $("gymSub").textContent = sc ? `${sc.region ? sc.region + " · " : ""}${state.voies.length} voie${state.voies.length > 1 ? "s" : ""}` : "Falaise";
+    return;
+  }
+  const g = gym(), w = activeWall();
+  $("gymName").textContent = g ? `${g.name}${g.city ? " " + g.city : ""}` : (state.loaded ? "Choisir une salle" : "Chargement…");
+  $("gymSub").textContent = g ? (w ? `${w.name} · ${state.blocs.filter(b => !isArchived(b)).length} blocs` : "Pas de photo du mur") : "";
+}
+function rerender() {
+  renderHeader();
+  if (state.view === "list") renderList();
+  if (state.view === "detail") renderDetail();
+  if (state.view === "create") renderEditor();
+  if (state.fsMode === "view") renderFsView();
+  if (state.fsMode === "breplay") renderBReplay();
+  if (!$("sheetBg").hidden) renderSheet();
+  if (state.view === "olist") renderOList();
+  if (state.view === "ovoie") renderVoie();
+  if (state.fsMode === "oview" || state.fsMode === "replay") renderOFs();
+}
+function switchGym(id) {
+  state.gymId = id; lsSet("pan-gym", id); state.blocs = []; state.filter = "all";
+  if (state.unsubBlocs) state.unsubBlocs();
+  state.unsubBlocs = null;
+  if (state.db) state.unsubBlocs = state.db.collection("blocs").where("gymId", "==", id).onSnapshot(snap => {
+    state.blocs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    rerender();
+  }, () => toast("Impossible de charger les blocs pour l'instant."));
+  state.edit = { kind: "new" }; state.holds = []; loadDraft(); renderGrades(); renderEditorChrome(); if (state.mode === "in") go(state.view === "detail" ? "list" : state.view); rerender();
+}
+
+/* ================= OUTDOOR: secteurs, voies, méthodes ================= */
+const SPORT = GRADES;
+const OT = {
+  hand: { label: "Main", color: "var(--h-hand)", r: 24 },
+  foot: { label: "Pied", color: "var(--h-foot)", r: 17 },
+};
+const secteur = () => state.secteurs.find(x => x.id === state.secteurId);
+const voie = () => state.voies.find(v => v.id === state.voieId);
+const myMethod = () => state.methodes.find(m => state.me && m.authorId === state.me);
+const oView = new WallView($("oeWall"), { onTap: (x, y) => oTap(x, y) });
+oView.max = 8;
+
+function switchSecteur(id) {
+  state.secteurId = id; lsSet("pan-sect", id); state.voies = [];
+  if (state.unsubVoies) state.unsubVoies(); state.unsubVoies = null;
+  if (state.db && id) state.unsubVoies = state.db.collection("voies").where("secteurId", "==", id).onSnapshot(sn => {
+    state.voies = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+    rerender();
+  }, () => toast("Impossible de charger les voies pour l'instant."));
+  if (state.mode === "out" && state.view !== "olist") go("olist"); else rerender();
+}
+function openVoie(id, sel) {
+  if (state.voieId !== id) {
+    state.voieId = id; state.methodes = []; state.oSel = sel || "anchors";
+    if (state.unsubMeth) state.unsubMeth(); state.unsubMeth = null;
+    if (state.db) state.unsubMeth = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => {
+      state.methodes = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      rerender();
+    }, () => {});
+  } else if (sel) state.oSel = sel;
+  go("ovoie");
+}
+
+/* ---------- drawing a route ---------- */
+function stepPoint(st, anchors) { if (st.t === "clip") { const a = anchors[st.a]; return a ? { x: a.x, y: a.y } : { x: st.x, y: st.y }; } return st; }
+function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, preview = null, markA = -1, markS = -1 } = {}) {
+  const W = v.w, H = v.h, k = Math.min(W, H) / 1400, img = preview || BT.img(v.image);
+  const P = p => [p.x * W, p.y * H];
+  let line = "", anc = "", flow = "", rings = "", top = "";
+  // route line through the anchors
+  if (anchors.length > 1) line = `<polyline points="${anchors.map(a => P(a).join(",")).join(" ")}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${7 * k}" stroke-linejoin="round"/><polyline points="${anchors.map(a => P(a).join(",")).join(" ")}" fill="none" stroke="#fff" stroke-width="${3 * k}" stroke-dasharray="${10 * k} ${8 * k}" stroke-linejoin="round" opacity=".85"/>`;
+  let bolt = 0;
+  anchors.forEach((a, ai) => {
+    const [x, y] = P(a), s = (mini ? 26 : 18) * k;
+    if (ai === markA) top += markRing(x, y, s + 20 * k, k);
+    if (a.t === "relais") anc += `<circle cx="${x}" cy="${y}" r="${s + 6 * k}" fill="#fff" stroke="#111" stroke-width="${3 * k}"/><circle cx="${x}" cy="${y}" r="${s - 3 * k}" fill="none" stroke="#111" stroke-width="${3 * k}"/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${17 * k}" fill="#111">R</text>`}`;
+    else { bolt++; anc += `<rect x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="${5 * k}" fill="#fff" stroke="#111" stroke-width="${3 * k}"/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${18 * k}" fill="#111">${bolt}</text>`}`; }
+  });
+  if (!mini) {
+    const vis = replay === null ? steps : steps.slice(0, replay + 1);
+    let move = 0, lastHand = null, prevHand = null;
+    vis.forEach((st, i) => {
+      const cur = replay !== null && i === replay, past = replay !== null && i < replay;
+      const op = past ? .5 : 1;
+      if (st.t === "clip") {
+        const p = stepPoint(st, anchors), [ax, ay] = P(p);
+        if (lastHand) { const [hx, hy] = P(lastHand); flow += `<line x1="${hx}" y1="${hy}" x2="${ax}" y2="${ay}" stroke="var(--h-top)" stroke-width="${4 * k}" stroke-dasharray="${8 * k} ${7 * k}" opacity="${op}"/>`; }
+        top += `<g opacity="${op}"><circle cx="${ax}" cy="${ay}" r="${30 * k}" fill="none" stroke="var(--h-top)" stroke-width="${(cur ? 9 : 6) * k}"/><text x="${ax + 34 * k}" y="${ay - 22 * k}" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${20 * k}" fill="var(--h-top)" stroke="rgba(0,0,0,.65)" stroke-width="${5 * k}" paint-order="stroke">CLIP</text></g>`;
+        if (cur) top += `<circle cx="${ax}" cy="${ay}" r="${42 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
+        if (i === markS) top += markRing(ax, ay, 50 * k, k);
+        return;
+      }
+      const t = OT[st.t] || OT.hand, [cx, cy] = P(st), r = t.r * k; move++;
+      if (st.t === "hand") { if (prevHand) { const [px, py] = P(prevHand); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`; } prevHand = st; lastHand = st; }
+      rings += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${10 * k}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${(cur ? 8 : 5.5) * k}"/>`;
+      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(move);
+      rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
+      if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 12 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
+      if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
+    });
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${mini ? "slice" : "meet"}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Photo de la voie avec ${anchors.length} points et ${steps.length} étapes"><image href="${esc(img)}" width="${W}" height="${H}"/>${line}${flow}${anc}${rings}${top}</svg>`;
+}
+const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip");
+function methodSummary(steps) {
+  const n = t => steps.filter(s => s.t === t).length;
+  return `${n("hand")} main${n("hand") > 1 ? "s" : ""} · ${n("foot")} pied${n("foot") > 1 ? "s" : ""}`;
+}
+
+/* ---------- route list ---------- */
+function renderOList() {
+  const el = $("oListEl");
+  if (!state.oLoaded) { el.innerHTML = `<div class="empty">Chargement des secteurs…</div>`; return; }
+  if (!secteur()) { el.innerHTML = `<div class="empty"><strong>La falaise, voie par voie</strong><span>Choisissez un secteur ou créez-le, puis ajoutez la photo d'une voie, ses points d'ancrage et votre méthode.</span><button class="btn" type="button" data-open-sectors>Choisir un secteur</button></div>`; return; }
+  if (!state.voies.length) { el.innerHTML = `<div class="empty"><strong>Aucune voie dans ce secteur</strong><span>Photographiez une voie, placez ses points d'ancrage et le relais. Chacun pourra ensuite y ajouter sa méthode.</span><button class="btn" type="button" onclick="startRoute()">Ajouter la première voie</button></div>`; return; }
+  el.innerHTML = state.voies.map(v => `
+    <button class="card route" data-voie="${esc(v.id)}">
+      <div class="thumb tall">${routeSVG(v, v.anchors || [], [], { mini: true, uid: "o" + v.id.replace(/\W/g, "") })}</div>
+      <div class="meta"><div class="name">${esc(v.name)}</div>
+        <div class="by">${(v.anchors || []).filter(a => a.t !== "relais").length} points · ${v.methodCount ? `${v.methodCount} méthode${v.methodCount > 1 ? "s" : ""}` : "ajoutée par " + esc(v.addedBy || "un grimpeur")}</div></div>
+      <div class="grade">${esc(v.grade)}</div>
+    </button>`).join("");
+}
+$("oListEl").addEventListener("click", e => { const c = e.target.closest("[data-voie]"); if (c) openVoie(c.dataset.voie); });
+document.addEventListener("click", e => { if (e.target.closest("[data-open-sectors]")) openSheet("sectors"); });
+
+/* ---------- one route ---------- */
+function selMethod() { return state.oSel === "anchors" ? null : state.methodes.find(m => m.id === state.oSel) || null; }
+function renderVoie() {
+  const v = voie();
+  if (!v) { $("ovName").textContent = "Voie introuvable"; $("ovBy").textContent = ""; $("ovGrade").textContent = ""; $("ovWall").hidden = true; $("ovMethods").innerHTML = ""; $("ovSeq").textContent = ""; $("ovNote").hidden = true; $("ovActions").innerHTML = ""; return; }
+  $("ovWall").hidden = false;
+  if (state.oSel !== "anchors" && !selMethod()) state.oSel = "anchors";
+  const m = selMethod(), mine = myMethod();
+  $("ovName").textContent = v.name; $("ovGrade").textContent = v.grade;
+  $("ovBy").textContent = `${secteur()?.name || ""} · ajoutée par ${v.addedBy || "un grimpeur"}`;
+  $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
+    `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
+  const btn = $("ovWall").querySelector(".float");
+  $("ovWall").innerHTML = routeSVG(v, v.anchors || [], mSteps(m), { uid: "ov" }); $("ovWall").appendChild(btn);
+  const bolts = (v.anchors || []).filter(a => a.t !== "relais").length, hasR = (v.anchors || []).some(a => a.t === "relais");
+  $("ovSeq").hidden = !!m;
+  $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${state.methodes.length ? `${state.methodes.length} méthode${state.methodes.length > 1 ? "s" : ""} partagée${state.methodes.length > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
+  $("ovNote").textContent = m?.note || ""; $("ovNote").hidden = !m?.note;
+  const acts = [];
+  if (m && mSteps(m).length) acts.push(`<button class="btn" type="button" data-act="replay">▶ Répéter la voie</button>`);
+  acts.push(mine ? `<button class="btn ${m ? "ghost" : ""} small" type="button" data-act="editm">Modifier ma méthode</button>` : `<button class="btn small" type="button" data-act="newm">Ajouter ma méthode</button>`);
+  if (state.me && v.authorId === state.me) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
+  if (m && ((mine && m.id === mine.id) || isAdmin())) acts.push(`<button class="btn danger small" type="button" data-act="delm">${mine && m.id === mine.id ? "Supprimer ma méthode" : "Supprimer cette méthode"}</button>`);
+  if (isAdmin()) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer la voie (admin)</button>`);
+  $("ovActions").innerHTML = acts.join("");
+}
+$("ovMethods").addEventListener("click", e => { const c = e.target.closest("[data-sel]"); if (!c) return; state.oSel = c.dataset.sel; renderVoie(); });
+$("ovWall").addEventListener("click", () => openFs("oview"));
+$("ovWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("oview"); } });
+$("ovActions").addEventListener("click", async e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act;
+  if (a === "replay") openFs("replay");
+  if (a === "newm" || a === "editm") startMethod();
+  if (a === "editr") startRoute(state.voieId);
+  if (a === "delm") {
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer la suppression"; return; }
+    const target = selMethod() || myMethod(); if (!target) return;
+    try { await state.db.collection("methodes").doc(target.id).delete(); bumpCount(state.voieId, -1); state.oSel = "anchors"; toast("Méthode supprimée"); } catch { toast("Suppression impossible"); }
+  }
+  if (a === "delv") {
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer : voie et méthodes"; return; }
+    const v = voie(); if (!v) return;
+    try {
+      for (const m of state.methodes) await state.db.collection("methodes").doc(m.id).delete();
+      if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
+      await state.db.collection("voies").doc(v.id).delete();
+      toast("Voie supprimée"); go("olist");
+    } catch { toast("Suppression impossible"); }
+  }
+});
+function bumpCount(voieId, d) { const v = state.voies.find(x => x.id === voieId); if (!v || !state.db) return; state.db.collection("voies").doc(voieId).update({ methodCount: Math.max(0, (v.methodCount || 0) + d) }).catch(() => {}); }
+
+/* ---------- fullscreen view & mental replay ---------- */
+function renderOFs() {
+  const v = voie(); if (!v) return;
+  const m = selMethod(), steps = mSteps(m);
+  if (state.fsMode === "replay") {
+    state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
+    $("fsTitle").innerHTML = `${esc(v.name)} <small>méthode de ${esc(m?.climber || "?")}</small>`;
+    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "rp", replay: state.rp }), v.w / v.h);
+    const st = steps[state.rp];
+    let move = 0; for (let i = 0; i <= state.rp; i++) if (steps[i].t !== "clip") move++;
+    const total = steps.filter(s => s.t !== "clip").length;
+    let boltNo = 0; if (st && st.t === "clip") { const a = (v.anchors || [])[st.a]; boltNo = a && a.t === "relais" ? "R" : (v.anchors || []).slice(0, st.a + 1).filter(x => x.t !== "relais").length; }
+    $("rpCap").innerHTML = st ? (st.t === "clip" ? `Clip ${boltNo === "R" ? "au relais" : "du point " + boltNo}<small>étape ${state.rp + 1} / ${steps.length}</small>` : `${st.t === "hand" ? "Main" : "Pied"} · move ${move} / ${total}<small>étape ${state.rp + 1} / ${steps.length}</small>`) : "";
+    rpChrome(state.rp, steps.length);
+  } else {
+    $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
+    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "fv" }), v.w / v.h);
+  }
+}
+function focusStep() {
+  const v = voie(), m = selMethod(); if (!v || !m) return;
+  const st = mSteps(m)[state.rp]; if (!st) return;
+  const p = stepPoint(st, v.anchors || []);
+  fsView.focus(p.x, p.y, Math.max(fsView.s, 2.4));
+}
+function rpChrome(i, n) {
+  $("rpFill").style.width = (n > 1 ? (i / (n - 1)) * 100 : 100) + "%";
+  const last = i >= n - 1;
+  $("rpNext").disabled = false; $("rpNext").textContent = last ? "↺ Recommencer" : "Suivant ▶";
+  $("rpPrev").disabled = i <= 0;
+}
+const rpStep = d => { if (d > 0 && $("rpNext").textContent.startsWith("↺")) { state.rp = 0; d = 0; } state.rp += d; if (state.fsMode === "breplay") { renderBReplay(); focusB(); } else { renderOFs(); focusStep(); } };
+$("rpPrev").addEventListener("click", () => rpStep(-1));
+$("rpNext").addEventListener("click", () => rpStep(1));
+document.addEventListener("keydown", e => { if (state.fsMode !== "replay" && state.fsMode !== "breplay") return; if (e.key === "ArrowRight") $("rpNext").click(); if (e.key === "ArrowLeft" && !$("rpPrev").disabled) $("rpPrev").click(); });
+
+/* ---------- editors: route anchors & personal method ---------- */
+function startRoute(id) {
+  if (!secteur()) { go("olist"); openSheet("sectors"); return; }
+  const v = id ? state.voies.find(x => x.id === id) : null;
+  state.oe = { kind: "route", id: v?.id || null, anchors: (v?.anchors || []).map(a => ({ ...a })), tool: "bolt", photo: null, grade: v?.grade || "6a" };
+  $("oName").value = v?.name || ""; $("oErr").textContent = ""; $("oePickErr").textContent = "";
+  go("oedit");
+}
+function startMethod() {
+  const v = voie(); if (!v) return;
+  const mine = myMethod();
+  state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand" };
+  $("oClimber").value = mine?.climber || lsGet("pan-setter") || $("fSetter").value || "";
+  $("oNote").value = mine?.note || ""; $("oErr").textContent = "";
+  go("oedit");
+}
+function oeTarget() {
+  const oe = state.oe; if (!oe) return null;
+  if (oe.kind === "route" && !oe.id) return oe.photo ? { w: oe.photo.w, h: oe.photo.h, image: oe.photo.preview } : null;
+  return oe.kind === "route" ? state.voies.find(v => v.id === oe.id) : state.voies.find(v => v.id === oe.voieId);
+}
+function oTap(x, y) {
+  const oe = state.oe, v = oeTarget(); if (!oe || !v) return;
+  const k = Math.min(v.w, v.h) / 1400, px = x * v.w, py = y * v.h;
+  const near = (list, rad) => list.findIndex(p => Math.hypot(p.x * v.w - px, p.y * v.h - py) <= rad * k);
+  if (oe.kind === "route") {
+    const hit = near(oe.anchors, 32);
+    if (hit >= 0) insRemove(oe, oe.anchors, hit);
+    else if (oe.tool === "relais") { oe.anchors = oe.anchors.filter(a => a.t !== "relais"); oe.anchors.push({ x: +x.toFixed(4), y: +y.toFixed(4), t: "relais" }); }
+    else {
+      const a = { x: +x.toFixed(4), y: +y.toFixed(4), t: "bolt" }, ri = oe.anchors.findIndex(q => q.t === "relais");
+      if (ri >= 0 && (oe.insertAt == null || oe.insertAt > ri)) oe.insertAt = ri;
+      insAdd(oe, oe.anchors, a);
+      const r2 = oe.anchors.findIndex(q => q.t === "relais"); if (r2 >= 0 && r2 < oe.anchors.length - 1) { oe.anchors.push(oe.anchors.splice(r2, 1)[0]); if (oe.insertAt != null && oe.insertAt >= oe.anchors.length - 1) oe.insertAt = null; }
+    }
+  } else {
+    const anchors = v.anchors || [];
+    if (oe.tool === "clip") {
+      const ai = near(anchors, 46);
+      if (ai < 0) { toast("Touchez un point d'ancrage pour placer le clip."); return; }
+      const ex = oe.steps.findIndex(s => s.t === "clip" && s.a === ai);
+      if (ex >= 0) insRemove(oe, oe.steps, ex); else insAdd(oe, oe.steps, { t: "clip", a: ai, x: anchors[ai].x, y: anchors[ai].y });
+    } else {
+      const hit = oe.steps.findIndex(s => s.t !== "clip" && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
+      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool });
+    }
+  }
+  $("oErr").textContent = ""; renderOE();
+}
+function renderOETools() {
+  const oe = state.oe; if (!oe) return;
+  const defs = oe.kind === "route"
+    ? [["bolt", "Point", "border-radius:3px;border-color:var(--fg)"], ["relais", "Relais", "border-color:var(--fg);box-shadow:inset 0 0 0 2px var(--surface),inset 0 0 0 4px var(--fg)"]]
+    : [["hand", "Main", "border-color:var(--h-hand)"], ["foot", "Pied", "border-color:var(--h-foot)"]];
+  const list = oe.kind === "route" ? oe.anchors : oe.steps;
+  const html = defs.map(([k, l, st]) => `<button type="button" class="tool" data-ot="${k}" aria-pressed="${oe.tool === k}"><span class="dot" style="${st}"></span>${l}</button>`).join("")
+    + `<button type="button" class="undo" data-oundo ${list.length ? "" : "disabled"} aria-label="Annuler le dernier repère"><span class="ic">↶</span>Annuler</button>`;
+  document.querySelectorAll("[data-otools]").forEach(el => { el.innerHTML = html; el.style.gridTemplateColumns = `repeat(${defs.length}, 1fr) auto`; });
+  const counts = oe.kind === "route"
+    ? `<span>Points <b>${oe.anchors.filter(a => a.t !== "relais").length}</b></span><span>Relais <b>${oe.anchors.some(a => a.t === "relais") ? "oui" : "non"}</b></span>`
+    : `<span>Mains <b>${oe.steps.filter(s => s.t === "hand").length}</b></span><span>Pieds <b>${oe.steps.filter(s => s.t === "foot").length}</b></span>`;
+  let ib = "";
+  if (oe.insertAt != null) {
+    const before = (oe.kind === "route" ? oe.anchors : oe.steps).slice(0, oe.insertAt);
+    const n = oe.kind === "route" ? before.filter(a => a.t !== "relais").length : before.filter(st => st.t !== "clip").length;
+    ib = insBanner(oe, oe.kind === "route" ? (n ? `Prochain point inséré après le point ${n}` : "Prochain point inséré en bas de la voie") : (n ? `Prochain repère inséré après le move ${n}` : "Prochain repère inséré au début"));
+  }
+  document.querySelectorAll("[data-ocounts]").forEach(el => el.innerHTML = counts + ib);
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-otools] .tool"); if (t && state.oe) { state.oe.tool = t.dataset.ot; renderOETools(); return; }
+  if (e.target.closest("[data-oundo]") && state.oe) { insUndo(state.oe, state.oe.kind === "route" ? state.oe.anchors : state.oe.steps); renderOE(); }
+});
+function renderOGrades() { $("oGrades").innerHTML = SPORT.map(g => `<button type="button" class="chip" data-og="${g}" aria-pressed="${state.oe?.grade === g}">${g}</button>`).join(""); }
+$("oGrades").addEventListener("click", e => { const b = e.target.closest("[data-og]"); if (!b || !state.oe) return; state.oe.grade = b.dataset.og; renderOGrades(); });
+function renderOE() {
+  const oe = state.oe; if (!oe) return;
+  const v = oeTarget(), isRoute = oe.kind === "route";
+  $("oeTitle").textContent = isRoute ? (oe.id ? "Modifier les points" : "Nouvelle voie") : `Ma méthode${voie() ? " · " + voie().name : ""}`;
+  $("oeHint").textContent = isRoute
+    ? "Touchez chaque point d'ancrage du bas vers le haut, puis le relais. Ces repères sont communs à tous les grimpeurs."
+    : "Touchez mains et pieds dans l'ordre où vous les prenez. Vous pouvez enregistrer une partie et compléter à la prochaine sortie.";
+  $("oePick").hidden = !(isRoute && !oe.id && !oe.photo);
+  $("oeWork").hidden = !$("oePick").hidden;
+  $("oeRouteF").hidden = !isRoute; $("oeMethF").hidden = isRoute;
+  $("oSave").textContent = isRoute ? (oe.id ? "Enregistrer les points" : "Publier la voie") : "Enregistrer ma méthode";
+  if (isRoute) renderOGrades();
+  renderOETools();
+  if (!v) return;
+  $("oeWall").style.aspectRatio = `${v.w} / ${v.h}`;
+  const anchors = isRoute ? oe.anchors : v.anchors || [], steps = isRoute ? [] : oe.steps;
+  const mk = oe.insertAt == null ? -1 : oe.insertAt - 1, marks = isRoute ? { markA: mk } : { markS: mk };
+  oView.set(routeSVG(v, anchors, steps, { uid: "oe", ...marks }), v.w / v.h);
+  if (state.fsMode === "oedit") fsView.set(routeSVG(v, anchors, steps, { uid: "of", ...marks }), v.w / v.h);
+}
+$("oeFile").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f || !state.oe) return;
+  if (!state.assets) { $("oePickErr").textContent = "L'envoi de photos n'est pas disponible avec votre accès à cette page."; return; }
+  try { state.oe.photo = await prepPhoto(f); renderOE(); oView.layout(true); } catch { $("oePickErr").textContent = "Cette photo n'a pas pu être lue. Essayez-en une autre."; }
+});
+$("oeFull").addEventListener("click", () => openFs("oedit"));
+$("oCancel").addEventListener("click", () => { const oe = state.oe; state.oe = null; oe && (oe.voieId || oe.id) ? go("ovoie") : go("olist"); });
+$("oForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const oe = state.oe; if (!oe) return;
+  if (!state.me) { askLogin("oErr", "enregistrer"); return; }
+  $("oSave").disabled = true;
+  try {
+    if (oe.kind === "route") {
+      const name = $("oName").value.trim();
+      if (!name) throw { msg: "Donnez un nom à la voie." };
+      if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
+      if (oe.id) { await state.db.collection("voies").doc(oe.id).update({ name, grade: oe.grade, anchors: oe.anchors, updatedAt: Date.now() }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
+      else {
+        $("oErr").textContent = "Envoi de la photo…";
+        const a = await state.assets.upload(oe.photo.blob);
+        const ref = await state.db.collection("voies").add({ secteurId: state.secteurId, name, grade: oe.grade, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, addedBy: lsGet("pan-setter") || $("fSetter").value || "", methodCount: 0, createdAt: Date.now() });
+        state.oe = null; $("oErr").textContent = ""; toast("Voie publiée. Ajoutez maintenant votre méthode."); openVoie(ref.id);
+      }
+    } else {
+      const climber = $("oClimber").value.trim(), note = $("oNote").value.trim();
+      if (!oe.steps.length) throw { msg: "Placez au moins une prise." };
+      if (!climber) throw { msg: "Indiquez votre prénom." };
+      lsSet("pan-setter", climber);
+      let id = oe.id;
+      if (id) await state.db.collection("methodes").doc(id).update({ climber, note, steps: oe.steps, updatedAt: Date.now() });
+      else { const ref = await state.db.collection("methodes").add({ voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, climber, note, steps: oe.steps, createdAt: Date.now(), updatedAt: Date.now() }); id = ref.id; bumpCount(oe.voieId, 1); }
+      state.oe = null; toast("Méthode enregistrée"); openVoie(voie()?.id || state.voieId, id);
+    }
+  } catch (err) { $("oErr").textContent = err && err.msg ? err.msg : "Enregistrement impossible pour l'instant. Réessayez."; }
+  finally { $("oSave").disabled = false; }
+});
+
+/* ---------- sector sheet ---------- */
+function renderSectorSheet() {
+  const s = $("sheet");
+  if (state.sheet === "newsector") {
+    s.innerHTML = `<h2 id="sheetTitle">Nouveau secteur</h2>
+      <div class="field"><label class="label" for="nsName">Nom du secteur</label><input id="nsName" maxlength="50" placeholder="Nom du secteur sur le topo" autocomplete="off"></div>
+      <div class="field"><label class="label" for="nsRegion">Site ou commune</label><input id="nsRegion" maxlength="40" placeholder="Site ou commune" autocomplete="off"></div>
+      <div class="err" id="sErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-sect-create>Créer le secteur</button><button class="btn ghost" type="button" data-sheet="sectors">Annuler</button></div>`;
+    return;
+  }
+  s.innerHTML = `<h2 id="sheetTitle">Secteurs de falaise</h2>
+    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
+    <button class="btn ghost small" type="button" data-sheet="newsector">+ Ajouter un secteur</button></section>
+    <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
+}
+$("sheet").addEventListener("click", async e => {
+  const sb = e.target.closest("[data-sect]"); if (sb) { switchSecteur(sb.dataset.sect); closeSheet(); return; }
+  if (e.target.closest("[data-sect-create]")) {
+    const name = $("nsName").value.trim(), region = $("nsRegion").value.trim();
+    if (!name) { $("sErr").textContent = "Donnez un nom au secteur."; return; }
+    if (!state.me) { askLogin("sErr", "créer un secteur"); return; }
+    try { const ref = await state.db.collection("secteurs").add({ name, region, authorId: state.me || null, createdAt: Date.now() }); switchSecteur(ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
+    catch { $("sErr").textContent = "La création a échoué. Réessayez."; }
+  }
+});
+
+/* ---------- compte, connexion, avis ---------- */
+function askLogin(errId, what) {
+  const box = $(errId); if (box) box.textContent = `Connectez-vous pour ${what}. Votre travail est conservé.`;
+  promptLogin(what);
+}
+function promptLogin(what) { state.loginWhat = what || "publier"; openSheet("login"); }
+const isAdmin = () => !!BT.user() && BT.user().email === window.BT_OWNER_EMAIL;
+// Un fichier photo ne s'envoie qu'une fois connecté : on propose la connexion avant d'ouvrir le sélecteur pour les salles et les murs.
+document.addEventListener("click", e => {
+  const inp = e.target.closest('input[type="file"]'); if (!inp || state.me || inp.id === "oeFile") return;
+  e.preventDefault(); promptLogin("envoyer une photo");
+}, true);
+function renderAcct() {
+  const u = BT.user(), b = $("acctBtn");
+  b.classList.toggle("on", !!u);
+  if (u) { b.textContent = ((u.displayName || u.email || "?").trim()[0] || "?").toUpperCase(); b.setAttribute("aria-label", "Mon compte"); }
+  else { b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'; b.setAttribute("aria-label", "Se connecter"); }
+}
+$("acctBtn").addEventListener("click", () => { if (BT.user()) openSheet("account"); else promptLogin("publier vos blocs et vos voies"); });
+document.addEventListener("click", e => { if (e.target.closest("[data-feedback]")) openSheet("feedback"); });
+function renderAcctSheet() {
+  const s = $("sheet"), u = BT.user();
+  if (state.sheet === "login") {
+    s.innerHTML = `<h2 id="sheetTitle">Connectez-vous pour ${esc(state.loginWhat || "publier")}</h2>
+      <p style="margin:0">Consulter TopoShare reste libre. Pour ajouter du contenu, on vous demande simplement de vous identifier avec votre compte Google.</p>
+      <ul class="login-list">
+        <li><span><b>Pas de compte à créer.</b> Un tap avec le compte Google que vous avez déjà.</span></li>
+        <li><span><b>Gratuit.</b> Rien à payer, ni maintenant ni plus tard.</span></li>
+        <li><span><b>Discret.</b> Votre prénom signe vos blocs, voies et méthodes. Aucune publicité, aucun e-mail envoyé.</span></li>
+        <li><span><b>Votre travail est gardé.</b> Les prises déjà posées restent en place pendant la connexion.</span></li>
+      </ul>
+      <p class="note" style="margin:0">Google affiche ensuite sa page de connexion avec l'adresse « betatheque.firebaseapp.com » : c'est l'adresse technique de TopoShare.</p>
+      <div class="err" id="sErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn gbtn" type="button" data-login-go><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continuer avec Google</button>
+        <button class="btn ghost" type="button" data-close-sheet>Plus tard</button>
+      </div>`;
+    return;
+  }
+  if (state.sheet === "feedback") {
+    s.innerHTML = `<h2 id="sheetTitle">Donner mon avis</h2>
+      <p class="note" style="margin:0">Une idée, un bug, une fonction qui manque ? Tout est lu.</p>
+      <div class="field"><label class="label" for="fbText">Votre message</label><textarea id="fbText" maxlength="2000" style="min-height:120px" placeholder="ex. J'aimerais pouvoir filtrer les blocs par ouvreur"></textarea></div>
+      ${u ? "" : `<div class="field"><label class="label" for="fbName">Prénom (optionnel)</label><input id="fbName" maxlength="40" autocomplete="given-name"></div>`}
+      <div class="err" id="sErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-fb-send>Envoyer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>`;
+    return;
+  }
+  s.innerHTML = `<h2 id="sheetTitle">Mon compte</h2>
+    <p style="margin:0">Connecté en tant que <b>${esc(u?.displayName || "")}</b><br><span class="note">${esc(u?.email || "")}</span></p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn ghost small" type="button" data-sheet="feedback">Donner mon avis</button>
+      ${u && u.email === window.BT_OWNER_EMAIL ? `<a class="btn ghost small" href="/admin" style="text-decoration:none">Suivi d'activité</a>` : ""}
+      <button class="btn danger small" type="button" data-signout>Se déconnecter</button>
+    </div>
+    <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
+}
+$("sheet").addEventListener("click", async e => {
+  if (e.target.closest("[data-login-go]")) {
+    BT.signIn().then(u => { if (BT.user()) closeSheet(); }).catch(() => { const b = $("sErr"); if (b) b.textContent = "La connexion n'a pas abouti. Réessayez."; });
+    return;
+  }
+  if (e.target.closest("[data-signout]")) { await BT.signOut(); closeSheet(); toast("Déconnecté"); return; }
+  if (e.target.closest("[data-fb-send]")) {
+    const text = $("fbText").value.trim(); if (!text) { $("sErr").textContent = "Écrivez votre message avant d'envoyer."; return; }
+    const u = BT.user();
+    try {
+      await state.db.collection("feedback").add({ text, uid: u?.uid || null, name: u?.displayName || ($("fbName")?.value.trim() || null), view: state.view, mode: state.mode, gymId: state.gymId || null, secteurId: state.secteurId || null, createdAt: Date.now() });
+      closeSheet(); toast("Merci, votre avis est bien arrivé");
+    } catch { $("sErr").textContent = "L'envoi a échoué. Réessayez dans un instant."; }
+  }
+});
+function subscribeDrafts() {
+  if (state.unsubDrafts) { state.unsubDrafts(); state.unsubDrafts = null; }
+  state.drafts = [];
+  if (!state.me || !state.db) return;
+  state.unsubDrafts = state.db.collection("data/users/" + state.me).onSnapshot(snap => {
+    state.drafts = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.kind === "draft");
+    if (state.edit.kind === "draft" && !state.drafts.some(d => d.id === state.edit.id)) state.edit = { kind: "new" };
+    renderEditorChrome(); if (state.view === "list") renderList();
+  }, () => {});
+}
+BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
+BT.onUser(u => {
+  state.me = u ? u.uid : null;
+  renderAcct(); subscribeDrafts(); renderEditorChrome();
+  if (u && !$("fSetter").value && u.displayName) $("fSetter").value = u.displayName.split(" ")[0];
+  if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
+  rerender();
+});
+
+
+/* ---------- langue ---------- */
+$("langBtn").textContent = TS_I18N.lang.toUpperCase();
+$("langBtn").addEventListener("click", () => openSheet("lang"));
+$("sheet").addEventListener("click", e => { const b = e.target.closest("[data-lang]"); if (b) { TS_I18N.set(b.dataset.lang); closeSheet(); } });
+document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.lang.toUpperCase(); rerender(); renderFilters(); renderTools(); renderEditorChrome(); if (state.oe) renderOE(); });
+
+/* ---------- splash ---------- */
+(() => {
+  const t0 = Date.now(), sp = $("splash");
+  const tick = setInterval(() => {
+    const dt = Date.now() - t0;
+    if (dt > 900 && (state.loaded || dt > 2600)) { clearInterval(tick); sp.classList.add("out"); setTimeout(() => sp.remove(), 500); }
+  }, 120);
+})();
+
+/* ---------- boot ---------- */
+$("fSetter").value = lsGet("pan-setter") || "";
+renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "out" ? "olist" : "list"); renderHeader();
+
+(async () => {
+  const [db, user, assets] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("assets")]);
+  Object.assign(state, { db, user, assets });
+  if (!db) { state.loaded = state.oLoaded = true; $("offline").hidden = false; renderHeader(); renderList(); if (state.mode === "out") renderOList(); return; }
+  db.collection("secteurs").onSnapshot(sn => {
+    state.secteurs = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); }
+    rerender();
+  }, () => {});
+  if (user) {
+    try { state.me = await user.id(); } catch {}
+    renderAcct(); subscribeDrafts(); renderEditorChrome();
+    if (!$("fSetter").value) { try { const me = await user.me(); if (me && me.name) $("fSetter").value = me.name.split(" ")[0]; } catch {} }
+  }
+  let gotG = false, gotW = false;
+  const ready = () => {
+    if (!(gotG && gotW)) return;
+    if (!state.loaded) {
+      state.loaded = true;
+      if (!state.gyms.some(g => g.id === state.gymId)) state.gymId = state.gyms[0]?.id || null;
+      if (state.gymId) switchGym(state.gymId); else rerender();
+    } else rerender();
+  };
+  const fail = () => { $("offline").hidden = false; };
+  db.collection("gyms").onSnapshot(s => { state.gyms = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); gotG = true; ready(); }, fail);
+  db.collection("walls").onSnapshot(s => { state.walls = s.docs.map(d => ({ id: d.id, ...d.data() })); gotW = true; ready(); }, fail);
+})();
+</script>
+</body>
+</html>

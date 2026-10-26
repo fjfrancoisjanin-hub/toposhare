@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner() {
+      return signedIn() && request.auth.token.email == 'fj.francoisjanin@gmail.com' && request.auth.token.email_verified == true;
+    }
+    // L'auteur d'un document est celui dont l'identifiant est dans authorId.
+    function mine() { return signedIn() && resource.data.authorId == request.auth.uid; }
+    function claimsMe() { return signedIn() && request.resource.data.authorId == request.auth.uid; }
+    function keepsAuthor() { return request.resource.data.authorId == resource.data.authorId; }
+
+    // Salles et murs : tout le monde lit, un grimpeur connecté peut ajouter une salle ou remonter un mur.
+    match /gyms/{id} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update, delete: if isOwner();
+    }
+    match /walls/{id} {
+      allow read: if true;
+      allow create, update: if signedIn();
+      allow delete: if isOwner();
+    }
+
+    // Blocs : seul l'ouvreur (ou le propriétaire du site) modifie ou supprime.
+    match /blocs/{id} {
+      allow read: if true;
+      allow create: if claimsMe() || isOwner();
+      allow update: if (mine() && keepsAuthor()) || isOwner();
+      allow delete: if mine() || isOwner();
+    }
+
+    // Falaise : secteurs, voies (points d'ancrage communs), méthodes par grimpeur.
+    match /secteurs/{id} {
+      allow read: if true;
+      allow create: if signedIn();
+      allow update, delete: if isOwner();
+    }
+    match /voies/{id} {
+      allow read: if true;
+      allow create: if claimsMe() || isOwner();
+      allow update: if (mine() && keepsAuthor()) || isOwner()
+        || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount']));
+      allow delete: if mine() || isOwner();
+    }
+    match /methodes/{id} {
+      allow read: if true;
+      allow create: if claimsMe() || isOwner();
+      allow update: if (mine() && keepsAuthor()) || isOwner();
+      allow delete: if mine() || isOwner();
+    }
+
+    // Brouillons : privés, visibles par leur auteur seulement.
+    match /data/users/{uid}/{docId} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Photos des murs et des voies, compressées (moins de 1 Mo) : lisibles par tous, ajoutées par un grimpeur connecté.
+    match /photos/{id} {
+      allow read: if true;
+      allow create: if claimsMe() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+      allow delete: if mine() || isOwner();
+    }
+
+    // Avis : tout le monde peut en envoyer, seul le propriétaire les lit.
+    match /feedback/{id} {
+      allow create: if request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow read, delete: if isOwner();
+    }
+  }
+}

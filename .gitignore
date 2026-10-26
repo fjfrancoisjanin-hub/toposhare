@@ -1,0 +1,9 @@
+node_modules/
+.firebase/
+*.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+test-results/
+playwright-report/
+.DS_Store

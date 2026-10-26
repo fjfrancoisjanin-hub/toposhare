@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Suivi TopoShare</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/ts-icon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one column dashboard — activity tiles, weekly bars, latest additions, feedback, one-time import. */
+:root {
+  --bg: #ECEEF0; --surface: #FFFFFF; --fg: #1B2024; --muted: #5C6670; --line: #D5D9DD; --accent: #E2501A; --accent-ink: #FFFFFF; --good: #1E8E4E;
+  --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) { :root { --bg: #14171A; --surface: #1D2125; --fg: #EDEFF1; --muted: #9AA3AC; --line: #30363C; --accent: #FF6630; --accent-ink: #14171A; --good: #4ADE80; color-scheme: dark; } }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--f-body); }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px; display: grid; gap: 22px; }
+h1 { font-family: var(--f-display); font-weight: 800; font-size: 26px; margin: 0; }
+h1 span { color: var(--accent); }
+h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0 0 10px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.note { color: var(--muted); font-size: 14px; }
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 2px; }
+.tile b { font-family: var(--f-mono); font-size: 26px; font-variant-numeric: tabular-nums; }
+.tile small { color: var(--good); font-weight: 700; font-size: 12px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.weeks { display: grid; gap: 6px; }
+.wk { display: grid; grid-template-columns: 74px 1fr 34px; gap: 10px; align-items: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.bar { height: 12px; border-radius: 6px; background: var(--bg); overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: 76px 1fr auto; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: baseline; font-size: 14px; }
+.row:first-child { border-top: 0; }
+.row .k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.row .m { min-width: 0; overflow-wrap: anywhere; }
+.row .d { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fb { padding: 10px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.fb:first-child { border-top: 0; }
+.fb p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.btn { appearance: none; border: 0; border-radius: 12px; padding: 12px 16px; font: 700 15px var(--f-body); cursor: pointer; background: var(--accent); color: var(--accent-ink); text-decoration: none; display: inline-block; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip { appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 999px; padding: 6px 12px; font: 600 13px var(--f-body); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.del { appearance: none; border: 1px solid #C62828; color: #C62828; background: transparent; border-radius: 8px; padding: 5px 10px; font: 700 12px var(--f-body); cursor: pointer; white-space: nowrap; }
+.del[data-armed="1"] { background: #C62828; color: #fff; }
+.del:disabled { opacity: .5; }
+.row.mg { grid-template-columns: 1fr auto; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.log { font-family: var(--f-mono); font-size: 12px; color: var(--muted); white-space: pre-wrap; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h1>Suivi <span>TopoShare</span></h1>
+    <a class="btn ghost" href="/">Ouvrir l'appli</a>
+  </div>
+
+  <div id="gate" class="panel" hidden>
+    <p style="margin-top:0">Cette page est réservée au propriétaire du site.</p>
+    <button class="btn" id="signin" type="button">Se connecter avec Google</button>
+    <p class="note" id="gateMsg"></p>
+  </div>
+
+  <div id="dash" hidden style="display:grid;gap:22px">
+    <section>
+      <div class="label" style="margin-bottom:8px">Contenu publié <span id="asof"></span></div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+    <section class="panel">
+      <h2>Ajouts par semaine</h2>
+      <div class="weeks" id="weeks"></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Blocs</span><span><i style="background:#2F9BFF"></i>Voies</span><span><i style="background:#22A55E"></i>Méthodes</span></div>
+    </section>
+    <section class="panel">
+      <h2>Avis reçus</h2>
+      <div id="feedback"></div>
+    </section>
+    <section class="panel">
+      <h2>Derniers ajouts</h2>
+      <div class="rows" id="latest"></div>
+    </section>
+    <section class="panel">
+      <h2>Gérer le contenu</h2>
+      <p class="note" style="margin-top:0">Supprimer efface aussi ce qui en dépend : une salle emporte ses murs et ses blocs, un secteur ses voies et leurs méthodes, une voie ses méthodes. Deux touches pour confirmer.</p>
+      <div class="chips" id="mgTabs" role="group" aria-label="Type de contenu"></div>
+      <div class="rows" id="mgList"></div>
+    </section>
+    <section class="panel" id="importBox">
+      <h2>Reprise des données du prototype</h2>
+      <p class="note" style="margin-top:0">À lancer une seule fois après la mise en ligne : importe la salle Altissimo, son spray wall, les blocs, le secteur Anglars, la voie et sa méthode. Les contenus importés vous sont attribués.</p>
+      <button class="btn" id="importBtn" type="button">Importer les données</button>
+      <div class="log" id="importLog"></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="/config.js"></script>
+<script src="/firebase-shim.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = t => t ? new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) + " " + new Date(t).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : "";
+const WEEK = 7 * 864e5;
+
+$("signin").onclick = () => BT.signIn().catch(e => $("gateMsg").textContent = "Connexion impossible : " + (e.message || e.code));
+
+BT.ready.then(start);
+BT.onUser(() => location.reload());
+
+async function start(u) {
+  if (!u || u.email !== window.BT_OWNER_EMAIL) {
+    $("gate").hidden = false;
+    if (u) $("gateMsg").textContent = `Connecté avec ${u.email}, qui n'est pas le compte propriétaire.`;
+    return;
+  }
+  $("dash").hidden = false;
+  await load();
+}
+
+async function all(col) { const s = await BT.fs.collection(col).get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); }
+
+async function load() {
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all = await Promise.all(["gyms", "walls", "blocs", "secteurs", "voies", "methodes", "feedback"].map(c => all(c).catch(() => [])));
+  const now = Date.now(), recent = arr => arr.filter(x => (x.createdAt || 0) > now - WEEK).length;
+  const authors = new Set([...blocs, ...voies, ...methodes].map(x => x.authorId).filter(Boolean));
+  const setters = new Set(blocs.map(b => (b.setter || "").trim().toLowerCase()).filter(Boolean));
+  $("asof").textContent = "· au " + fmt(now);
+  const tile = (label, n, wk) => `<div class="tile"><span class="label">${label}</span><b>${n}</b>${wk ? `<small>+${wk} cette semaine</small>` : `<small style="color:var(--muted)">—</small>`}</div>`;
+  $("tiles").innerHTML = [
+    tile("Blocs", blocs.length, recent(blocs)),
+    tile("Voies", voies.length, recent(voies)),
+    tile("Méthodes", methodes.length, recent(methodes)),
+    tile("Contributeurs", authors.size, 0),
+    tile("Ouvreurs", setters.size, 0),
+    tile("Salles", gyms.length, recent(gyms)),
+    tile("Secteurs", secteurs.length, recent(secteurs)),
+    tile("Avis", feedback.length, recent(feedback)),
+  ].join("");
+
+  // weekly activity, last 8 weeks
+  const rows = [];
+  let max = 1;
+  for (let i = 7; i >= 0; i--) {
+    const a = now - (i + 1) * WEEK, b = now - i * WEEK, inW = arr => arr.filter(x => x.createdAt >= a && x.createdAt < b).length;
+    const r = { label: new Date(a).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }), b: inW(blocs), v: inW(voies), m: inW(methodes) };
+    r.t = r.b + r.v + r.m; max = Math.max(max, r.t); rows.push(r);
+  }
+  $("weeks").innerHTML = rows.map(r => `<div class="wk"><span>${r.label}</span><div class="bar" role="img" aria-label="${r.b} blocs, ${r.v} voies, ${r.m} méthodes"><i style="width:${r.b / max * 100}%;background:var(--accent)"></i><i style="width:${r.v / max * 100}%;background:#2F9BFF"></i><i style="width:${r.m / max * 100}%;background:#22A55E"></i></div><b>${r.t}</b></div>`).join("");
+
+  // feedback
+  const fb = feedback.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  $("feedback").innerHTML = fb.length ? fb.map(f => `<div class="fb"><p>${esc(f.text)}</p><span class="note">${esc(f.name || "Anonyme")} · ${fmt(f.createdAt)}${f.mode ? " · " + (f.mode === "out" ? "Falaise" : "Salle") : ""}</span></div>`).join("") : `<p class="note" style="margin:0">Aucun avis pour l'instant. Le lien « Donnez votre avis » est en bas des listes de l'appli.</p>`;
+
+  // latest additions
+  const gName = id => gyms.find(g => g.id === id)?.name || "", sName = id => secteurs.find(s => s.id === id)?.name || "", vName = id => voies.find(v => v.id === id)?.name || "";
+  const items = [
+    ...blocs.map(b => ({ k: "Bloc", t: b.createdAt, m: `${esc(b.name)} · ${esc(b.grade)} · ${esc(gName(b.gymId))} · ouvert par ${esc(b.setter || "?")}` })),
+    ...voies.map(v => ({ k: "Voie", t: v.createdAt, m: `${esc(v.name)} · ${esc(v.grade)} · ${esc(sName(v.secteurId))} · par ${esc(v.addedBy || "?")}` })),
+    ...methodes.map(m => ({ k: "Méthode", t: m.updatedAt || m.createdAt, m: `${esc(m.climber || "?")} sur ${esc(vName(m.voieId))}` })),
+    ...gyms.map(g => ({ k: "Salle", t: g.createdAt, m: `${esc(g.name)} ${esc(g.city || "")}` })),
+    ...secteurs.map(s => ({ k: "Secteur", t: s.createdAt, m: `${esc(s.name)} · ${esc(s.region || "")}` })),
+    ...walls.filter(w => w.createdAt).map(w => ({ k: "Mur", t: w.createdAt, m: `${esc(w.name)} · ${esc(gName(w.gymId))}${w.active ? "" : " (démonté)"}` })),
+  ].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 25);
+  $("latest").innerHTML = items.length ? items.map(i => `<div class="row"><span class="k">${i.k}</span><span class="m">${i.m}</span><span class="d">${fmt(i.t)}</span></div>`).join("") : `<p class="note" style="margin:0">Rien pour l'instant.</p>`;
+
+  renderManage();
+  if (gyms.some(g => g.id === "altissimo-albi") && voies.length) $("importBtn").textContent = "Données déjà importées · relancer quand même";
+}
+
+/* ---------- gestion du contenu ---------- */
+const D = { all: [[], [], [], [], [], [], []], tab: "blocs" };
+const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"]];
+function renderManage() {
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all;
+  const by = { gyms, walls, blocs, secteurs, voies, methodes, feedback };
+  const gName = id => gyms.find(g => g.id === id)?.name || "?", sName = id => secteurs.find(x => x.id === id)?.name || "?", vName = id => voies.find(v => v.id === id)?.name || "?";
+  $("mgTabs").innerHTML = TABS.map(([k, l]) => `<button class="chip" data-tab="${k}" aria-pressed="${D.tab === k}">${l} (${by[k].length})</button>`).join("");
+  const label = {
+    blocs: b => `<b>${esc(b.name)}</b> · ${esc(b.grade)} · ${esc(gName(b.gymId))} · ${esc(b.setter || "?")}`,
+    voies: v => `<b>${esc(v.name)}</b> · ${esc(v.grade)} · ${esc(sName(v.secteurId))} · ${methodes.filter(m => m.voieId === v.id).length} méthode(s)`,
+    methodes: m => `<b>${esc(m.climber || "?")}</b> sur ${esc(vName(m.voieId))} · ${(m.steps || []).length} prises`,
+    gyms: g => `<b>${esc(g.name)}</b> ${esc(g.city || "")} · ${walls.filter(w => w.gymId === g.id).length} mur(s) · ${blocs.filter(b => b.gymId === g.id).length} bloc(s)`,
+    walls: w => `<b>${esc(w.name)}</b> · ${esc(gName(w.gymId))} · ${w.active ? "actuel" : "démonté"} · ${blocs.filter(b => b.wallId === w.id).length} bloc(s)`,
+    secteurs: x => `<b>${esc(x.name)}</b> ${esc(x.region || "")} · ${voies.filter(v => v.secteurId === x.id).length} voie(s)`,
+    feedback: f => `${esc(String(f.text).slice(0, 90))}${String(f.text).length > 90 ? "…" : ""} · ${esc(f.name || "Anonyme")}`,
+  }[D.tab];
+  const list = [...by[D.tab]].sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  $("mgList").innerHTML = list.length ? list.map(x => `<div class="row mg"><span class="m">${label(x)}<br><span class="note">${fmt(x.updatedAt || x.createdAt)}</span></span><button class="del" type="button" data-del="${esc(x.id)}">Supprimer</button></div>`).join("") : `<p class="note" style="margin:0">Rien dans cette catégorie.</p>`;
+}
+$("mgTabs").addEventListener("click", e => { const c = e.target.closest("[data-tab]"); if (c) { D.tab = c.dataset.tab; renderManage(); } });
+const delDoc = (col, id) => BT.fs.collection(col).doc(id).delete();
+const delPhoto = ref => String(ref || "").startsWith("photo:") ? delDoc("photos", ref.slice(6)).catch(() => {}) : null;
+async function cascade(col, id) {
+  const [gyms, walls, blocs, secteurs, voies, methodes] = D.all;
+  if (col === "gyms") { for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
+  if (col === "walls") { const w = walls.find(x => x.id === id); for (const b of blocs.filter(b => b.wallId === id)) await delDoc("blocs", b.id); await delPhoto(w?.image); }
+  if (col === "secteurs") { for (const v of voies.filter(v => v.secteurId === id)) await cascade("voies", v.id); }
+  if (col === "voies") { const v = voies.find(x => x.id === id); for (const m of methodes.filter(m => m.voieId === id)) await delDoc("methodes", m.id); await delPhoto(v?.image); }
+  if (col === "methodes") { const m = methodes.find(x => x.id === id), v = voies.find(x => x.id === m?.voieId); if (v) await BT.fs.collection("voies").doc(v.id).update({ methodCount: Math.max(0, (v.methodCount || 1) - 1) }).catch(() => {}); }
+  await delDoc(col, id);
+}
+$("mgList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-del]"); if (!b) return;
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer"; setTimeout(() => { if (b.isConnected && !b.disabled) { b.dataset.armed = ""; b.textContent = "Supprimer"; } }, 4000); return; }
+  b.disabled = true; b.textContent = "…";
+  try { await cascade(D.tab, b.dataset.del); await load(); }
+  catch (err) { b.disabled = false; b.dataset.armed = ""; b.textContent = "Échec"; console.error(err); }
+});
+
+$("importBtn").onclick = async () => {
+  const btn = $("importBtn"), log = m => $("importLog").textContent += m + "\n";
+  btn.disabled = true; $("importLog").textContent = "";
+  try {
+    const u = BT.user(), seed = await (await fetch("/seed/seed.json", { cache: "no-store" })).json();
+    for (const [col, docs] of Object.entries(seed)) {
+      for (const [id, raw] of Object.entries(docs)) {
+        const data = { ...raw };
+        if ("authorId" in data) data.authorId = u.uid;
+        if (col === "methodes" && data.steps) data.steps = data.steps.filter(s => s.t !== "clip");
+        if (typeof data.image === "string" && data.image.startsWith("seed/")) {
+          const blob = await (await fetch("/" + data.image)).blob();
+          data.image = (await BT.uploadPhoto(blob)).url;
+          log(`photo envoyée : ${col}/${id}`);
+        }
+        await BT.fs.collection(col).doc(id).set(data);
+        log(`${col}/${id} : ${data.name || data.climber || "ok"}`);
+      }
+    }
+    log("Import terminé.");
+    await load();
+  } catch (e) { log("Erreur : " + (e.message || e.code || e)); }
+  finally { btn.disabled = false; }
+};
+</script>
+</body>
+</html>

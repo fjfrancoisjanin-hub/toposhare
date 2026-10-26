@@ -1,0 +1,48 @@
+{
+  "hosting": [
+    {
+      "site": "toposhare",
+      "public": "public",
+      "ignore": [
+        "firebase.json",
+        "**/.*"
+      ],
+      "cleanUrls": true,
+      "headers": [
+        {
+          "source": "**/*.@(jpg|png|svg)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=86400"
+            }
+          ]
+        },
+        {
+          "source": "**/*.@(html|js|json|webmanifest)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "site": "betatheque",
+      "public": "redirect",
+      "redirects": [
+        {
+          "source": "/:path*",
+          "destination": "https://toposhare.web.app/:path",
+          "type": 301
+        }
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
