@@ -1,5 +1,9 @@
 # TopoShare : mise en ligne
 
+> **Développement (depuis octobre 2026)** : le projet est versionné avec git, testé (`npm test`) et déployé automatiquement par GitHub Actions à chaque merge sur `main`.
+> Première installation : voir [`MISE-EN-ROUTE.md`](MISE-EN-ROUTE.md). Contexte pour Claude Code : [`CLAUDE.md`](CLAUDE.md).
+> Les sections de déploiement manuel ci-dessous restent valables en secours, mais ne sont plus la voie normale.
+
 Site web mobile pour tracer et partager les betas des blocs de spray wall et des voies de falaise.
 Adresse : **https://toposhare.web.app** (l'ancienne adresse betatheque.web.app redirige vers elle).
 Le projet Firebase garde son identifiant technique `betatheque`, qui ne peut pas être modifié.
