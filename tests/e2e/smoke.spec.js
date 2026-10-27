@@ -20,7 +20,7 @@ test("l'onglet Falaise s'active", async ({ page }) => {
 test('le lien « Donnez votre avis » ouvre le formulaire', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-feedback]').first().click();
-  await expect(page.locator('textarea').first()).toBeVisible();
+  await expect(page.locator('#fbText')).toBeVisible();
 });
 
 test('la page de suivi /admin se charge', async ({ page }) => {
