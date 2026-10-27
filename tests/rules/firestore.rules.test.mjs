@@ -75,6 +75,10 @@ describe('Voies et méthodes', () => {
     await seed('voies/v1', { authorId: 'alice', name: 'Voie', methodCount: 2 });
     await assertSucceeds(user('bob').doc('voies/v1').update({ methodCount: 3 }));
   });
+  test('le compteur de méthodes ne peut pas passer sous 0', async () => {
+    await seed('voies/v1', { authorId: 'alice', name: 'Voie', methodCount: 0 });
+    await assertFails(user('bob').doc('voies/v1').update({ methodCount: -1 }));
+  });
   test("bob ne peut pas supprimer la méthode d'alice", async () => {
     await seed('methodes/m1', { authorId: 'alice', voieId: 'v1' });
     await assertFails(user('bob').doc('methodes/m1').delete());

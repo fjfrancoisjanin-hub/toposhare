@@ -41,7 +41,8 @@ service cloud.firestore {
       allow create: if claimsMe() || isOwner();
       allow update: if (mine() && keepsAuthor()) || isOwner()
         || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount'])
-            && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]);
+            && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]
+            && request.resource.data.methodCount >= 0);
       allow delete: if mine() || isOwner();
     }
     match /methodes/{id} {
