@@ -7,7 +7,7 @@
   // En local (localhost), l'appli parle aux émulateurs Firebase et ne touche jamais la base de prod.
   if (["localhost", "127.0.0.1"].includes(location.hostname)) {
     auth.useEmulator("http://127.0.0.1:9099", { disableWarnings: true });
-    fs.useEmulator("127.0.0.1", 8080);
+    fs.useEmulator("127.0.0.1", 8085);
   }
   auth.languageCode = "fr";
 

@@ -18,7 +18,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - `redirect/` : site `betatheque` qui redirige.
 
 ## Commandes
-- `npm run dev` : émulateurs (Auth, Firestore, Hosting sur http://localhost:5000, UI sur :4000). Jamais de données de prod en local.
+- `npm run dev` : émulateurs (Auth, Firestore, Firestore sur :8085, Hosting sur http://localhost:5000, UI sur :4000). Jamais de données de prod en local.
 - `npm test` : règles Firestore puis E2E Playwright (Pixel 7 + iPhone 14). Nécessite Java 21.
 - `npm run test:rules` / `npm run test:e2e` séparément.
 - Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → URL de prévisualisation commentée sur la PR.
