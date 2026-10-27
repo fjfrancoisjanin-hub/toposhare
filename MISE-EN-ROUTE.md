@@ -32,10 +32,10 @@ Les tests « todo » affichés en jaune sont des **failles de sécurité connues
 
 1. Créer un compte sur https://github.com/signup (gratuit).
 2. https://github.com/new : nom `toposhare`, **Private**, ne rien cocher (ni README, ni .gitignore, ni licence).
-3. Relier et pousser (remplacer `TON-PSEUDO`) :
+3. Relier et pousser :
 
 ```
-git remote add origin https://github.com/TON-PSEUDO/toposhare.git
+git remote add origin https://github.com/fjfrancoisjanin-hub/toposhare.git
 git push -u origin main --tags
 ```
 
@@ -48,7 +48,7 @@ npx firebase login
 npx firebase init hosting:github
 ```
 
-- Dépôt : `TON-PSEUDO/toposhare`.
+- Dépôt : `fjfrancoisjanin-hub/toposhare`.
 - « Set up the workflow to run a build script before every deploy? » : **No**.
 - « Set up automatic deployment to your site's live channel when a PR is merged? » : **No**.
 
