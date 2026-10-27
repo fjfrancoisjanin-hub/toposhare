@@ -29,9 +29,8 @@ Chaque contenu porte `authorId` = uid de l'auteur. Le propriétaire (`isOwner()`
 
 ## Sécurité : failles connues (tests `todo` dans tests/rules)
 1. `walls` : n'importe quel grimpeur connecté peut remplacer la photo du mur d'une salle → à fermer avec le rôle « admin de salle ».
-2. `voies.methodCount` : modifiable à n'importe quelle valeur par tout connecté → n'autoriser que ±1.
-3. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
-4. `feedback` ouvert sans compte : risque de spam (limité à 2000 caractères).
+2. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
+3. `feedback` ouvert sans compte : risque de spam (limité à 2000 caractères).
 Avant une diffusion large : App Check, alerte budget, mentions légales / politique de confidentialité (connexion Google, RGPD).
 
 ## Backlog
