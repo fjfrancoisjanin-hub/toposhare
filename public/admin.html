@@ -110,6 +110,9 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
       <p class="note" style="margin-top:0">Supprimer efface aussi ce qui en dépend : une salle emporte ses murs et ses blocs, un secteur ses voies et leurs méthodes, une voie ses méthodes. Deux touches pour confirmer.</p>
       <div class="chips" id="mgTabs" role="group" aria-label="Type de contenu"></div>
       <div class="rows" id="mgList"></div>
+      <p class="note">Une voie où d'autres grimpeurs ont une méthode ne peut être supprimée que par l'admin. À lancer une fois après la mise en ligne, pour les méthodes antérieures :</p>
+      <button class="btn ghost" id="recount" type="button">Recalculer les contributeurs</button>
+      <div class="log" id="recountLog"></div>
     </section>
     <section class="panel" id="importBox">
       <h2>Reprise des données du prototype</h2>
@@ -149,7 +152,7 @@ async function start(u) {
 async function all(col) { const s = await BT.fs.collection(col).get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); }
 
 async function load() {
-  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all = await Promise.all(["gyms", "walls", "blocs", "secteurs", "voies", "methodes", "feedback"].map(c => all(c).catch(() => [])));
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all = await Promise.all(["gyms", "walls", "blocs", "secteurs", "voies", "methodes", "feedback", "methodesPrivees"].map(c => all(c).catch(() => [])));
   const now = Date.now(), recent = arr => arr.filter(x => (x.createdAt || 0) > now - WEEK).length;
   const authors = new Set([...blocs, ...voies, ...methodes].map(x => x.authorId).filter(Boolean));
   const setters = new Set(blocs.map(b => (b.setter || "").trim().toLowerCase()).filter(Boolean));
@@ -222,16 +225,17 @@ $("ownerList").addEventListener("click", async e => {
   try { await delDoc("gymOwners", b.dataset.owner); D.owners = D.owners.filter(o => o.id !== b.dataset.owner); $("ownerMsg").textContent = "Rôle retiré."; renderOwners(); }
   catch { $("ownerMsg").textContent = "Retrait impossible. Réessayez."; }
 });
-const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"]];
+const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"], ["methodesPrivees", "Méthodes privées"]];
 function renderManage() {
-  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all;
-  const by = { gyms, walls, blocs, secteurs, voies, methodes, feedback };
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees] = D.all;
+  const by = { gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees };
   const gName = id => gyms.find(g => g.id === id)?.name || "?", sName = id => secteurs.find(x => x.id === id)?.name || "?", vName = id => voies.find(v => v.id === id)?.name || "?";
   $("mgTabs").innerHTML = TABS.map(([k, l]) => `<button class="chip" data-tab="${k}" aria-pressed="${D.tab === k}">${l} (${by[k].length})</button>`).join("");
   const label = {
     blocs: b => `<b>${esc(b.name)}</b> · ${esc(b.grade)} · ${esc(gName(b.gymId))} · ${esc(b.setter || "?")}`,
     voies: v => `<b>${esc(v.name)}</b> · ${esc(v.grade)} · ${esc(sName(v.secteurId))} · ${methodes.filter(m => m.voieId === v.id).length} méthode(s)`,
     methodes: m => `<b>${esc(m.climber || "?")}</b> sur ${esc(vName(m.voieId))} · ${(m.steps || []).length} prises`,
+    methodesPrivees: m => `<b>${esc(m.climber || "?")}</b> sur ${esc(vName(m.voieId))} · ${(m.steps || []).length} prises`,
     gyms: g => `<b>${esc(g.name)}</b> ${esc(g.city || "")} · ${walls.filter(w => w.gymId === g.id).length} mur(s) · ${blocs.filter(b => b.gymId === g.id).length} bloc(s)`,
     walls: w => `<b>${esc(w.name)}</b> · ${esc(gName(w.gymId))} · ${w.active ? "actuel" : "démonté"} · ${blocs.filter(b => b.wallId === w.id).length} bloc(s)`,
     secteurs: x => `<b>${esc(x.name)}</b> ${esc(x.region || "")} · ${voies.filter(v => v.secteurId === x.id).length} voie(s)`,
@@ -241,6 +245,7 @@ function renderManage() {
   $("mgList").innerHTML = list.length ? list.map(x => `<div class="row mg"><span class="m">${label(x)}<br><span class="note">${fmt(x.updatedAt || x.createdAt)}</span></span><button class="del" type="button" data-del="${esc(x.id)}">Supprimer</button></div>`).join("") : `<p class="note" style="margin:0">Rien dans cette catégorie.</p>`;
 }
 $("mgTabs").addEventListener("click", e => { const c = e.target.closest("[data-tab]"); if (c) { D.tab = c.dataset.tab; renderManage(); } });
+const voieDoc = id => BT.fs.collection("voies").doc(id);
 const delDoc = (col, id) => BT.fs.collection(col).doc(id).delete();
 const delPhoto = ref => String(ref || "").startsWith("photo:") ? delDoc("photos", ref.slice(6)).catch(() => {}) : null;
 async function cascade(col, id) {
@@ -248,8 +253,22 @@ async function cascade(col, id) {
   if (col === "gyms") { for (const o of D.owners.filter(o => o.gymId === id)) await delDoc("gymOwners", o.id); D.owners = D.owners.filter(o => o.gymId !== id); for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
   if (col === "walls") { const w = walls.find(x => x.id === id); for (const b of blocs.filter(b => b.wallId === id)) await delDoc("blocs", b.id); await delPhoto(w?.image); }
   if (col === "secteurs") { for (const v of voies.filter(v => v.secteurId === id)) await cascade("voies", v.id); }
-  if (col === "voies") { const v = voies.find(x => x.id === id); for (const m of methodes.filter(m => m.voieId === id)) await delDoc("methodes", m.id); await delPhoto(v?.image); }
-  if (col === "methodes") { const m = methodes.find(x => x.id === id), v = voies.find(x => x.id === m?.voieId); if (v) await BT.fs.collection("voies").doc(v.id).update({ methodCount: Math.max(0, (v.methodCount || 1) - 1) }).catch(() => {}); }
+  if (col === "voies") {
+    const v = voies.find(x => x.id === id);
+    for (const m of methodes.filter(m => m.voieId === id)) await delDoc("methodes", m.id);
+    for (const m of D.all[7].filter(m => m.voieId === id)) await delDoc("methodesPrivees", m.id);
+    for (const d of (await voieDoc(id).collection("contributeurs").get()).docs) await d.ref.delete();
+    await delPhoto(v?.image);
+  }
+  if (col === "methodes" || col === "methodesPrivees") {
+    const m = (col === "methodes" ? methodes : D.all[7]).find(x => x.id === id), v = voies.find(x => x.id === m?.voieId), bump = {};
+    if (v && col === "methodes" && v.methodCount > 0) bump.methodCount = v.methodCount - 1;
+    if (v && m.authorId !== v.authorId) {
+      const mark = voieDoc(v.id).collection("contributeurs").doc(m.authorId);
+      if ((await mark.get()).exists) { await mark.delete(); bump.foreignCount = Math.max(0, (v.foreignCount || 0) - 1); }
+    }
+    if (Object.keys(bump).length) await voieDoc(v.id).update(bump);
+  }
   await delDoc(col, id);
 }
 $("mgList").addEventListener("click", async e => {
@@ -260,6 +279,17 @@ $("mgList").addEventListener("click", async e => {
   catch (err) { b.disabled = false; b.dataset.armed = ""; b.textContent = "Échec"; console.error(err); }
 });
 
+$("recount").onclick = async () => {
+  const [, , , , voies, methodes] = D.all, priv = D.all[7];
+  let n = 0;
+  for (const v of voies) {
+    const others = new Set([...methodes, ...priv].filter(m => m.voieId === v.id && m.authorId && m.authorId !== v.authorId).map(m => m.authorId));
+    for (const uid of others) await voieDoc(v.id).collection("contributeurs").doc(uid).set({ createdAt: Date.now() });
+    if ((v.foreignCount || 0) !== others.size) { await voieDoc(v.id).update({ foreignCount: others.size }); n++; }
+  }
+  $("recountLog").textContent = `${n} voie(s) corrigée(s).`;
+  await load();
+};
 $("importBtn").onclick = async () => {
   const btn = $("importBtn"), log = m => $("importLog").textContent += m + "\n";
   btn.disabled = true; $("importLog").textContent = "";

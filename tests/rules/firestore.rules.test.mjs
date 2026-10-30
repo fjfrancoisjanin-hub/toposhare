@@ -198,6 +198,93 @@ describe('Propriétaires de salle', () => {
   });
 });
 
+describe('Méthodes privées', () => {
+  const meth = { authorId: 'alice', voieId: 'v1', climber: 'Alice', createdAt: 1 };
+  test('un autre connecté et un invité ne lisent pas une méthode privée, même avec son identifiant', async () => {
+    await seed('methodesPrivees/m1', meth);
+    await assertFails(user('bob').doc('methodesPrivees/m1').get());
+    await assertFails(anon().doc('methodesPrivees/m1').get());
+    await assertFails(user('bob').collection('methodesPrivees').where('voieId', '==', 'v1').get());
+  });
+  test("l'auteur la lit, la modifie et la crée à son nom seulement", async () => {
+    await seed('methodesPrivees/m1', meth);
+    await assertSucceeds(user('alice').doc('methodesPrivees/m1').get());
+    await assertSucceeds(user('alice').collection('methodesPrivees').where('voieId', '==', 'v1').where('authorId', '==', 'alice').get());
+    await assertSucceeds(user('alice').doc('methodesPrivees/m1').update(trace('alice', { climber: 'Alicia' })));
+    await assertFails(user('alice').doc('methodesPrivees/m1').update(trace('alice', { authorId: 'bob' })));
+    await assertFails(user('bob').doc('methodesPrivees/m1').update(trace('bob', { climber: 'X' })));
+    await assertFails(user('bob').doc('methodesPrivees/m2').set(meth));
+  });
+  test("l'admin la lit et la supprime", async () => {
+    await seed('methodesPrivees/m1', meth);
+    await assertSucceeds(owner().doc('methodesPrivees/m1').get());
+    await assertSucceeds(owner().collection('methodesPrivees').where('voieId', '==', 'v1').get());
+    await assertSucceeds(owner().doc('methodesPrivees/m1').delete());
+  });
+  test('passer en public est un déplacement dans un seul lot, le compteur fait +1', async () => {
+    await seed('voies/v1', { authorId: 'bob', name: 'V', methodCount: 0 });
+    await seed('methodesPrivees/m1', meth);
+    const db = user('alice'), batch = db.batch();
+    batch.delete(db.doc('methodesPrivees/m1'));
+    batch.set(db.doc('methodes/m1'), meth);
+    batch.update(db.doc('voies/v1'), { methodCount: 1 });
+    await assertSucceeds(batch.commit());
+  });
+});
+
+describe('Suppression d\'une voie avec des contributeurs', () => {
+  const voie = (foreignCount = 0) => ({ authorId: 'alice', name: 'V', methodCount: 0, foreignCount });
+  const contribute = async uid => {
+    const db = user(uid), batch = db.batch();
+    batch.set(db.doc(`voies/v1/contributeurs/${uid}`), { createdAt: 1 });
+    batch.update(db.doc('voies/v1'), { foreignCount: 1 });
+    return batch.commit();
+  };
+  test("l'auteur supprime sa voie sans contributeur", async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(user('alice').doc('voies/v1').delete());
+  });
+  test("l'auteur ne peut pas supprimer la voie si un autre y a une méthode, publique ou privée ; l'admin le peut", async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(contribute('bob'));
+    await assertFails(user('alice').doc('voies/v1').delete());
+    await assertSucceeds(owner().doc('voies/v1').delete());
+  });
+  test("l'auteur ne peut pas remettre le compteur à zéro ni retirer la marque d'un autre", async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(contribute('bob'));
+    await assertFails(user('alice').doc('voies/v1').update({ foreignCount: 0 }));
+    const db = user('alice'), batch = db.batch();
+    batch.delete(db.doc('voies/v1/contributeurs/bob'));
+    batch.update(db.doc('voies/v1'), { foreignCount: 0 });
+    await assertFails(batch.commit());
+  });
+  test('le compteur ne bouge pas sans la marque, et la marque pas sans le compteur', async () => {
+    await seed('voies/v1', voie());
+    await assertFails(user('bob').doc('voies/v1').update({ foreignCount: 1 }));
+    await assertFails(user('bob').doc('voies/v1/contributeurs/bob').set({ createdAt: 1 }));
+    await seed('voies/v2', { ...voie(), foreignCount: 1 });
+    await assertFails(user('bob').doc('voies/v2').update({ foreignCount: 0 }));
+  });
+  test("l'auteur de la voie ne se marque pas comme contributeur, ni au nom d'un autre", async () => {
+    await seed('voies/v1', voie());
+    await assertFails(contribute('alice'));
+    const db = user('bob'), batch = db.batch();
+    batch.set(db.doc('voies/v1/contributeurs/carole'), { createdAt: 1 });
+    batch.update(db.doc('voies/v1'), { foreignCount: 1 });
+    await assertFails(batch.commit());
+  });
+  test('un contributeur retire sa marque avec le compteur : la voie redevient supprimable', async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(contribute('bob'));
+    const db = user('bob'), batch = db.batch();
+    batch.delete(db.doc('voies/v1/contributeurs/bob'));
+    batch.update(db.doc('voies/v1'), { foreignCount: 0 });
+    await assertSucceeds(batch.commit());
+    await assertSucceeds(user('alice').doc('voies/v1').delete());
+  });
+});
+
 describe('Correction des noms', () => {
   const CONTENUS = [
     ['blocs/b1', { authorId: 'alice', gymId: 'g1', wallId: 'w1', createdAt: 1, name: 'Bloc', grade: '6a', setter: 'Alice' }, { setter: 'Alicia', name: 'Bloc v2', grade: '6b' }],

@@ -69,16 +69,44 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     match /voies/{id} {
+      // Compteurs : methodCount bouge de ±1 ; foreignCount seulement avec la marque du grimpeur, écrite ou retirée dans le même lot.
+      function countersOnly() {
+        let mark = /databases/$(database)/documents/voies/$(id)/contributeurs/$(request.auth.uid);
+        let d = request.resource.data.get('foreignCount', 0) - resource.data.get('foreignCount', 0);
+        return signedIn() && changed().hasOnly(['methodCount', 'foreignCount'])
+          && request.resource.data.get('methodCount', 0) - resource.data.get('methodCount', 0) in [-1, 0, 1]
+          && request.resource.data.get('methodCount', 0) >= 0
+          && request.resource.data.get('foreignCount', 0) >= 0
+          && (d == 0 || (d == 1 && !exists(mark) && existsAfter(mark)) || (d == -1 && exists(mark) && !existsAfter(mark)));
+      }
       allow read: if true;
       allow create: if claimsMe() || isAdmin();
-      allow update: if ((mine() || isAdmin()) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
-        || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount'])
-            && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]
-            && request.resource.data.methodCount >= 0);
-      allow delete: if mine() || isAdmin();
+      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignCount']))) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
+        || countersOnly();
+      // Si d'autres grimpeurs ont contribué à la voie, seul l'admin peut la supprimer.
+      allow delete: if isAdmin() || (mine() && resource.data.get('foreignCount', 0) == 0);
+
+      // Une marque par grimpeur autre que l'auteur ayant contribué à la voie. Elle ne bouge qu'avec le compteur foreignCount.
+      match /contributeurs/{uid} {
+        function voieBefore() { return get(/databases/$(database)/documents/voies/$(id)).data; }
+        function voieAfter() { return getAfter(/databases/$(database)/documents/voies/$(id)).data; }
+        allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+        allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && voieBefore().authorId != uid
+          && voieAfter().get('foreignCount', 0) == voieBefore().get('foreignCount', 0) + 1);
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid
+          && voieAfter().get('foreignCount', 0) == voieBefore().get('foreignCount', 0) - 1);
+      }
     }
     match /methodes/{id} {
       allow read: if true;
+      allow create: if claimsMe() || isAdmin();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
+      allow delete: if mine() || isAdmin();
+    }
+
+    // Méthodes privées : à part des méthodes publiques, lisibles par leur auteur et l'admin seulement.
+    match /methodesPrivees/{id} {
+      allow read: if mine() || isAdmin();
       allow create: if claimsMe() || isAdmin();
       allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
       allow delete: if mine() || isAdmin();

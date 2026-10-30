@@ -275,6 +275,11 @@
     ["hier", "yesterday", "ayer"],
     // sélecteur de langue
     ["Langue", "Language", "Idioma"],
+    ["Visibilité", "Visibility", "Visibilidad"],
+    ["Privée (moi seul)", "Private (only me)", "Privado (solo yo)"],
+    ["Visible par tous", "Visible to everyone", "Visible para todos"],
+    ["Privée", "Private", "Privado"],
+    ["Supprimer ma voie", "Delete my route", "Eliminar mi vía"],
     ["Vous n'avez plus le droit de changer ce mur.", "You no longer have the right to change this wall.", "Ya no tienes permiso para cambiar este muro."],
     ["Environnement de test", "Test environment", "Entorno de prueba"],
   ];
