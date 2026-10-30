@@ -5,7 +5,8 @@
   "description": "TopoShare — les betas de la communauté, prise par prise.",
   "scripts": {
     "dev": "firebase emulators:start --project betatheque",
-    "test": "npm run test:rules && npm run test:e2e",
+    "test": "npm run test:config && npm run test:rules && npm run test:e2e",
+    "test:config": "node --test tests/config/config.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-toposhare \"node --test tests/rules/firestore.rules.test.mjs\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project betatheque \"playwright test\"",
     "deploy": "firebase deploy",
@@ -15,6 +16,7 @@
     "@firebase/rules-unit-testing": "^4.0.1",
     "@playwright/test": "^1.49.0",
     "firebase": "^11.0.0",
+    "firebase-admin": "^14.5.0",
     "firebase-tools": "^14.0.0"
   }
 }

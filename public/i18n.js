@@ -275,6 +275,7 @@
     ["hier", "yesterday", "ayer"],
     // sélecteur de langue
     ["Langue", "Language", "Idioma"],
+    ["Environnement de test", "Test environment", "Entorno de prueba"],
   ];
   const MAP = { en: new Map(), es: new Map() };
   for (const [fr, en, es] of E) { MAP.en.set(fr, en); MAP.es.set(fr, es); }
@@ -294,6 +295,7 @@
     [/^(\d+) points? d'ancrage( \+ relais)?$/, m => `${m[1]} bolt${pl(m[1], "", "s")}${m[2] ? " + anchor" : ""}`, m => `${m[1]} chapa${pl(m[1], "", "s")}${m[2] ? " + reunión" : ""}`],
     [/^(\d+) mains$/, m => `${m[1]} hands`, m => `${m[1]} manos`],
     [/^il y a (\d+) j$/, m => `${m[1]} d ago`, m => `hace ${m[1]} d`],
+    [/^Environnement de test · PR #(\d+)$/, m => `Test environment · PR #${m[1]}`, m => `Entorno de prueba · PR #${m[1]}`],
     [/^Ouvert par (.+)$/, m => `Set by ${sub(m[1])}`, m => `Trazado por ${sub(m[1])}`],
     [/^modifié le (.+)$/, m => `edited ${m[1]}`, m => `editado el ${m[1]}`],
     [/^ajoutée par (.+)$/, m => `added by ${sub(m[1])}`, m => `añadida por ${sub(m[1])}`],

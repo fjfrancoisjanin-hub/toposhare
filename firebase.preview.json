@@ -1,0 +1,28 @@
+{
+  "hosting": {
+    "site": "toposhare-test",
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "seed/**",
+      "wall.jpg"
+    ],
+    "cleanUrls": true,
+    "headers": [
+      {
+        "source": "**/*.@(html|js|json|webmanifest)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
