@@ -156,7 +156,7 @@ describe('Propriétaires de salle', () => {
   });
   test('la création d\'une salle reste ouverte, avec sa photo initiale dans le même lot', async () => {
     const db = bob(), batch = db.batch();
-    batch.set(db.doc('gyms/neuve'), { name: 'Neuve' });
+    batch.set(db.doc('gyms/neuve'), { name: 'Neuve', commune: { nom: 'Albi', code: '81004', departement: '81', simple: 'albi', verifie: true } });
     batch.set(db.doc('walls/init'), { ...wall, gymId: 'neuve' });
     await assertSucceeds(batch.commit());
     // Le créateur ne devient pas propriétaire : le mur suivant lui est refusé.
@@ -282,6 +282,29 @@ describe('Suppression d\'une voie avec des contributeurs', () => {
     batch.update(db.doc('voies/v1'), { foreignCount: 0 });
     await assertSucceeds(batch.commit());
     await assertSucceeds(user('alice').doc('voies/v1').delete());
+  });
+});
+
+describe('Commune obligatoire', () => {
+  const ok = { nom: 'Saint-Antonin-Noble-Val', code: '82155', departement: '82', lat: 44.15, lon: 1.75, simple: 'saint antonin noble val', verifie: true };
+  const libre = { nom: 'Saint Machin', simple: 'saint machin', verifie: false };
+  for (const col of ['secteurs', 'gyms']) {
+    test(`${col} : créé avec une commune de la liste ou une saisie non vérifiée, refusé sinon`, async () => {
+      await assertSucceeds(user('alice').doc(`${col}/a`).set({ name: 'A', commune: ok }));
+      await assertSucceeds(user('alice').doc(`${col}/b`).set({ name: 'B', commune: libre }));
+      await assertFails(user('alice').doc(`${col}/c`).set({ name: 'C' }));
+      await assertFails(user('alice').doc(`${col}/d`).set({ name: 'D', commune: { ...ok, nom: '  ' } }));
+      await assertFails(user('alice').doc(`${col}/e`).set({ name: 'E', commune: { nom: 'X', simple: 'x', verifie: true } }));
+      await assertFails(anon().doc(`${col}/f`).set({ name: 'F', commune: ok }));
+    });
+  }
+  test("un non-admin ne modifie pas la commune du secteur d'un autre, ni du sien ; l'admin la rattache", async () => {
+    await seed('secteurs/s1', { name: 'S', authorId: 'alice' });
+    await assertFails(user('bob').doc('secteurs/s1').update(trace('bob', { commune: ok, region: 'X' })));
+    await assertFails(user('alice').doc('secteurs/s1').update(trace('alice', { commune: ok, region: 'X' })));
+    await assertSucceeds(owner().doc('secteurs/s1').update(trace('owner', { commune: ok, region: 'Saint-Antonin-Noble-Val (82)' })));
+    await seed('secteurs/s2', { name: 'S2' });
+    await assertFails(owner().doc('secteurs/s2').update({ commune: libre }));
   });
 });
 

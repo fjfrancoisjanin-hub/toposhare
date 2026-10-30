@@ -92,7 +92,9 @@ test('un grimpeur connecté crée une salle avec sa photo, sans en devenir propr
   await login(page, BOB);
   await page.locator('#gymName').click();
   await page.locator('[data-sheet="newgym"]').click();
+  await page.route('**/geo.api.gouv.fr/**', r => r.abort());
   await page.locator('#ngName').fill(`N ${id}`.slice(0, 40));
+  await page.locator('#ngCity').fill('Albi');
   await page.locator('#ngFile').setInputFiles(WALL_FILE);
   await expect(page.locator('#gymName')).toContainText(`N ${id}`.slice(0, 12));
   await page.locator('#gymName').click();

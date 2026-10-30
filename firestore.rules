@@ -20,8 +20,14 @@ service cloud.firestore {
     function nameOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].trim().size() > 0 && request.resource.data[f].size() <= max); }
     function optionalOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].size() <= max); }
     function traced() {
-      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'updatedAt', 'updatedBy'])
+      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'commune', 'updatedAt', 'updatedBy'])
         || (request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is number);
+    }
+    // Commune d'un nouveau secteur ou d'une nouvelle salle : issue de la liste officielle, ou saisie libre marquée non vérifiée si le service ne répond pas.
+    function communeOk() {
+      let c = request.resource.data.commune;
+      return c is map && c.nom is string && c.nom.trim().size() > 0 && c.nom.size() <= 60 && c.simple is string && c.verifie is bool
+        && (c.verifie == false || (c.code is string && c.departement is string));
     }
     function editOk() { return keepsIdentity() && traced(); }
 
@@ -37,8 +43,8 @@ service cloud.firestore {
     // Ensuite, seuls le propriétaire de la salle et l'admin peuvent ajouter, activer ou désactiver un mur.
     match /gyms/{id} {
       allow read: if true;
-      allow create: if signedIn();
-      allow update: if isAdmin() && editOk() && nameOk('name', 40) && optionalOk('city', 30);
+      allow create: if isAdmin() || (signedIn() && communeOk());
+      allow update: if isAdmin() && editOk() && nameOk('name', 40) && optionalOk('city', 60);
       allow delete: if isAdmin();
     }
     match /walls/{id} {
@@ -64,8 +70,8 @@ service cloud.firestore {
     // Falaise : secteurs, voies (points d'ancrage communs), méthodes par grimpeur.
     match /secteurs/{id} {
       allow read: if true;
-      allow create: if signedIn();
-      allow update: if isAdmin() && editOk() && nameOk('name', 50) && optionalOk('region', 40);
+      allow create: if isAdmin() || (signedIn() && communeOk());
+      allow update: if isAdmin() && editOk() && nameOk('name', 50) && optionalOk('region', 60);
       allow delete: if isAdmin();
     }
     match /voies/{id} {

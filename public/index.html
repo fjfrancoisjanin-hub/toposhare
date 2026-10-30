@@ -868,12 +868,14 @@ $("dDel").addEventListener("click", () => { state.delArmed = state.current; $("d
 $("dDelOk").addEventListener("click", async () => { try { await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
 
 /* ---------- gyms & walls sheet ---------- */
-function openSheet(panel = "main") { state.sheet = panel; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
+function openSheet(panel = "main") { state.sheet = panel; $("sheet").innerHTML = ""; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
 function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; if ($("fs").hidden) document.body.classList.remove("locked"); }
 $("sheetBg").addEventListener("click", e => { if (e.target === $("sheetBg")) closeSheet(); });
 $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "sectors" : "main"));
 function renderSheet() {
   if (state.sheet === "edit") return renderEditSheet();
+  // Une mise à jour en direct n'efface pas un formulaire de création en cours.
+  if ((state.sheet === "newgym" && $("ngName")) || (state.sheet === "newsector" && $("nsName"))) return;
   if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
   if (state.sheet === "account" || state.sheet === "feedback" || state.sheet === "login") return renderAcctSheet();
   if (state.sheet === "lang") {
@@ -886,20 +888,24 @@ function renderSheet() {
   if (state.sheet === "newgym") {
     s.innerHTML = `<h2 id="sheetTitle">Ajouter une salle</h2>
       <div class="field"><label class="label" for="ngName">Nom de la salle</label><input id="ngName" maxlength="40" placeholder="ex. Altissimo" autocomplete="off"></div>
-      <div class="field"><label class="label" for="ngCity">Ville</label><input id="ngCity" maxlength="30" placeholder="ex. Albi" autocomplete="off"></div>
+      <div class="field"><label class="label" for="ngCity">Ville</label><input id="ngCity" maxlength="60" placeholder="ex. Albi" autocomplete="off"><div id="ngCityBox" class="gymlist"></div></div>
       <div class="field"><label class="label" for="ngWall">Nom du mur</label><input id="ngWall" maxlength="30" value="Spray wall" autocomplete="off"></div>
       <div class="note">Prenez le mur bien de face, en entier, avec un bon éclairage. La photo devient le support de tous les blocs.</div>
       ${photoNote}<div class="err" id="sErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn filebtn" ${noAssets ? 'style="opacity:.45"' : ""}>Photographier le mur et créer<input type="file" accept="image/*" id="ngFile" ${noAssets ? "disabled" : ""}></label><button class="btn ghost" type="button" data-sheet="main">Annuler</button></div>`;
+    state.ngPicker = communePicker($("ngCity"), $("ngCityBox"));
     $("ngFile")?.addEventListener("change", async e => {
       const file = e.target.files[0]; e.target.value = ""; if (!file) return;
-      const name = $("ngName").value.trim(), city = $("ngCity").value.trim(), wname = $("ngWall").value.trim() || "Spray wall";
+      const name = $("ngName").value.trim(), wname = $("ngWall").value.trim() || "Spray wall";
       if (!name) { $("sErr").textContent = "Donnez un nom à la salle."; return; }
+      await state.ngPicker.check();
+      const commune = state.ngPicker.get();
+      if (!commune) { $("sErr").textContent = "Choisissez une commune dans la liste."; return; }
       $("sErr").textContent = "Envoi de la photo…";
       try {
         const ph = await uploadPhoto(file);
         const gref = state.db.collection("gyms").doc(), batch = state.db.batch();
-        batch.set(gref, { name, city, createdAt: Date.now() });
+        batch.set(gref, { name, city: communeLabel(commune), commune, createdAt: Date.now() });
         batch.set(state.db.collection("walls").doc(), { gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
         await batch.commit();
         switchGym(gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
@@ -932,7 +938,7 @@ function renderSheet() {
   }
   const walls = g ? wallsOf(g.id) : [];
   s.innerHTML = `<h2 id="sheetTitle">Salles</h2>
-    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
+    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}${unverified(x)}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
     ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
       <div class="walllist">${walls.length ? walls.map(w => `<div><span>${esc(w.name)} · photo du ${day(w.createdAt)}</span><b style="color:${w.active ? "var(--fg)" : "var(--muted)"}">${w.active ? "Actuel" : "Démonté"}</b></div>`).join("") : "<div>Aucune photo du mur.</div>"}</div>
@@ -1400,44 +1406,100 @@ $("oForm").addEventListener("submit", async e => {
   finally { $("oSave").disabled = false; }
 });
 
+/* ---------- commune : liste officielle (geo.api.gouv.fr) ---------- */
+const simplify = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\bst\b/g, "saint").replace(/\bste\b/g, "sainte");
+const communeLabel = c => c.departement ? `${c.nom} (${c.departement})` : c.nom;
+const unverified = x => x.commune?.verifie === false ? " · commune non vérifiée" : "";
+function communePicker(input, box, onPick = () => {}) {
+  let picked = null, down = false, timer = null, query = "", running = Promise.resolve(), seq = 0;
+  const lookup = async q => {
+    const my = ++seq;
+    try {
+      const r = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(q)}&fields=nom,code,codeDepartement,centre&boost=population&limit=20`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) throw new Error(r.status);
+      const list = await r.json();
+      if (my !== seq) return;
+      down = false;
+      box.style.cssText = "max-height:220px;overflow-y:auto";
+      box.innerHTML = list.map((c, i) => `<button class="gymrow" type="button" data-commune="${i}"><span><b>${esc(c.nom)}</b></span><small>${esc(c.codeDepartement)}</small></button>`).join("");
+      box.onclick = e => {
+        const b = e.target.closest("[data-commune]"); if (!b) return;
+        const c = list[+b.dataset.commune], [lon, lat] = c.centre?.coordinates || [];
+        picked = { nom: c.nom, code: c.code, departement: c.codeDepartement, lat: lat ?? null, lon: lon ?? null, simple: simplify(c.nom), verifie: true };
+        input.value = communeLabel(picked); box.innerHTML = ""; onPick(picked);
+      };
+    } catch {
+      if (my !== seq) return;
+      down = true;
+      box.innerHTML = `<div class="note">Service des communes indisponible : votre saisie sera enregistrée comme « commune non vérifiée ».</div>`;
+    }
+  };
+  input.addEventListener("input", () => {
+    picked = null; onPick(null); clearTimeout(timer); timer = null;
+    query = simplify(input.value);
+    if (query.length < 2) { seq++; box.innerHTML = ""; return; }
+    timer = setTimeout(() => { timer = null; running = lookup(query); }, 200);
+  });
+  return {
+    // Attend la réponse en cours : sans elle, on ne sait pas encore si le service répond.
+    async check() {
+      if (timer) { clearTimeout(timer); timer = null; running = lookup(query); }
+      await running;
+    },
+    get() {
+      if (picked) return picked;
+      const nom = input.value.trim();
+      return down && nom ? { nom, simple: simplify(nom), verifie: false } : null;
+    },
+  };
+}
+
 /* ---------- sector sheet ---------- */
 function renderSectorSheet() {
   const s = $("sheet");
   if (state.sheet === "newsector") {
     s.innerHTML = `<h2 id="sheetTitle">Nouveau secteur</h2>
       <div class="field"><label class="label" for="nsName">Nom du secteur</label><input id="nsName" maxlength="50" placeholder="Nom du secteur sur le topo" autocomplete="off"></div>
-      <div class="field"><label class="label" for="nsRegion">Site ou commune</label><input id="nsRegion" maxlength="40" placeholder="Site ou commune" autocomplete="off"></div>
+      <div class="field"><label class="label" for="nsRegion">Commune</label><input id="nsRegion" maxlength="60" placeholder="ex. Saint-Antonin-Noble-Val" autocomplete="off"><div id="nsRegionBox" class="gymlist"></div></div>
+      <div id="nsKnown" hidden style="display:grid;gap:8px"></div>
       <div class="err" id="sErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-sect-create>Créer le secteur</button><button class="btn ghost" type="button" data-sheet="sectors">Annuler</button></div>`;
+    state.nsPicker = communePicker($("nsRegion"), $("nsRegionBox"), c => {
+      const known = c ? state.secteurs.filter(x => x.commune?.code === c.code || simplify(x.region) === c.simple) : [];
+      $("nsKnown").hidden = !known.length;
+      $("nsKnown").innerHTML = known.length ? `<div class="label">Déjà référencés à ${esc(c.nom)} :</div>${known.map(x => `<button class="gymrow" type="button" data-sect="${esc(x.id)}"><span><b>${esc(x.name)}</b></span><small>Choisir</small></button>`).join("")}` : "";
+    });
     return;
   }
   s.innerHTML = `<h2 id="sheetTitle">Secteurs de falaise</h2>
-    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
+    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}${unverified(x)}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newsector">+ Ajouter un secteur</button></section>
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", async e => {
   const sb = e.target.closest("[data-sect]"); if (sb) { switchSecteur(sb.dataset.sect); closeSheet(); return; }
   if (e.target.closest("[data-sect-create]")) {
-    const name = $("nsName").value.trim(), region = $("nsRegion").value.trim();
+    const name = $("nsName").value.trim();
     if (!name) { $("sErr").textContent = "Donnez un nom au secteur."; return; }
     if (!state.me) { askLogin("sErr", "créer un secteur"); return; }
-    try { const ref = await state.db.collection("secteurs").add({ name, region, authorId: state.me || null, createdAt: Date.now() }); switchSecteur(ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
+    await state.nsPicker.check();
+    const commune = state.nsPicker.get();
+    if (!commune) { $("sErr").textContent = "Choisissez une commune dans la liste."; return; }
+    try { const ref = await state.db.collection("secteurs").add({ name, region: communeLabel(commune), commune, authorId: state.me || null, createdAt: Date.now() }); switchSecteur(ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
     catch { $("sErr").textContent = "La création a échoué. Réessayez."; }
   }
 });
 
 /* ---------- correction des noms par l'admin ---------- */
 const EDITS = {
-  gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 30, false]] },
-  secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 40, false]] },
+  gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 60, false]], commune: "city" },
+  secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 60, false]], commune: "region" },
   voies: { title: "Modifier la voie", items: () => state.voies, fields: [["name", "Nom de la voie", 50, true], ["addedBy", "Ajoutée par", 30, true]], grade: true },
   blocs: { title: "Modifier l'ouvreur", items: () => state.blocs, fields: [["setter", "Ouvert par", 30, true]] },
   methodes: { title: "Modifier le prénom", items: () => state.methodes, fields: [["climber", "Grimpeur", 30, true]] },
 };
 const withEdit = (col, x, row) => isAdmin() ? `<div style="display:flex;gap:8px"><div style="flex:1;min-width:0;display:grid">${row}</div><button class="btn ghost small" type="button" data-edit="${col}:${esc(x.id)}" aria-label="Modifier « ${esc(x.name)} »">Modifier</button></div>` : row;
 function openEdit(col, id) { if (!EDITS[col]?.items().some(x => x.id === id)) return; state.editing = { col, id }; $("sheet").innerHTML = ""; openSheet("edit"); }
-const looseName = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 function renderEditSheet() {
   const { col, id } = state.editing, key = col + ":" + id, spec = EDITS[col], x = spec.items().find(i => i.id === id);
   if ($("eForm")?.dataset.key === key) return; // Une mise à jour en direct n'efface pas la saisie en cours.
@@ -1446,13 +1508,15 @@ function renderEditSheet() {
     <form id="eForm" data-key="${esc(key)}" novalidate style="display:grid;gap:14px">
       ${spec.fields.map(([f, label, max]) => `<div class="field"><label class="label" for="e_${f}">${label}</label><input id="e_${f}" maxlength="${max}" value="${esc(x[f] || "")}" autocomplete="off"></div>`).join("")}
       ${spec.grade ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
+      <div id="eCommuneBox" class="gymlist"></div>
       <div class="note" id="eWarn" hidden>Un autre secteur porte déjà ce nom dans cette commune.</div>
       <div class="err" id="eErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>
     </form>`;
-  const warn = () => { if (col !== "secteurs") return; const n = looseName($("e_name").value), r = looseName($("e_region").value); $("eWarn").hidden = !state.secteurs.some(s => s.id !== id && looseName(s.name) === n && looseName(s.region) === r); };
+  const warn = () => { if (col !== "secteurs") return; const n = simplify($("e_name").value), r = simplify($("e_region").value); $("eWarn").hidden = !state.secteurs.some(s => s.id !== id && simplify(s.name) === n && simplify(s.region) === r); };
   warn();
   $("eForm").addEventListener("input", warn);
+  const picker = spec.commune ? communePicker($("e_" + spec.commune), $("eCommuneBox"), warn) : null;
   $("eGrades")?.addEventListener("click", e => { const c = e.target.closest("[data-g]"); if (!c) return; $("eGrades").dataset.grade = c.dataset.g; $("eGrades").querySelectorAll("[data-g]").forEach(b => b.setAttribute("aria-pressed", b === c)); });
   $("eForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -1462,6 +1526,12 @@ function renderEditSheet() {
       if (required && !p[f]) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
     }
     if (spec.grade) p.grade = $("eGrades").dataset.grade;
+    if (picker && p[spec.commune] !== (x[spec.commune] || "")) {
+      await picker.check();
+      const c = picker.get();
+      if (p[spec.commune] && !c) { $("eErr").textContent = "Choisissez une commune dans la liste."; return; }
+      p.commune = c; if (c) p[spec.commune] = communeLabel(c);
+    }
     try { await state.db.collection(col).doc(id).update(p); closeSheet(); toast("Modification enregistrée"); }
     catch { $("eErr").textContent = "Enregistrement impossible pour l'instant. Réessayez."; }
   });
