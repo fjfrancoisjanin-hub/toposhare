@@ -71,7 +71,7 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
   </div>
 
   <div id="gate" class="panel" hidden>
-    <p style="margin-top:0">Cette page est réservée au propriétaire du site.</p>
+    <p style="margin-top:0">Cette page est réservée à l'admin du site.</p>
     <button class="btn" id="signin" type="button">Se connecter avec Google</button>
     <p class="note" id="gateMsg"></p>
   </div>
@@ -93,6 +93,17 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
     <section class="panel">
       <h2>Derniers ajouts</h2>
       <div class="rows" id="latest"></div>
+    </section>
+    <section class="panel">
+      <h2>Propriétaires de salle</h2>
+      <p class="note" style="margin-top:0">Le propriétaire change la photo du mur de sa salle et peut en supprimer les blocs. Le rôle s'active dès sa connexion, même sans compte existant.</p>
+      <form id="ownerForm" style="display:grid;gap:8px;margin-bottom:12px">
+        <select id="ownerGym" aria-label="Salle" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)"></select>
+        <input id="ownerEmail" type="email" placeholder="E-mail du compte Google" aria-label="E-mail" autocomplete="off" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)">
+        <button class="btn" type="submit">Désigner ce propriétaire</button>
+        <div class="note" id="ownerMsg" role="status"></div>
+      </form>
+      <div class="rows" id="ownerList"></div>
     </section>
     <section class="panel">
       <h2>Gérer le contenu</h2>
@@ -128,7 +139,7 @@ BT.onUser(() => location.reload());
 async function start(u) {
   if (!u || u.email !== window.BT_OWNER_EMAIL) {
     $("gate").hidden = false;
-    if (u) $("gateMsg").textContent = `Connecté avec ${u.email}, qui n'est pas le compte propriétaire.`;
+    if (u) $("gateMsg").textContent = `Connecté avec ${u.email}, qui n'est pas le compte admin.`;
     return;
   }
   $("dash").hidden = false;
@@ -181,12 +192,36 @@ async function load() {
   ].sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 25);
   $("latest").innerHTML = items.length ? items.map(i => `<div class="row"><span class="k">${i.k}</span><span class="m">${i.m}</span><span class="d">${fmt(i.t)}</span></div>`).join("") : `<p class="note" style="margin:0">Rien pour l'instant.</p>`;
 
+  D.owners = await all("gymOwners");
+  renderOwners();
   renderManage();
   if (gyms.some(g => g.id === "altissimo-albi") && voies.length) $("importBtn").textContent = "Données déjà importées · relancer quand même";
 }
 
 /* ---------- gestion du contenu ---------- */
-const D = { all: [[], [], [], [], [], [], []], tab: "blocs" };
+const D = { all: [[], [], [], [], [], [], []], tab: "blocs", owners: [] };
+function renderOwners() {
+  const gyms = D.all[0], gName = id => gyms.find(g => g.id === id)?.name || "?", sel = $("ownerGym"), cur = sel.value;
+  sel.innerHTML = gyms.map(g => `<option value="${esc(g.id)}">${esc(g.name)} ${esc(g.city || "")}</option>`).join("");
+  if (gyms.some(g => g.id === cur)) sel.value = cur;
+  $("ownerList").innerHTML = D.owners.length ? D.owners.map(o => `<div class="row mg"><span class="m"><b>${esc(gName(o.gymId))}</b> · ${esc(o.email)}</span><button class="del" type="button" data-owner="${esc(o.id)}">Retirer</button></div>`).join("") : `<p class="note" style="margin:0">Aucun propriétaire désigné.</p>`;
+}
+$("ownerForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const gymId = $("ownerGym").value, email = $("ownerEmail").value.trim().toLowerCase();
+  if (!gymId || !/^[^@\s]+@[^@\s]+$/.test(email)) { $("ownerMsg").textContent = "Choisissez une salle et saisissez un e-mail valide."; return; }
+  try {
+    const id = gymId + "__" + email;
+    await BT.fs.collection("gymOwners").doc(id).set({ gymId, email, createdAt: Date.now() });
+    D.owners = D.owners.filter(o => o.id !== id).concat({ id, gymId, email });
+    $("ownerEmail").value = ""; $("ownerMsg").textContent = "Propriétaire désigné."; renderOwners();
+  } catch { $("ownerMsg").textContent = "Désignation impossible. Réessayez."; }
+});
+$("ownerList").addEventListener("click", async e => {
+  const b = e.target.closest("[data-owner]"); if (!b) return;
+  try { await delDoc("gymOwners", b.dataset.owner); D.owners = D.owners.filter(o => o.id !== b.dataset.owner); $("ownerMsg").textContent = "Rôle retiré."; renderOwners(); }
+  catch { $("ownerMsg").textContent = "Retrait impossible. Réessayez."; }
+});
 const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"]];
 function renderManage() {
   const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all;
@@ -210,7 +245,7 @@ const delDoc = (col, id) => BT.fs.collection(col).doc(id).delete();
 const delPhoto = ref => String(ref || "").startsWith("photo:") ? delDoc("photos", ref.slice(6)).catch(() => {}) : null;
 async function cascade(col, id) {
   const [gyms, walls, blocs, secteurs, voies, methodes] = D.all;
-  if (col === "gyms") { for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
+  if (col === "gyms") { for (const o of D.owners.filter(o => o.gymId === id)) await delDoc("gymOwners", o.id); D.owners = D.owners.filter(o => o.gymId !== id); for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
   if (col === "walls") { const w = walls.find(x => x.id === id); for (const b of blocs.filter(b => b.wallId === id)) await delDoc("blocs", b.id); await delPhoto(w?.image); }
   if (col === "secteurs") { for (const v of voies.filter(v => v.secteurId === id)) await cascade("voies", v.id); }
   if (col === "voies") { const v = voies.find(x => x.id === id); for (const m of methodes.filter(m => m.voieId === id)) await delDoc("methodes", m.id); await delPhoto(v?.image); }

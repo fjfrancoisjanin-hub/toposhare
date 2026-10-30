@@ -2,8 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function isOwner() {
+    function isAdmin() {
       return signedIn() && request.auth.token.email == 'fj.francoisjanin@gmail.com' && request.auth.token.email_verified == true;
+    }
+    // Propriétaire d'une salle : attribué par l'admin, par e-mail. Le document porte l'identifiant « salle__e-mail ».
+    function isGymOwner(gymId) {
+      return signedIn() && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/gymOwners/$(gymId + '__' + request.auth.token.email.lower()));
     }
     // L'auteur d'un document est celui dont l'identifiant est dans authorId.
     function mine() { return signedIn() && resource.data.authorId == request.auth.uid; }
@@ -20,48 +25,63 @@ service cloud.firestore {
     }
     function editOk() { return keepsIdentity() && traced(); }
 
-    // Salles et murs : tout le monde lit, un grimpeur connecté peut ajouter une salle ou remonter un mur.
+    // Rôles : seul l'admin les écrit. Chacun ne lit que les siens.
+    match /gymOwners/{id} {
+      allow read: if isAdmin() || (signedIn() && request.auth.token.email_verified == true && resource.data.email == request.auth.token.email.lower());
+      allow create: if isAdmin() && request.resource.data.email is string && request.resource.data.email == request.resource.data.email.lower()
+        && request.resource.data.gymId is string && id == request.resource.data.gymId + '__' + request.resource.data.email;
+      allow delete: if isAdmin();
+    }
+
+    // Salles et murs : tout le monde lit, un grimpeur connecté peut ajouter une salle avec sa photo initiale.
+    // Ensuite, seuls le propriétaire de la salle et l'admin peuvent ajouter, activer ou désactiver un mur.
     match /gyms/{id} {
       allow read: if true;
       allow create: if signedIn();
-      allow update: if isOwner() && editOk() && nameOk('name', 40) && optionalOk('city', 30);
-      allow delete: if isOwner();
+      allow update: if isAdmin() && editOk() && nameOk('name', 40) && optionalOk('city', 30);
+      allow delete: if isAdmin();
     }
     match /walls/{id} {
+      // Photo initiale : le mur est écrit dans le même lot que la création de sa salle.
+      function isInitialWall() {
+        let gym = /databases/$(database)/documents/gyms/$(request.resource.data.gymId);
+        return signedIn() && !exists(gym) && existsAfter(gym);
+      }
       allow read: if true;
-      allow create, update: if signedIn();
-      allow delete: if isOwner();
+      allow create: if isAdmin() || isGymOwner(request.resource.data.gymId) || isInitialWall();
+      allow update: if (isAdmin() || isGymOwner(resource.data.gymId)) && keepsIdentity();
+      allow delete: if isAdmin();
     }
 
     // Blocs : seul l'ouvreur (ou le propriétaire du site) modifie ou supprime.
     match /blocs/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isOwner();
-      allow update: if (mine() || isOwner()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30);
-      allow delete: if mine() || isOwner();
+      allow create: if claimsMe() || isAdmin();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30);
+      allow delete: if mine() || isAdmin() || isGymOwner(resource.data.gymId);
     }
 
     // Falaise : secteurs, voies (points d'ancrage communs), méthodes par grimpeur.
     match /secteurs/{id} {
       allow read: if true;
       allow create: if signedIn();
-      allow update: if isOwner() && editOk() && nameOk('name', 50) && optionalOk('region', 40);
-      allow delete: if isOwner();
+      allow update: if isAdmin() && editOk() && nameOk('name', 50) && optionalOk('region', 40);
+      allow delete: if isAdmin();
     }
     match /voies/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isOwner();
-      allow update: if ((mine() || isOwner()) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
+      allow create: if claimsMe() || isAdmin();
+      allow update: if ((mine() || isAdmin()) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
         || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount'])
             && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]
             && request.resource.data.methodCount >= 0);
-      allow delete: if mine() || isOwner();
+      allow delete: if mine() || isAdmin();
     }
     match /methodes/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isOwner();
-      allow update: if (mine() || isOwner()) && editOk() && nameOk('climber', 30);
-      allow delete: if mine() || isOwner();
+      allow create: if claimsMe() || isAdmin();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
+      allow delete: if mine() || isAdmin();
     }
 
     // Brouillons : privés, visibles par leur auteur seulement.
@@ -73,7 +93,7 @@ service cloud.firestore {
     match /photos/{id} {
       allow read: if true;
       allow create: if claimsMe() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
-      allow delete: if mine() || isOwner();
+      allow delete: if mine() || isAdmin();
     }
 
     // Avis : tout le monde peut en envoyer, seul le propriétaire les lit.
@@ -81,7 +101,7 @@ service cloud.firestore {
       allow create: if request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 2000;
-      allow read, delete: if isOwner();
+      allow read, delete: if isAdmin();
     }
   }
 }

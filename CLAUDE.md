@@ -24,8 +24,8 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → déployée sur l'environnement de test https://toposhare-test.web.app (projet `toposhare-test`, données fictives remises à zéro à chaque déploiement, une seule URL : la dernière PR déployée s'affiche, voir le bandeau). Le job `preview` n'a aucun accès à la prod.
 
 ## Modèle de données (collections)
-`gyms`, `walls` (photo du mur d'une salle), `blocs`, `secteurs`, `voies` (champ `methodCount`), `methodes`, `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés).
-Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isOwner()` dans les règles : e-mail vérifié) peut tout modérer.
+`gyms`, `walls` (photo du mur d'une salle), `blocs`, `secteurs`, `voies` (champ `methodCount`), `methodes`, `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).
+Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les règles : e-mail vérifié) peut tout modérer.
 
 ## Décisions de référence
 - **Rôles :**
@@ -44,13 +44,12 @@ Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isOwner()` dans les
 - **Contrôle côté serveur** : toute règle d'accès est appliquée par les règles Firestore, jamais seulement en cachant un bouton.
 
 ## Sécurité : failles connues (tests `todo` dans tests/rules)
-1. `walls` : n'importe quel grimpeur connecté peut remplacer la photo du mur d'une salle → à fermer avec le rôle « admin de salle ».
-2. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
-3. `feedback` ouvert sans compte : risque de spam (limité à 2000 caractères).
+1. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
+2. `feedback` ouvert sans compte : risque de spam (limité à 2000 caractères).
 Avant une diffusion large : App Check, alerte budget, mentions légales / politique de confidentialité (connexion Google, RGPD).
 
 ## Backlog
-Rôle admin de salle (seul à changer la photo du mur) ; suggestions de modification validées par l'ouvreur ; archivage des blocs au remontage ; multi-salles ; types d'utilisateurs (invité, inscrit), profils ouvreurs, commentaires ; import de vidéo de drone pour tracer une voie ; indicateur « clip » des méthodes falaise.
+Suggestions de modification validées par l'ouvreur ; archivage des blocs au remontage ; multi-salles ; types d'utilisateurs (invité, inscrit), profils ouvreurs, commentaires ; import de vidéo de drone pour tracer une voie ; indicateur « clip » des méthodes falaise.
 
 ## Façon de travailler
 - Une branche par fonctionnalité, petits commits en français, PR vers `main`.
