@@ -15,7 +15,17 @@ service cloud.firestore {
     function claimsMe() { return signedIn() && request.resource.data.authorId == request.auth.uid; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // Auteur réel, date de création et rattachements ne bougent jamais, même pour le propriétaire du site.
-    function keepsIdentity() { return !changed().hasAny(['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId']); }
+    function keepsIdentity() { return !changed().hasAny(['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId', 'ratingCount', 'ratingSum']); }
+    function noRating() { return !request.resource.data.keys().hasAny(['ratingCount', 'ratingSum']); }
+    // Compteurs de notes : ils ne bougent que du vote de la personne, écrit, modifié ou retiré dans le même lot.
+    function ratingOnly(kind, id) {
+      let v = /databases/$(database)/documents/votes/$(kind + '__' + id + '__' + request.auth.uid);
+      let before = exists(v) ? get(v).data.value : -1;
+      let after = existsAfter(v) ? getAfter(v).data.value : -1;
+      return signedIn() && changed().hasOnly(['ratingCount', 'ratingSum']) && before != after
+        && request.resource.data.get('ratingCount', 0) == resource.data.get('ratingCount', 0) + (after >= 0 ? 1 : 0) - (before >= 0 ? 1 : 0)
+        && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0) + (after >= 0 ? after : 0) - (before >= 0 ? before : 0);
+    }
     // Un champ n'est contrôlé que s'il change : les anciens documents restent modifiables.
     function nameOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].trim().size() > 0 && request.resource.data[f].size() <= max); }
     function optionalOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].size() <= max); }
@@ -62,8 +72,9 @@ service cloud.firestore {
     // Blocs : seul l'ouvreur (ou le propriétaire du site) modifie ou supprime.
     match /blocs/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
-      allow update: if (mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30);
+      allow create: if (claimsMe() || isAdmin()) && noRating();
+      allow update: if ((mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30))
+        || ratingOnly('blocs', id);
       allow delete: if mine() || isAdmin() || isGymOwner(resource.data.gymId);
     }
 
@@ -86,9 +97,9 @@ service cloud.firestore {
           && (d == 0 || (d == 1 && !exists(mark) && existsAfter(mark)) || (d == -1 && exists(mark) && !existsAfter(mark)));
       }
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
+      allow create: if (claimsMe() || isAdmin()) && noRating();
       allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignCount']))) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
-        || countersOnly();
+        || countersOnly() || ratingOnly('voies', id);
       // Si d'autres grimpeurs ont contribué à la voie, seul l'admin peut la supprimer.
       allow delete: if isAdmin() || (mine() && resource.data.get('foreignCount', 0) == 0);
 
@@ -116,6 +127,32 @@ service cloud.firestore {
       allow create: if claimsMe() || isAdmin();
       allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
       allow delete: if mine() || isAdmin();
+    }
+
+    // Notes : un vote par personne (l'identifiant le garantit), visible par son auteur et l'admin seulement.
+    match /votes/{id} {
+      function target(data) { return /databases/$(database)/documents/$(data.kind)/$(data.targetId); }
+      function archived(t) { return t.get('wallId', '') != '' && get(/databases/$(database)/documents/walls/$(t.wallId)).data.get('active', true) == false; }
+      function shapeOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['kind', 'targetId', 'authorId', 'value', 'createdAt', 'updatedAt'])
+          && d.kind in ['blocs', 'voies'] && d.authorId == request.auth.uid && d.value is int && d.value >= 0 && d.value <= 3
+          && id == d.kind + '__' + d.targetId + '__' + request.auth.uid;
+      }
+      // Lire son propre vote doit aussi marcher quand il n'existe pas encore : on se fie à l'identifiant, qui finit par l'uid.
+      allow read: if (signedIn() && id.matches('^(blocs|voies)__.+__' + request.auth.uid + '$')) || isAdmin();
+      allow create: if signedIn() && shapeOk()
+        && get(target(request.resource.data)).data.authorId != request.auth.uid
+        && !archived(get(target(request.resource.data)).data)
+        && getAfter(target(request.resource.data)).data.get('ratingCount', 0) == get(target(request.resource.data)).data.get('ratingCount', 0) + 1
+        && getAfter(target(request.resource.data)).data.get('ratingSum', 0) == get(target(request.resource.data)).data.get('ratingSum', 0) + request.resource.data.value;
+      allow update: if mine() && shapeOk() && !changed().hasAny(['kind', 'targetId', 'authorId'])
+        && !archived(get(target(resource.data)).data)
+        && getAfter(target(resource.data)).data.get('ratingCount', 0) == get(target(resource.data)).data.get('ratingCount', 0)
+        && getAfter(target(resource.data)).data.get('ratingSum', 0) == get(target(resource.data)).data.get('ratingSum', 0) + request.resource.data.value - resource.data.value;
+      allow delete: if isAdmin() || (mine()
+        && getAfter(target(resource.data)).data.get('ratingCount', 0) == get(target(resource.data)).data.get('ratingCount', 0) - 1
+        && getAfter(target(resource.data)).data.get('ratingSum', 0) == get(target(resource.data)).data.get('ratingSum', 0) - resource.data.value);
     }
 
     // Brouillons : privés, visibles par leur auteur seulement.

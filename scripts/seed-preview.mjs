@@ -5,7 +5,7 @@ import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT = 'toposhare-test';
-const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'photos', 'feedback', 'data'];
+const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'photos', 'votes', 'feedback', 'data'];
 
 // Ce script efface toute la base : il refuse de tourner avec une autre clé que celle du projet de test.
 const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;

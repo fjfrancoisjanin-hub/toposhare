@@ -308,6 +308,109 @@ describe('Commune obligatoire', () => {
   });
 });
 
+describe('Notes', () => {
+  const voie = (extra = {}) => ({ authorId: 'alice', name: 'V', ...extra });
+  const vid = uid => `voies__v1__${uid}`;
+  const vote = (uid, value) => ({ kind: 'voies', targetId: 'v1', authorId: uid, value, createdAt: 1, updatedAt: 1 });
+  function cast(uid, value, { count = 1, sum = value, id = vid(uid) } = {}) {
+    const db = user(uid), b = db.batch();
+    b.set(db.doc(`votes/${id}`), vote(uid, value));
+    b.update(db.doc('voies/v1'), { ratingCount: count, ratingSum: sum });
+    return b.commit();
+  }
+  test('un grimpeur vote de 0 à 3 ; le compteur suit', async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(cast('bob', 0));
+    await seed('voies/v2', voie());
+    const db = user('carole'), b = db.batch();
+    b.set(db.doc('votes/voies__v2__carole'), { ...vote('carole', 3), targetId: 'v2' });
+    b.update(db.doc('voies/v2'), { ratingCount: 1, ratingSum: 3 });
+    await assertSucceeds(b.commit());
+  });
+  test('les valeurs −1, 4 et 2,5 sont refusées', async () => {
+    await seed('voies/v1', voie());
+    for (const v of [-1, 4, 2.5]) await assertFails(cast('bob', v));
+  });
+  test('un invité ne peut pas voter', async () => {
+    await seed('voies/v1', voie());
+    const db = anon(), b = db.batch();
+    b.set(db.doc(`votes/${vid('bob')}`), vote('bob', 2));
+    b.update(db.doc('voies/v1'), { ratingCount: 1, ratingSum: 2 });
+    await assertFails(b.commit());
+  });
+  test("l'auteur ne peut pas noter son propre contenu", async () => {
+    await seed('voies/v1', voie());
+    await assertFails(cast('alice', 3));
+  });
+  test('un second vote du même grimpeur ne compte pas deux fois', async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(cast('bob', 2));
+    await assertFails(cast('bob', 3, { count: 2, sum: 5 }));
+    const db = user('bob'), b = db.batch();
+    b.update(db.doc(`votes/${vid('bob')}`), { value: 3 });
+    b.update(db.doc('voies/v1'), { ratingSum: 3 });
+    await assertSucceeds(b.commit());
+  });
+  test('un vote ne peut pas être enregistré sous un autre identifiant', async () => {
+    await seed('voies/v1', voie());
+    await assertFails(cast('bob', 2, { id: 'voies__v1__autre' }));
+    await assertFails(cast('bob', 2, { id: 'libre' }));
+  });
+  test("personne ne peut modifier ni lire le vote d'un autre", async () => {
+    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
+    await seed(`votes/${vid('bob')}`, vote('bob', 2));
+    await assertFails(user('carole').doc(`votes/${vid('bob')}`).get());
+    await assertFails(anon().doc(`votes/${vid('bob')}`).get());
+    await assertFails(user('carole').doc(`votes/${vid('bob')}`).update({ value: 0 }));
+    await assertFails(user('carole').doc(`votes/${vid('bob')}`).delete());
+    await assertSucceeds(user('bob').doc(`votes/${vid('bob')}`).get());
+    await assertSucceeds(owner().doc(`votes/${vid('bob')}`).get());
+  });
+  test("chacun lit son vote même s'il n'existe pas encore, pas celui d'un autre", async () => {
+    await assertSucceeds(user('bob').doc(`votes/${vid('bob')}`).get());
+    await assertFails(user('carole').doc(`votes/${vid('bob')}`).get());
+    await assertFails(user('bob').collection('votes').get());
+  });
+  test('la moyenne ne peut pas être faussée', async () => {
+    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
+    await seed(`votes/${vid('bob')}`, vote('bob', 2));
+    await assertFails(user('carole').doc('voies/v1').update({ ratingCount: 2, ratingSum: 5 }));
+    await assertFails(user('alice').doc('voies/v1').update(trace('alice', { ratingSum: 300 })));
+    await assertFails(owner().doc('voies/v1').update(trace('owner', { ratingSum: 300 })));
+    await assertFails(cast('carole', 1, { count: 2, sum: 90 }));
+    // Retirer son vote exige de retirer aussi sa part du total.
+    await assertFails(user('bob').doc(`votes/${vid('bob')}`).delete());
+    const db = user('bob'), b = db.batch();
+    b.delete(db.doc(`votes/${vid('bob')}`));
+    b.update(db.doc('voies/v1'), { ratingCount: 0, ratingSum: 0 });
+    await assertSucceeds(b.commit());
+  });
+  test('on ne crée pas un contenu avec une note déjà remplie', async () => {
+    await assertFails(user('alice').doc('voies/v9').set({ authorId: 'alice', name: 'V', ratingCount: 9, ratingSum: 27 }));
+    await assertFails(user('alice').doc('blocs/b9').set({ authorId: 'alice', name: 'B', ratingCount: 9, ratingSum: 27 }));
+  });
+  test('un bloc archivé garde sa note mais ne peut plus être noté', async () => {
+    await seed('walls/old', { gymId: 'g1', active: false });
+    await seed('walls/new', { gymId: 'g1', active: true });
+    await seed('blocs/b1', { authorId: 'alice', name: 'B', wallId: 'old', ratingCount: 3, ratingSum: 6 });
+    await seed('blocs/b2', { authorId: 'alice', name: 'B', wallId: 'new' });
+    const go = (bloc, count, sum) => {
+      const db = user('bob'), b = db.batch();
+      b.set(db.doc(`votes/blocs__${bloc}__bob`), { kind: 'blocs', targetId: bloc, authorId: 'bob', value: 2, createdAt: 1, updatedAt: 1 });
+      b.update(db.doc(`blocs/${bloc}`), { ratingCount: count, ratingSum: sum });
+      return b.commit();
+    };
+    await assertFails(go('b1', 4, 8));
+    await assertSucceeds(go('b2', 1, 2));
+  });
+  test("l'admin supprime les votes d'un contenu qu'il supprime", async () => {
+    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
+    await seed(`votes/${vid('bob')}`, vote('bob', 2));
+    await assertSucceeds(owner().collection('votes').where('targetId', '==', 'v1').get());
+    await assertSucceeds(owner().doc(`votes/${vid('bob')}`).delete());
+  });
+});
+
 describe('Correction des noms', () => {
   const CONTENUS = [
     ['blocs/b1', { authorId: 'alice', gymId: 'g1', wallId: 'w1', createdAt: 1, name: 'Bloc', grade: '6a', setter: 'Alice' }, { setter: 'Alicia', name: 'Bloc v2', grade: '6b' }],
