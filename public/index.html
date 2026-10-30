@@ -355,6 +355,10 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
           </div>
           <div id="oeMethF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oClimber">Grimpeur</label><input id="oClimber" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
+            <div class="field"><span class="label">Visibilité</span><div style="display:grid;gap:6px">
+              <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="oVis" id="oVisPrivate" value="private">Privée (moi seul)</label>
+              <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="oVis" id="oVisPublic" value="public">Visible par tous</label>
+            </div></div>
             <div class="field"><label class="label" for="oNote">Notes de méthode (optionnel)</label><textarea id="oNote" maxlength="400" placeholder="ex. Repos genou après le 3e point, crux entre le 4e et le 5e"></textarea></div>
           </div>
           <div class="err" id="oErr"></div>
@@ -814,7 +818,7 @@ $("list").addEventListener("click", e => {
 document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet]")) openSheet(); });
 
 /* ---------- detail ---------- */
-function openDetail(id) { state.current = id; go("detail"); }
+function openDetail(id) { state.current = id; state.delArmed = null; go("detail"); }
 function renderDetail() {
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
   $("dAdminEdit").hidden = !(b && w && isAdmin());
@@ -828,7 +832,7 @@ function renderDetail() {
   $("dSeq").textContent = seqText(b.holds || []);
   $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
   const own = state.me && b.authorId === state.me;
-  $("dDel").hidden = !(own || canManageGym(b.gymId)); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
+  $("dDel").hidden = !(own || canManageGym(b.gymId)) || state.delArmed === b.id; $("dDelOk").hidden = state.delArmed !== b.id; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
 $("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
@@ -860,7 +864,7 @@ function focusB() {
 }
 $("dWall").addEventListener("click", () => openFs("view"));
 $("dWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("view"); } });
-$("dDel").addEventListener("click", () => { $("dDel").hidden = true; $("dDelOk").hidden = false; });
+$("dDel").addEventListener("click", () => { state.delArmed = state.current; $("dDel").hidden = true; $("dDelOk").hidden = false; });
 $("dDelOk").addEventListener("click", async () => { try { await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
 
 /* ---------- gyms & walls sheet ---------- */
@@ -1039,14 +1043,20 @@ function switchSecteur(id) {
   }, () => toast("Impossible de charger les voies pour l'instant."));
   if (state.mode === "out" && state.view !== "olist") go("olist"); else rerender();
 }
+// Méthodes publiques de la voie, plus les méthodes privées de l'utilisateur : les règles refusent toute autre lecture.
+function subscribeMethods(id) {
+  state.unsubMeth?.(); state.unsubMeth = null;
+  if (!state.db || !id) return;
+  let pub = [], priv = [];
+  const merge = () => { state.methodes = [...pub, ...priv].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); rerender(); };
+  const u1 = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => { pub = sn.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, () => {});
+  const u2 = state.me ? state.db.collection("methodesPrivees").where("voieId", "==", id).where("authorId", "==", state.me).onSnapshot(sn => { priv = sn.docs.map(d => ({ id: d.id, ...d.data(), isPrivate: true })); merge(); }, () => {}) : null;
+  state.unsubMeth = () => { u1(); u2?.(); };
+}
 function openVoie(id, sel) {
   if (state.voieId !== id) {
-    state.voieId = id; state.methodes = []; state.oSel = sel || "anchors";
-    if (state.unsubMeth) state.unsubMeth(); state.unsubMeth = null;
-    if (state.db) state.unsubMeth = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => {
-      state.methodes = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      rerender();
-    }, () => {});
+    state.voieId = id; state.methodes = []; state.armedAct = null; state.oSel = sel || "anchors";
+    subscribeMethods(id);
   } else if (sel) state.oSel = sel;
   go("ovoie");
 }
@@ -1125,12 +1135,13 @@ function renderVoie() {
   $("ovName").textContent = v.name; $("ovGrade").textContent = v.grade;
   $("ovBy").textContent = `${secteur()?.name || ""} · ajoutée par ${v.addedBy || "un grimpeur"}`;
   $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
-    `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
+    `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">${x.isPrivate ? `<span class="tag">Privée</span> ` : ""}Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
   const btn = $("ovWall").querySelector(".float");
   $("ovWall").innerHTML = routeSVG(v, v.anchors || [], mSteps(m), { uid: "ov" }); $("ovWall").appendChild(btn);
   const bolts = (v.anchors || []).filter(a => a.t !== "relais").length, hasR = (v.anchors || []).some(a => a.t === "relais");
+  const shared = state.methodes.filter(x => !x.isPrivate).length;
   $("ovSeq").hidden = !!m;
-  $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${state.methodes.length ? `${state.methodes.length} méthode${state.methodes.length > 1 ? "s" : ""} partagée${state.methodes.length > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
+  $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${shared ? `${shared} méthode${shared > 1 ? "s" : ""} partagée${shared > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
   $("ovNote").textContent = m?.note || ""; $("ovNote").hidden = !m?.note;
   const acts = [];
   if (m && mSteps(m).length) acts.push(`<button class="btn" type="button" data-act="replay">▶ Répéter la voie</button>`);
@@ -1140,7 +1151,11 @@ function renderVoie() {
   if (isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminv">Modifier la voie</button>`);
   if (m && isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminm">Modifier le prénom</button>`);
   if (isAdmin()) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer la voie (admin)</button>`);
+  else if (state.me && v.authorId === state.me && !v.foreignCount) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer ma voie</button>`);
   $("ovActions").innerHTML = acts.join("");
+  // Une mise à jour en direct ne doit pas annuler une suppression en attente de confirmation.
+  const armed = state.armedAct && $("ovActions").querySelector(`[data-act="${state.armedAct}"]`);
+  if (armed) { armed.dataset.armed = "1"; armed.textContent = armed.dataset.act === "delv" ? "Confirmer : voie et méthodes" : "Confirmer la suppression"; }
 }
 $("ovMethods").addEventListener("click", e => { const c = e.target.closest("[data-sel]"); if (!c) return; state.oSel = c.dataset.sel; renderVoie(); });
 $("ovWall").addEventListener("click", () => openFs("oview"));
@@ -1154,22 +1169,68 @@ $("ovActions").addEventListener("click", async e => {
   if (a === "adminv") openEdit("voies", state.voieId);
   if (a === "adminm") openEdit("methodes", selMethod()?.id);
   if (a === "delm") {
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer la suppression"; return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer la suppression"; return; }
+    state.armedAct = null;
     const target = selMethod() || myMethod(); if (!target) return;
-    try { await state.db.collection("methodes").doc(target.id).delete(); bumpCount(state.voieId, -1); state.oSel = "anchors"; toast("Méthode supprimée"); } catch { toast("Suppression impossible"); }
+    try { await deleteMethod(target); state.oSel = "anchors"; toast("Méthode supprimée"); } catch { toast("Suppression impossible"); }
   }
   if (a === "delv") {
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer : voie et méthodes"; return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer : voie et méthodes"; return; }
+    state.armedAct = null;
     const v = voie(); if (!v) return;
-    try {
-      for (const m of state.methodes) await state.db.collection("methodes").doc(m.id).delete();
-      if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
-      await state.db.collection("voies").doc(v.id).delete();
-      toast("Voie supprimée"); go("olist");
-    } catch { toast("Suppression impossible"); }
+    try { await deleteVoie(v); toast("Voie supprimée"); go("olist"); } catch { toast("Suppression impossible"); }
   }
 });
-function bumpCount(voieId, d) { const v = state.voies.find(x => x.id === voieId); if (!v || !state.db) return; state.db.collection("voies").doc(voieId).update({ methodCount: Math.max(0, (v.methodCount || 0) + d) }).catch(() => {}); }
+const voieRef = id => state.db.collection("voies").doc(id);
+const contribRef = (voieId, uid) => voieRef(voieId).collection("contributeurs").doc(uid);
+async function saveMethod(oe, fields, wantPrivate) {
+  const v = state.voies.find(x => x.id === oe.voieId), now = Date.now(), batch = state.db.batch(), bump = {};
+  const col = isPrivate => state.db.collection(isPrivate ? "methodesPrivees" : "methodes");
+  const cur = oe.id ? state.methodes.find(m => m.id === oe.id) : null;
+  let id = oe.id;
+  if (cur && !!cur.isPrivate === wantPrivate) batch.update(col(wantPrivate).doc(id), { ...fields, updatedAt: now, updatedBy: state.me });
+  else if (cur) {
+    // Changer de visibilité déplace la méthode, sous le même identifiant.
+    const { id: _, isPrivate: __, ...kept } = cur;
+    batch.delete(col(!wantPrivate).doc(id));
+    batch.set(col(wantPrivate).doc(id), { ...kept, ...fields, updatedAt: now, updatedBy: state.me });
+    if (wantPrivate ? v.methodCount > 0 : true) bump.methodCount = state.db.increment(wantPrivate ? -1 : 1);
+  } else {
+    const ref = col(wantPrivate).doc(); id = ref.id;
+    batch.set(ref, { voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, ...fields, createdAt: now, updatedAt: now });
+    if (!wantPrivate) bump.methodCount = state.db.increment(1);
+    if (v.authorId !== state.me) {
+      const mark = contribRef(oe.voieId, state.me);
+      if (!(await mark.get()).exists) { batch.set(mark, { createdAt: now }); bump.foreignCount = state.db.increment(1); }
+    }
+  }
+  if (Object.keys(bump).length) batch.update(voieRef(oe.voieId), bump);
+  await batch.commit();
+  return id;
+}
+async function deleteMethod(m) {
+  const v = state.voies.find(x => x.id === m.voieId), batch = state.db.batch(), bump = {};
+  batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
+  if (!m.isPrivate && v?.methodCount > 0) bump.methodCount = state.db.increment(-1);
+  if (v && m.authorId !== v.authorId) {
+    const mark = contribRef(m.voieId, m.authorId);
+    if ((await mark.get()).exists) { batch.delete(mark); bump.foreignCount = state.db.increment(-1); }
+  }
+  if (Object.keys(bump).length) batch.update(voieRef(m.voieId), bump);
+  await batch.commit();
+}
+async function deleteVoie(v) {
+  const batch = state.db.batch();
+  for (const m of state.methodes) batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
+  if (isAdmin()) {
+    // L'admin emporte aussi les méthodes privées des autres et les marques de contribution.
+    (await state.db.collection("methodesPrivees").where("voieId", "==", v.id).get()).forEach(d => batch.delete(d.ref));
+    (await voieRef(v.id).collection("contributeurs").get()).forEach(d => batch.delete(d.ref));
+  }
+  batch.delete(voieRef(v.id));
+  await batch.commit();
+  if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
+}
 
 /* ---------- fullscreen view & mental replay ---------- */
 function renderOFs() {
@@ -1220,6 +1281,7 @@ function startMethod() {
   const mine = myMethod();
   state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand" };
   $("oClimber").value = mine?.climber || accountFirstName();
+  $(mine && !mine.isPrivate ? "oVisPublic" : "oVisPrivate").checked = true;
   $("oNote").value = mine?.note || ""; $("oErr").textContent = "";
   go("oedit");
 }
@@ -1331,9 +1393,7 @@ $("oForm").addEventListener("submit", async e => {
       const climber = $("oClimber").value.trim(), note = $("oNote").value.trim();
       if (!oe.steps.length) throw { msg: "Placez au moins une prise." };
       if (!climber) throw { msg: "Indiquez votre prénom." };
-      let id = oe.id;
-      if (id) await state.db.collection("methodes").doc(id).update({ climber, note, steps: oe.steps, updatedAt: Date.now(), updatedBy: state.me });
-      else { const ref = await state.db.collection("methodes").add({ voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, climber, note, steps: oe.steps, createdAt: Date.now(), updatedAt: Date.now() }); id = ref.id; bumpCount(oe.voieId, 1); }
+      const id = await saveMethod(oe, { climber, note, steps: oe.steps }, $("oVisPrivate").checked);
       state.oe = null; toast("Méthode enregistrée"); openVoie(voie()?.id || state.voieId, id);
     }
   } catch (err) { $("oErr").textContent = err && err.msg ? err.msg : "Enregistrement impossible pour l'instant. Réessayez."; }
@@ -1509,7 +1569,7 @@ function subscribeDrafts() {
 BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
 BT.onUser(u => {
   state.me = u ? u.uid : null;
-  renderAcct(); subscribeDrafts(); subscribeRoles(); renderEditorChrome();
+  renderAcct(); subscribeDrafts(); subscribeRoles(); subscribeMethods(state.voieId); renderEditorChrome();
   syncNames();
   if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
   rerender();

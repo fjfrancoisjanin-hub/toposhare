@@ -90,7 +90,7 @@
     ready,
   };
 
-  const dbNs = { collection: p => fs.collection(p), doc: p => fs.doc(p), batch: () => fs.batch() };
+  const dbNs = { collection: p => fs.collection(p), doc: p => fs.doc(p), batch: () => fs.batch(), increment: n => firebase.firestore.FieldValue.increment(n) };
   const userNs = {
     id: async () => auth.currentUser ? auth.currentUser.uid : null,
     me: async () => ({ id: auth.currentUser?.uid || null, name: auth.currentUser?.displayName || "", email: auth.currentUser?.email || null }),
