@@ -7,3 +7,6 @@ ui-debug.log*
 test-results/
 playwright-report/
 .DS_Store
+
+# Clés de service Firebase : ne jamais les committer
+*firebase-adminsdk*.json

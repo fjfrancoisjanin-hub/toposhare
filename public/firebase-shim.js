@@ -2,6 +2,17 @@
 // Les photos sont compressées puis rangées dans la base (collection "photos"), sans Cloud Storage.
 // Expose window.claude.use(...) avec la même forme que la version prototype, pour garder le code de l'appli inchangé.
 (function () {
+  // Hors prod, un bandeau rappelle qu'on est sur l'environnement de test.
+  if (window.TS_TEST_ENV) {
+    const showBanner = () => {
+      const b = document.createElement("div");
+      b.id = "tsEnvBanner"; b.setAttribute("role", "status");
+      b.style.cssText = "background:#FFD84D;color:#1A1A1A;font:600 12px/1.4 system-ui,sans-serif;text-align:center;padding:4px 8px";
+      b.textContent = "Environnement de test" + (window.TS_PREVIEW_PR ? " · PR #" + window.TS_PREVIEW_PR : "");
+      document.body.prepend(b);
+    };
+    if (document.body) showBanner(); else document.addEventListener("DOMContentLoaded", showBanner);
+  }
   firebase.initializeApp(window.FIREBASE_CONFIG);
   const auth = firebase.auth(), fs = firebase.firestore();
   // En local (localhost), l'appli parle aux émulateurs Firebase et ne touche jamais la base de prod.

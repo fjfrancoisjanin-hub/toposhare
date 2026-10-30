@@ -1,5 +1,5 @@
 # Tests à chaque pull request et à chaque push sur main,
-# puis, pour une pull request, mise en ligne sur une URL de prévisualisation (valable 7 jours).
+# puis, pour une pull request, mise en ligne sur l'environnement de test (projet toposhare-test, sans aucun accès à la prod).
 name: CI
 
 on:
@@ -34,17 +34,48 @@ jobs:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     needs: test
     runs-on: ubuntu-latest
+    # Une seule URL de test : les déploiements passent l'un après l'autre, le dernier gagne.
+    concurrency:
+      group: preview
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
-      checks: write
+    env:
+      PREVIEW_PR: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/setup-node@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BETATHEQUE }}
-          projectId: betatheque
-          expires: 7d
-          target: toposhare
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Numéro de PR dans le bandeau
+        run: |
+          sed -i "s/window.TS_PREVIEW_PR = \"\";/window.TS_PREVIEW_PR = \"$PREVIEW_PR\";/" public/config.js
+          grep -q "TS_PREVIEW_PR = \"$PREVIEW_PR\"" public/config.js
+
+      - name: Clé du projet de test
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TOPOSHARE_TEST }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Site et règles sur le projet de test
+        run: npx firebase deploy --config firebase.preview.json --only hosting,firestore:rules --project toposhare-test --non-interactive
+
+      - name: Jeu de données fictif
+        run: node scripts/seed-preview.mjs
+
+      - name: Contrôle du site en ligne
+        run: npx playwright test -c playwright.preview.config.js
+
+      - name: URL sur la PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "$PREVIEW_PR" --repo "$GITHUB_REPOSITORY" --edit-last --create-if-none \
+            --body "Environnement de test : https://toposhare-test.web.app (commit ${{ github.event.pull_request.head.sha }}). Une seule URL partagée entre les PR : la dernière déployée s'affiche, voir le numéro dans le bandeau."

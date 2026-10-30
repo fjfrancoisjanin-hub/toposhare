@@ -65,9 +65,9 @@ git commit --allow-empty -m "Test de la chaîne CI"
 git push -u origin test/chaine
 ```
 
-Sur GitHub, ouvrir une **pull request** depuis cette branche : la CI lance les tests, puis commente la PR avec une **URL de prévisualisation** valable 7 jours. Fusionner la PR : le workflow Deploy met en production.
+Sur GitHub, ouvrir une **pull request** depuis cette branche : la CI lance les tests, déploie la PR sur l'**environnement de test** (https://toposhare-test.web.app), puis commente la PR. Fusionner la PR : le workflow Deploy met en production.
 
-Note : la connexion Google ne fonctionne pas sur les URL de prévisualisation (domaine non autorisé). La consultation, si. Une URL de prévisualisation utilise la **base de prod** : ce que les testeurs y publient est réel.
+Note : l'environnement de test utilise le projet Firebase `toposhare-test`, jamais la base de prod. La connexion Google y fonctionne. Ses données sont fictives et remises à zéro à chaque déploiement. Il n'y a qu'une URL : si deux PR sont ouvertes, c'est la dernière déployée qui s'affiche, et son numéro est dans le bandeau.
 
 ## Au quotidien, ensuite
 
