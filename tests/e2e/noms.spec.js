@@ -15,7 +15,7 @@ async function openCrag(page, secteurId, extra = {}) {
     for (const [k, v] of Object.entries(x)) localStorage.setItem(k, v);
   }, [secteurId, extra]);
   await page.route('**/geo.api.gouv.fr/**', r => r.abort());
-  await page.goto('/');
+  await page.goto(`/#/secteur/${secteurId}`);
 }
 
 async function seedCrag(id) {
@@ -100,7 +100,7 @@ test('un grimpeur ordinaire ne voit aucun bouton de correction', async ({ page }
   await openCrag(page, id);
   await login(page, BOB);
   await page.locator('#gymName').click();
-  await expect(page.locator('.gymrow').first()).toBeVisible();
+  await expect(page.locator('#sheet .gymrow').first()).toBeVisible();
   await expect(page.locator('[data-edit]')).toHaveCount(0);
 });
 
@@ -138,8 +138,7 @@ test("l'admin corrige une salle et l'ouvreur d'un bloc", async ({ page }, testIn
   await seed('gyms', id, { name: `Salle ${id}`, city: 'Albi', createdAt: 1 });
   await seed('walls', `w-${id}`, { gymId: id, name: 'Spray wall', image: '', w: 100, h: 100, active: true, createdAt: 1 });
   await seed('blocs', `b-${id}`, { gymId: id, wallId: `w-${id}`, name: `Bloc ${id}`, grade: '6a', setter: 'Mauvais', holds: [], authorId: 'alice-e2e', createdAt: 1 });
-  await page.addInitScript(g => localStorage.setItem('pan-gym', g), id);
-  await page.goto('/');
+  await page.goto(`/#/salle/${id}`);
   await login(page, ADMIN);
 
   await page.getByText(`Bloc ${id}`).click();

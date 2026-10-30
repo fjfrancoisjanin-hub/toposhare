@@ -12,8 +12,9 @@ async function mockGeo(page, queries = []) {
   });
 }
 async function openNewSector(page) {
-  await page.addInitScript(() => localStorage.setItem('pan-mode', 'out'));
-  await page.goto('/');
+  const base = `base-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  await seed('secteurs', base, { name: base, region: '', createdAt: 1 });
+  await page.goto(`/#/secteur/${base}`);
   await login(page, ALICE);
   await page.locator('#gymName').click();
   await page.locator('[data-sheet="newsector"]').click();
@@ -80,8 +81,7 @@ test("un secteur sans commune reste valide, et l'admin lui rattache une commune"
   const id = uid(testInfo);
   await seed('secteurs', id, { name: `Ancien ${id}`, region: '', createdAt: 1 });
   await mockGeo(page);
-  await page.addInitScript(s => { localStorage.setItem('pan-mode', 'out'); localStorage.setItem('pan-sect', s); }, id);
-  await page.goto('/');
+  await page.goto(`/#/secteur/${id}`);
   await expect(page.locator('#gymName')).toContainText(`Ancien ${id}`);
   await login(page, ADMIN);
   await page.locator('#gymName').click();

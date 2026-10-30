@@ -141,7 +141,23 @@ textarea { min-height: 60px; resize: vertical; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; padding-block: 18px 24px; justify-content: flex-end; }
 
 nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; padding-block: 10px; }
+nav.tabs .in { max-width: 720px; margin: 0 auto; display: flex; gap: 10px; padding-block: 10px; }
+nav.tabs .tab { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+nav.tabs .tab.plus { flex-grow: 1.3; }
+.search { width: 100%; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); }
+.home { display: grid; gap: 16px; padding-block: 14px 24px; }
+.home h1 { font-family: var(--f-display); font-size: 26px; margin: 0; }
+.home section { display: grid; gap: 8px; }
+.resume { appearance: none; border: 0; padding: 0; position: relative; display: block; width: 100%; min-height: 150px; border-radius: 16px; overflow: hidden; background: var(--stage); color: #fff; text-align: left; cursor: pointer; }
+.resume img, .placehero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.resume .txt, .placehero .txt { position: relative; display: grid; gap: 2px; padding: 40px 14px 12px; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+.resume b, .placehero b { font: 800 19px var(--f-display); overflow-wrap: anywhere; }
+.resume small, .placehero small { opacity: .85; }
+.placehero { position: relative; border-radius: 14px; overflow: hidden; background: var(--stage); color: #fff; margin-block: 10px; }
+.placehero .bar { position: relative; display: flex; gap: 8px; justify-content: space-between; padding: 8px; }
+.placehero .bar button { appearance: none; border: 0; border-radius: 10px; padding: 8px 10px; font: 700 13px var(--f-body); background: rgba(0,0,0,.55); color: #fff; cursor: pointer; }
+.placehero .bar div { display: flex; gap: 8px; }
+mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
 .tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 700 15px var(--f-body); padding: 10px; border-radius: 12px; cursor: pointer; }
 .tab[aria-current="page"] { color: var(--fg); background: var(--bg); }
 .tab.plus { background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
@@ -234,9 +250,21 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
     <button class="gymbtn" id="gymBtn" type="button" aria-label="Changer de salle"><b id="gymName">Chargement…</b><small id="gymSub"></small></button>
   </header>
 
+  <!-- HOME -->
+  <section id="vHome">
+    <div class="gut home">
+      <h1 id="hTitle" hidden>Où grimpes-tu aujourd'hui ?</h1>
+      <input class="search" id="hSearch" type="search" placeholder="Salle, secteur, commune, voie" aria-label="Rechercher" autocomplete="off">
+      <div id="hResults" style="display:grid;gap:14px" aria-live="polite"></div>
+      <div id="hBody" style="display:grid;gap:16px"></div>
+      <button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button>
+    </div>
+  </section>
+
   <!-- LIST -->
-  <section id="vList">
+  <section id="vList" hidden>
     <div class="gut">
+      <div class="placehero" data-hero="salle"></div>
       <div class="banner" id="offline" hidden>Impossible de joindre la base. Vérifiez votre connexion puis rechargez la page.</div>
       <div class="filters" role="group" aria-label="Filtrer" id="filters"></div>
       <div class="list" id="list" aria-live="polite"></div>
@@ -313,7 +341,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
 
   <!-- OUTDOOR: route list -->
   <section id="oList" hidden>
-    <div class="gut"><div class="list" id="oListEl" aria-live="polite"></div><button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button></div>
+    <div class="gut"><div class="placehero" data-hero="secteur"></div><div class="list" id="oListEl" aria-live="polite"></div><button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button></div>
   </section>
 
   <!-- OUTDOOR: one route -->
@@ -373,9 +401,9 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
 </div>
 
 <nav class="tabs"><div class="in">
-  <button class="tab" id="tabList" aria-current="page">Salle</button>
-  <button class="tab" id="tabOut">Falaise</button>
-  <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau bloc</span></button>
+  <button class="tab" id="tabHome" aria-current="page">Accueil</button>
+  <button class="tab" id="tabPlace" hidden></button>
+  <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau</span></button>
 </div></nav>
 
 <!-- FULLSCREEN -->
@@ -432,7 +460,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
 
@@ -779,6 +807,7 @@ function renderFilters() {
 }
 $("filters").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.filter = b.dataset.f; renderFilters(); renderList(); });
 function renderList() {
+  renderHero();
   renderFilters();
   if (!state.loaded) { $("list").innerHTML = `<div class="empty">Chargement des blocs…</div>`; return; }
   if (!gym()) { $("list").innerHTML = `<div class="empty"><strong>Choisissez votre salle</strong><span>Sélectionnez une salle existante ou ajoutez la vôtre avec une photo de son mur.</span><button class="btn" type="button" data-open-sheet>Choisir une salle</button></div>`; return; }
@@ -869,11 +898,12 @@ $("dDelOk").addEventListener("click", async () => { try { await state.db.collect
 
 /* ---------- gyms & walls sheet ---------- */
 function openSheet(panel = "main") { state.sheet = panel; $("sheet").innerHTML = ""; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
-function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; if ($("fs").hidden) document.body.classList.remove("locked"); }
+function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; state.afterPick = false; if ($("fs").hidden) document.body.classList.remove("locked"); }
 $("sheetBg").addEventListener("click", e => { if (e.target === $("sheetBg")) closeSheet(); });
 $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "sectors" : "main"));
 function renderSheet() {
   if (state.sheet === "edit") return renderEditSheet();
+  if (state.sheet === "newchoice") return renderChoiceSheet();
   // Une mise à jour en direct n'efface pas un formulaire de création en cours.
   if ((state.sheet === "newgym" && $("ngName")) || (state.sheet === "newsector" && $("nsName"))) return;
   if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
@@ -908,7 +938,7 @@ function renderSheet() {
         batch.set(gref, { name, city: communeLabel(commune), commune, createdAt: Date.now() });
         batch.set(state.db.collection("walls").doc(), { gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
         await batch.commit();
-        switchGym(gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
+        openPlace("salle", gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
       } catch (err) { $("sErr").textContent = "La création a échoué. Vérifiez la photo et réessayez."; }
     });
     return;
@@ -948,7 +978,7 @@ function renderSheet() {
 $("sheet").addEventListener("click", e => {
   const p = e.target.closest("[data-sheet]"); if (p) { state.sheet = p.dataset.sheet; renderSheet(); return; }
   if (e.target.closest("[data-close-sheet]")) { closeSheet(); return; }
-  const gb = e.target.closest("[data-gym]"); if (gb) { switchGym(gb.dataset.gym); closeSheet(); }
+  const gb = e.target.closest("[data-gym]"); if (gb) { const after = state.afterPick; openPlace("salle", gb.dataset.gym); closeSheet(); if (after) $("tabCreate").click(); }
 });
 async function prepPhoto(file) {
   const url = URL.createObjectURL(file), img = new Image(); img.src = url; await img.decode();
@@ -966,17 +996,160 @@ async function uploadPhoto(file) {
   return { url: a.url, w: p.w, h: p.h };
 }
 
+/* ---------- accueil : lieu en cours, favoris, récents (gardés sur le téléphone) ---------- */
+const lsJson = k => { try { return JSON.parse(lsGet(k) || "[]"); } catch { return []; } };
+const placeOf = (type, id) => type === "salle" ? state.gyms.find(g => g.id === id) : type === "secteur" ? state.secteurs.find(x => x.id === id) : type === "voie" ? state.allVoies.find(v => v.id === id) : null;
+const liveRecents = () => lsJson("ts-recents").filter(r => placeOf(r.type, r.id));
+const currentPlace = () => liveRecents().find(r => r.type !== "voie") || null;
+function touchRecent(type, id) { lsSet("ts-recents", JSON.stringify([{ type, id, t: Date.now() }, ...lsJson("ts-recents").filter(r => !(r.type === type && r.id === id))].slice(0, 20))); }
+const isFav = (type, id) => lsJson("ts-favs").some(f => f.type === type && f.id === id);
+function toggleFav(type, id) { const favs = lsJson("ts-favs"); lsSet("ts-favs", JSON.stringify(isFav(type, id) ? favs.filter(f => !(f.type === type && f.id === id)) : [...favs, { type, id }])); }
+const placeCommune = (type, x) => type === "salle" ? x.city : type === "secteur" ? x.region : state.secteurs.find(s => s.id === x.secteurId)?.name;
+const placePhoto = (type, id) => { const ref = type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image; return ref ? BT.img(ref) : ""; };
+const placeUrl = (type, id) => `${location.origin}/#/${type}/${id}`;
+function openPlace(type, id) {
+  touchRecent(type, id);
+  if (type === "salle") { if (state.gymId !== id) switchGym(id); go("list"); }
+  else { if (state.secteurId !== id) switchSecteur(id); go("olist"); }
+}
+function renderTabs() {
+  const p = currentPlace(), x = p && placeOf(p.type, p.id), tab = $("tabPlace");
+  tab.hidden = !x;
+  if (x) { tab.textContent = `${p.type === "salle" ? "🧗" : "⛰️"} ${x.name}`; tab.setAttribute("aria-label", x.name); }
+  const editing = p?.type === "salle" && (state.edit.kind !== "new" || state.holds.length);
+  $("tabCreateLbl").textContent = !p ? "Nouveau" : p.type === "secteur" ? "Nouvelle voie" : editing ? "Bloc en cours" : "Nouveau bloc";
+}
+function renderHero() {
+  for (const el of document.querySelectorAll("[data-hero]")) {
+    const type = el.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId, x = placeOf(type, id);
+    if (!x) { el.innerHTML = ""; el.hidden = true; continue; }
+    const photo = placePhoto(type, id), fav = isFav(type, id);
+    el.hidden = false;
+    el.innerHTML = `${photo ? `<img src="${esc(photo)}" alt="">` : ""}
+      <div class="bar"><button type="button" data-home>← Accueil</button><div>
+        <button type="button" data-share>Partager le lien</button>
+        <button type="button" data-star aria-pressed="${fav}" aria-label="${fav ? "Retirer des favoris" : "Ajouter aux favoris"}">${fav ? "★" : "☆"}</button></div></div>
+      <div class="txt"><b>${esc(x.name)}</b><small>${esc(placeCommune(type, x) || "")}</small></div>`;
+  }
+}
+document.addEventListener("click", async e => {
+  const h = e.target.closest("[data-hero]"); if (!h) return;
+  const type = h.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId;
+  if (e.target.closest("[data-home]")) go("home");
+  if (e.target.closest("[data-star]")) { toggleFav(type, id); renderHero(); }
+  if (e.target.closest("[data-share]")) {
+    const url = placeUrl(type, id);
+    try { if (navigator.share) await navigator.share({ title: placeOf(type, id)?.name, url }); else { await navigator.clipboard.writeText(url); toast("Lien copié"); } }
+    catch (err) { if (err?.name !== "AbortError") prompt("Lien à copier", url); }
+  }
+});
+const placeRow = (r, sub) => { const x = placeOf(r.type, r.id); return `<button class="gymrow" type="button" data-go="${r.type}:${esc(r.id)}"><span><b>${esc(x.name)}</b> <small>${esc(sub ?? placeCommune(r.type, x) ?? "")}</small></span><small>${TYPE_LABEL[r.type]}</small></button>`; };
+const TYPE_LABEL = { salle: "Salle", secteur: "Secteur", voie: "Voie" };
+function renderHome() {
+  renderSearch();
+  const recents = liveRecents(), p = recents.find(r => r.type !== "voie"), firstRun = !lsJson("ts-recents").length;
+  $("hTitle").hidden = !firstRun;
+  $("hBody").hidden = !!$("hSearch").value.trim();
+  if (!state.loaded || !state.oLoaded) { $("hBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  if (!p && !recents.length) {
+    $("hBody").innerHTML = `<section>${[...state.gyms.map(g => placeRow({ type: "salle", id: g.id })), ...state.secteurs.map(x => placeRow({ type: "secteur", id: x.id }))].join("")}</section>
+      <button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
+    return;
+  }
+  const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id)), others = recents.filter(r => !(p && r.type === p.type && r.id === p.id)).slice(0, 5);
+  let html = "";
+  if (p) {
+    const x = placeOf(p.type, p.id), photo = placePhoto(p.type, p.id);
+    html += `<button class="resume" id="hResume" data-go="${p.type}:${esc(p.id)}">${photo ? `<img src="${esc(photo)}" alt="">` : ""}<span class="txt"><b>Reprendre : ${esc(x.name)}</b><small>${[TYPE_LABEL[p.type], placeCommune(p.type, x), ago(p.t)].filter(Boolean).map(esc).join(" · ")}</small></span></button>`;
+  }
+  if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
+  if (others.length) html += `<section><div class="label">Récents</div>${others.map(r => placeRow(r)).join("")}</section>`;
+  $("hBody").innerHTML = html;
+}
+// Recherche sur le contenu public seulement : aucune méthode ni aucun brouillon.
+const foldChars = s => [...(s || "")].map(c => { const f = c.normalize("NFD")[0].toLowerCase(); return /[a-z0-9]/.test(f) ? f : " "; }).join("");
+function highlight(text, q) {
+  const folded = foldChars(text), needle = [q, q.replace(/\bsaint\b/g, "st"), q.replace(/\bsainte\b/g, "ste")].find(n => folded.includes(n));
+  if (!needle) return esc(text);
+  const i = folded.indexOf(needle), chars = [...text];
+  return esc(chars.slice(0, i).join("")) + "<mark>" + esc(chars.slice(i, i + needle.length).join("")) + "</mark>" + esc(chars.slice(i + needle.length).join(""));
+}
+function renderSearch() {
+  const raw = $("hSearch").value.trim(), q = simplify(raw), box = $("hResults");
+  $("hBody").hidden = !!raw;
+  if (!q) { box.innerHTML = ""; return; }
+  const hit = s => simplify(s).includes(q), groups = [];
+  const row = (attr, name, sub, kind) => `<button class="gymrow" type="button" ${attr}><span><b>${highlight(name, q)}</b> <small>${esc(sub || "")}</small></span><small>${kind}</small></button>`;
+  const communes = new Map();
+  for (const x of [...state.secteurs.map(s => [s, s.region]), ...state.gyms.map(g => [g, g.city])]) if (x[1] && hit(x[1])) communes.set(simplify(x[1]), x[1]);
+  if (communes.size) groups.push(["Commune", [...communes.values()].map(c => row(`data-q="${esc(c)}"`, c, "", "Commune"))]);
+  const secteurs = state.secteurs.filter(s => hit(s.name) || hit(s.region));
+  if (secteurs.length) groups.push(["Secteurs", secteurs.map(s => row(`data-go="secteur:${esc(s.id)}"`, s.name, s.region, "Secteur"))]);
+  const voies = state.allVoies.filter(v => hit(v.name));
+  if (voies.length) groups.push(["Voies", voies.map(v => row(`data-go="voie:${esc(v.id)}"`, v.name, state.secteurs.find(s => s.id === v.secteurId)?.name, "Voie"))]);
+  const salles = state.gyms.filter(g => hit(g.name) || hit(g.city));
+  if (salles.length) groups.push(["Salles", salles.map(g => row(`data-go="salle:${esc(g.id)}"`, g.name, g.city, "Salle"))]);
+  const satisfied = secteurs.length || voies.length || salles.length;
+  box.innerHTML = groups.map(([t, rows]) => `<section style="display:grid;gap:8px"><div class="label">${t}</div>${rows.join("")}</section>`).join("")
+    + (satisfied ? "" : `<div class="note">Aucun résultat.</div><button class="btn ghost small" type="button" data-new-sector>Créer un secteur à ${esc(raw)}</button>`);
+}
+$("hSearch").addEventListener("input", renderSearch);
+function openVoieById(id) {
+  const v = state.allVoies.find(x => x.id === id); if (!v) return false;
+  openPlace("secteur", v.secteurId);
+  openVoie(id);
+  return true;
+}
+$("vHome").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) { const [type, id] = g.dataset.go.split(/:(.*)/s); type === "voie" ? openVoieById(id) : openPlace(type, id); return; }
+  const c = e.target.closest("[data-q]");
+  if (c) { $("hSearch").value = c.dataset.q; renderSearch(); return; }
+  if (e.target.closest("[data-add-place]")) { state.me ? openSheet("newchoice") : promptLogin("ajouter du contenu"); return; }
+  if (e.target.closest("[data-new-sector]")) {
+    if (!state.me) { promptLogin("créer un secteur"); return; }
+    const q = $("hSearch").value.trim();
+    openSheet("newsector");
+    $("nsRegion").value = q; $("nsRegion").dispatchEvent(new Event("input"));
+  }
+});
+function renderChoiceSheet() {
+  $("sheet").innerHTML = `<h2 id="sheetTitle">Que veux-tu ajouter ?</h2>
+    <div style="display:grid;gap:10px"><button class="btn" type="button" data-pick-after="main">Nouveau bloc</button><button class="btn" type="button" data-pick-after="sectors">Nouvelle voie</button>
+    <button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>`;
+}
+$("sheet").addEventListener("click", e => { const b = e.target.closest("[data-pick-after]"); if (!b) return; state.afterPick = true; state.sheet = b.dataset.pickAfter; renderSheet(); });
+// Liens directs : /#/salle/id, /#/secteur/id, /#/voie/id, /#/bloc/id. Un lien n'ouvre que la consultation.
+async function routeFromHash() {
+  const m = location.hash.match(/^#\/(salle|secteur|voie|bloc)\/(.+)$/);
+  if (!m) return;
+  const [, type, id] = m;
+  history.replaceState(null, "", location.pathname + location.search);
+  const gone = () => { toast("Ce contenu n'existe plus"); go("home"); };
+  if (type === "salle" || type === "secteur") { placeOf(type, id) ? openPlace(type, id) : gone(); return; }
+  try {
+    const d = await state.db.collection(type === "voie" ? "voies" : "blocs").doc(id).get();
+    if (!d.exists) return gone();
+    const x = d.data();
+    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x }); openPlace("secteur", x.secteurId); openVoie(id); }
+    else { if (!placeOf("salle", x.gymId)) return gone(); openPlace("salle", x.gymId); openDetail(id); }
+  } catch { gone(); }
+}
+window.addEventListener("hashchange", () => { if (state.booted) routeFromHash(); });
+function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); routeFromHash(); }
+
 /* ---------- navigation ---------- */
-const VIEWS = { list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+const VIEWS = { home: "vHome", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
   state.view = v; state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode);
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
-  $("tabList").setAttribute("aria-current", state.mode === "in" && v !== "create" ? "page" : "false");
-  $("tabOut").setAttribute("aria-current", state.mode === "out" && v !== "oedit" ? "page" : "false");
+  $("gymBtn").hidden = v === "home";
+  $("tabHome").setAttribute("aria-current", v === "home" ? "page" : "false");
+  $("tabPlace").setAttribute("aria-current", ["list", "olist", "detail", "ovoie"].includes(v) ? "page" : "false");
   $("tabCreate").setAttribute("aria-current", v === "create" || v === "oedit" ? "page" : "false");
-  $("tabCreateLbl").textContent = state.mode === "out" ? "Nouvelle voie" : (state.edit.kind !== "new" || state.holds.length ? "Bloc en cours" : "Nouveau bloc");
   renderHeader();
+  if (v === "home") renderHome();
   if (v === "olist") renderOList();
   if (v === "ovoie") renderVoie();
   if (v === "oedit") { renderOE(); oView.layout(true); }
@@ -985,16 +1158,21 @@ function go(v) {
   if (v === "detail") renderDetail();
   window.scrollTo(0, 0);
 }
-$("tabList").onclick = () => go("list");
-$("tabOut").onclick = () => go("olist");
+$("tabHome").onclick = () => go("home");
+$("tabPlace").onclick = () => { const p = currentPlace(); if (p) openPlace(p.type, p.id); };
 $("tabCreate").onclick = () => {
-  if (!state.me) { setTimeout(() => promptLogin(state.mode === "out" ? "ajouter une voie" : "publier un bloc"), 150); }
-  state.mode === "out" ? startRoute() : go("create");
+  const p = currentPlace();
+  if (!p && !state.me) { promptLogin("ajouter du contenu"); return; }
+  if (!p) { openSheet("newchoice"); return; }
+  if (!state.me) { setTimeout(() => promptLogin(p.type === "secteur" ? "ajouter une voie" : "publier un bloc"), 150); }
+  if (p.type === "secteur") { if (state.secteurId !== p.id) switchSecteur(p.id); startRoute(); }
+  else { if (state.gymId !== p.id) switchGym(p.id); go("create"); }
 };
 $("backBtn").onclick = () => { if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
 let tt; function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
 
 function renderHeader() {
+  renderTabs();
   if (state.mode === "out") {
     const sc = secteur();
     $("gymName").textContent = sc ? sc.name : (state.oLoaded ? "Choisir un secteur" : "Chargement…");
@@ -1007,6 +1185,7 @@ function renderHeader() {
 }
 function rerender() {
   renderHeader();
+  if (state.view === "home") renderHome();
   if (state.view === "list") renderList();
   if (state.view === "detail") renderDetail();
   if (state.view === "create") renderEditor();
@@ -1045,6 +1224,7 @@ function switchSecteur(id) {
   if (state.unsubVoies) state.unsubVoies(); state.unsubVoies = null;
   if (state.db && id) state.unsubVoies = state.db.collection("voies").where("secteurId", "==", id).onSnapshot(sn => {
     state.voies = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+    state.allVoies = [...state.allVoies.filter(v => v.secteurId !== id), ...state.voies];
     rerender();
   }, () => toast("Impossible de charger les voies pour l'instant."));
   if (state.mode === "out" && state.view !== "olist") go("olist"); else rerender();
@@ -1060,6 +1240,7 @@ function subscribeMethods(id) {
   state.unsubMeth = () => { u1(); u2?.(); };
 }
 function openVoie(id, sel) {
+  touchRecent("voie", id);
   if (state.voieId !== id) {
     state.voieId = id; state.methodes = []; state.armedAct = null; state.oSel = sel || "anchors";
     subscribeMethods(id);
@@ -1115,6 +1296,7 @@ function methodSummary(steps) {
 
 /* ---------- route list ---------- */
 function renderOList() {
+  renderHero();
   const el = $("oListEl");
   if (!state.oLoaded) { el.innerHTML = `<div class="empty">Chargement des secteurs…</div>`; return; }
   if (!secteur()) { el.innerHTML = `<div class="empty"><strong>La falaise, voie par voie</strong><span>Choisissez un secteur ou créez-le, puis ajoutez la photo d'une voie, ses points d'ancrage et votre méthode.</span><button class="btn" type="button" data-open-sectors>Choisir un secteur</button></div>`; return; }
@@ -1477,7 +1659,7 @@ function renderSectorSheet() {
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", async e => {
-  const sb = e.target.closest("[data-sect]"); if (sb) { switchSecteur(sb.dataset.sect); closeSheet(); return; }
+  const sb = e.target.closest("[data-sect]"); if (sb) { const after = state.afterPick; openPlace("secteur", sb.dataset.sect); closeSheet(); if (after) $("tabCreate").click(); return; }
   if (e.target.closest("[data-sect-create]")) {
     const name = $("nsName").value.trim();
     if (!name) { $("sErr").textContent = "Donnez un nom au secteur."; return; }
@@ -1485,7 +1667,7 @@ $("sheet").addEventListener("click", async e => {
     await state.nsPicker.check();
     const commune = state.nsPicker.get();
     if (!commune) { $("sErr").textContent = "Choisissez une commune dans la liste."; return; }
-    try { const ref = await state.db.collection("secteurs").add({ name, region: communeLabel(commune), commune, authorId: state.me || null, createdAt: Date.now() }); switchSecteur(ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
+    try { const ref = await state.db.collection("secteurs").add({ name, region: communeLabel(commune), commune, authorId: state.me || null, createdAt: Date.now() }); state.secteurs.push({ id: ref.id, name, region: communeLabel(commune), commune }); openPlace("secteur", ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
     catch { $("sErr").textContent = "La création a échoué. Réessayez."; }
   }
 });
@@ -1663,7 +1845,7 @@ document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.
 
 /* ---------- boot ---------- */
 try { localStorage.removeItem("pan-setter"); } catch {}
-renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "out" ? "olist" : "list"); renderHeader();
+renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
 
 (async () => {
   const [db, user, assets] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("assets")]);
@@ -1671,7 +1853,7 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
   if (!db) { state.loaded = state.oLoaded = true; $("offline").hidden = false; renderHeader(); renderList(); if (state.mode === "out") renderOList(); return; }
   db.collection("secteurs").onSnapshot(sn => {
     state.secteurs = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
-    if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); }
+    if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); bootRoute(); }
     rerender();
   }, () => {});
   if (user) {
@@ -1686,9 +1868,11 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
       state.loaded = true;
       if (!state.gyms.some(g => g.id === state.gymId)) state.gymId = state.gyms[0]?.id || null;
       if (state.gymId) switchGym(state.gymId); else rerender();
+      bootRoute();
     } else rerender();
   };
   const fail = () => { $("offline").hidden = false; };
+  db.collection("voies").get().then(s => { const known = new Set(state.allVoies.map(v => v.id)); state.allVoies.push(...s.docs.filter(d => !known.has(d.id)).map(d => ({ id: d.id, ...d.data() }))); rerender(); }).catch(() => {});
   db.collection("gyms").onSnapshot(s => { state.gyms = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); gotG = true; ready(); }, fail);
   db.collection("walls").onSnapshot(s => { state.walls = s.docs.map(d => ({ id: d.id, ...d.data() })); gotW = true; ready(); }, fail);
 })();
