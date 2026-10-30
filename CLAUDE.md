@@ -27,6 +27,22 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 `gyms`, `walls` (photo du mur d'une salle), `blocs`, `secteurs`, `voies` (champ `methodCount`), `methodes`, `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés).
 Chaque contenu porte `authorId` = uid de l'auteur. Le propriétaire (`isOwner()` dans les règles : e-mail vérifié) peut tout modérer.
 
+## Décisions de référence
+- **Rôles :**
+  - **Invité** : consulte seulement.
+  - **Grimpeur connecté** : crée et modifie ce qu'il a créé ; ajoute sa méthode et ses vues sur la voie d'un autre.
+  - **Propriétaire de salle** : change la photo du mur de sa salle ; supprime, sans les modifier, les blocs de sa salle.
+  - **Admin** : tous les droits.
+- **Propriétaire de salle** : attribué par l'admin depuis `/admin`, par e-mail. Créer une salle ne rend pas propriétaire.
+- **Création de salle** : ouverte à tout grimpeur connecté, avec la photo initiale.
+- **Méthodes falaise** : privées par défaut, publiques sur choix explicite. L'admin peut les lire et les supprimer pour la modération, sans qu'elles s'affichent dans sa navigation normale.
+- **Suppression d'une voie** : si d'autres grimpeurs y ont une méthode ou une vue, seul l'admin peut la supprimer.
+- **Notes** : de 0 à 3 étoiles, connexion obligatoire, un vote par personne, moyenne affichée à partir de 3 votes, pas de note sur son propre contenu.
+- **Géographie** : deux niveaux en falaise, commune puis secteur. La commune vient de la liste officielle française (geo.api.gouv.fr), elle est obligatoire pour un nouveau secteur, et affichée « Saint-Antonin-Noble-Val (82) ». France uniquement pour l'instant.
+- **Voies** : une ou plusieurs longueurs, chacune avec sa cotation ; une ou plusieurs vues (photos) par longueur ; points d'ancrage propres à chaque vue.
+- **Navigation** : écran d'accueil avec recherche ; barre du bas « Accueil · lieu en cours · Nouveau bloc / Nouvelle voie ».
+- **Contrôle côté serveur** : toute règle d'accès est appliquée par les règles Firestore, jamais seulement en cachant un bouton.
+
 ## Sécurité : failles connues (tests `todo` dans tests/rules)
 1. `walls` : n'importe quel grimpeur connecté peut remplacer la photo du mur d'une salle → à fermer avec le rôle « admin de salle ».
 2. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
