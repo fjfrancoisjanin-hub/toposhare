@@ -12,8 +12,8 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 
 ## Fichiers
 - `public/index.html` : l'appli (un seul fichier, ~110 Ko).
-- `public/admin.html` : `/admin`, suivi d'activité, avis, import du seed, modération. Réservé au propriétaire.
-- `public/config.js` : config Firebase (publique par nature) + e-mail propriétaire.
+- `public/admin.html` : `/admin`, suivi d'activité, avis, import du seed, modération. Réservé à l'admin.
+- `public/config.js` : config Firebase (publique par nature) + e-mail de l'admin.
 - `firestore.rules` : seule vraie barrière de sécurité. Tout changement de règle = test dans `tests/rules/`.
 - `redirect/` : site `betatheque` qui redirige.
 
@@ -25,7 +25,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 
 ## Modèle de données (collections)
 `gyms`, `walls` (photo du mur d'une salle), `blocs`, `secteurs`, `voies` (champ `methodCount`), `methodes`, `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés).
-Chaque contenu porte `authorId` = uid de l'auteur. Le propriétaire (`isOwner()` dans les règles : e-mail vérifié) peut tout modérer.
+Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isOwner()` dans les règles : e-mail vérifié) peut tout modérer.
 
 ## Décisions de référence
 - **Rôles :**
@@ -55,6 +55,7 @@ Rôle admin de salle (seul à changer la photo du mur) ; suggestions de modifica
 ## Façon de travailler
 - Une branche par fonctionnalité, petits commits en français, PR vers `main`.
 - Avant de proposer une PR : `npm test` vert. Nouvelle fonctionnalité = au moins un test E2E ; nouvelle règle = tests de règles (accès autorisé ET refusé).
+- Avant chaque ticket, vérifier le dépôt actuel, signaler les écarts avec la spec et proposer un plan avant de coder.
 - Pour une fonctionnalité non triviale : proposer un plan d'abord.
 - Ne pas casser l'interface `window.claude.use(...)` du shim sans adapter `index.html` et `admin.html`.
 - Garder l'appli légère et rapide sur mobile ; vérifier en viewport 390 px.
