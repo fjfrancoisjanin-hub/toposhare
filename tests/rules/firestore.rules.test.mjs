@@ -92,12 +92,109 @@ describe('Salles et murs', () => {
     await assertFails(user('alice').doc('gyms/g1').update({ name: 'Autre' }));
     await assertSucceeds(owner().doc('gyms/g1').update(trace('owner', { name: 'Altissimo' })));
   });
-  test("un grimpeur quelconque ne doit pas pouvoir remplacer la photo du mur d'une salle", { todo: 'faille connue : rôle admin de salle au backlog' }, async () => {
+  test("un grimpeur quelconque ne doit pas pouvoir remplacer la photo du mur d'une salle", async () => {
     await seed('walls/w1', { gymId: 'g1', photo: 'photo:abc', authorId: 'alice' });
     await assertFails(user('bob').doc('walls/w1').update({ photo: 'photo:pirate' }));
   });
   test('un invité ne peut pas créer de salle', async () => {
     await assertFails(anon().doc('gyms/g2').set({ name: 'Nouvelle salle' }));
+  });
+});
+
+describe('Propriétaires de salle', () => {
+  const ALICE = { email: 'alice@example.com', email_verified: true };
+  const alice = () => env.authenticatedContext('alice', ALICE).firestore();
+  const bob = () => env.authenticatedContext('bob', { email: 'bob@example.com', email_verified: true }).firestore();
+  const owns = (gymId, email = ALICE.email) => seed(`gymOwners/${gymId}__${email}`, { gymId, email });
+  const wall = { gymId: 'g1', image: 'photo:x', active: true, createdAt: 1 };
+
+  test('un connecté non-propriétaire ne peut pas changer le mur', async () => {
+    await seed('gyms/g1', { name: 'A' });
+    await seed('walls/w1', wall);
+    await assertFails(bob().doc('walls/w1').update({ active: false }));
+    await assertFails(bob().doc('walls/w2').set(wall));
+  });
+  test('le propriétaire ajoute et désactive un mur de sa salle, l\'admin aussi', async () => {
+    await owns('g1');
+    await seed('gyms/g1', { name: 'A' });
+    await seed('walls/w1', wall);
+    await assertSucceeds(alice().doc('walls/w1').update({ active: false }));
+    await assertSucceeds(alice().doc('walls/w2').set(wall));
+    await assertSucceeds(owner().doc('walls/w1').update({ active: true }));
+    await assertSucceeds(owner().doc('walls/w3').set(wall));
+  });
+  test('un mur ne change pas de salle', async () => {
+    await owns('g1');
+    await seed('walls/w1', wall);
+    await assertFails(alice().doc('walls/w1').update({ gymId: 'g2' }));
+  });
+  test('le propriétaire de la salle A ne peut pas changer le mur de la salle B', async () => {
+    await owns('g1');
+    await seed('gyms/g2', { name: 'B' });
+    await seed('walls/w9', { ...wall, gymId: 'g2' });
+    await assertFails(alice().doc('walls/w9').update({ active: false }));
+    await assertFails(alice().doc('walls/w10').set({ ...wall, gymId: 'g2' }));
+  });
+  test('une personne peut posséder plusieurs salles', async () => {
+    await owns('g1'); await owns('g2');
+    await seed('walls/w1', wall);
+    await seed('walls/w2', { ...wall, gymId: 'g2' });
+    await assertSucceeds(alice().doc('walls/w1').update({ active: false }));
+    await assertSucceeds(alice().doc('walls/w2').update({ active: false }));
+  });
+  test('un e-mail non vérifié ne donne pas le rôle', async () => {
+    await owns('g1');
+    await seed('walls/w1', wall);
+    const fake = env.authenticatedContext('x', { email: ALICE.email, email_verified: false }).firestore();
+    await assertFails(fake.doc('walls/w1').update({ active: false }));
+  });
+  test('un rôle retiré ne donne plus aucun droit', async () => {
+    await owns('g1');
+    await seed('walls/w1', wall);
+    await owner().doc(`gymOwners/g1__${ALICE.email}`).delete();
+    await assertFails(alice().doc('walls/w1').update({ active: false }));
+  });
+  test('la création d\'une salle reste ouverte, avec sa photo initiale dans le même lot', async () => {
+    const db = bob(), batch = db.batch();
+    batch.set(db.doc('gyms/neuve'), { name: 'Neuve' });
+    batch.set(db.doc('walls/init'), { ...wall, gymId: 'neuve' });
+    await assertSucceeds(batch.commit());
+    // Le créateur ne devient pas propriétaire : le mur suivant lui est refusé.
+    await assertFails(bob().doc('walls/w2').set({ ...wall, gymId: 'neuve' }));
+    await assertFails(bob().doc('walls/init').update({ active: false }));
+  });
+  test('sans créer la salle, le mur initial est refusé', async () => {
+    await assertFails(bob().doc('walls/w1').set({ ...wall, gymId: 'inexistante' }));
+  });
+  test('le propriétaire supprime le bloc d\'un autre dans sa salle, sans pouvoir le modifier', async () => {
+    await owns('g1');
+    await seed('blocs/b1', { authorId: 'bob', gymId: 'g1', name: 'Bloc' });
+    await seed('blocs/b2', { authorId: 'bob', gymId: 'g2', name: 'Bloc' });
+    await assertFails(alice().doc('blocs/b1').update({ name: 'Autre', updatedAt: 1, updatedBy: 'alice' }));
+    await assertFails(alice().doc('blocs/b2').delete());
+    await assertSucceeds(alice().doc('blocs/b1').delete());
+  });
+  test('personne ne peut s\'attribuer un rôle', async () => {
+    const data = { gymId: 'g1', email: ALICE.email };
+    await assertFails(alice().doc(`gymOwners/g1__${ALICE.email}`).set(data));
+    await assertFails(anon().doc(`gymOwners/g1__${ALICE.email}`).set(data));
+    await owns('g1');
+    await assertFails(alice().doc(`gymOwners/g1__${ALICE.email}`).delete());
+    await assertFails(alice().doc(`gymOwners/g2__${ALICE.email}`).set({ gymId: 'g2', email: ALICE.email }));
+  });
+  test('l\'admin attribue et retire un rôle, avec un identifiant cohérent', async () => {
+    await assertSucceeds(owner().doc(`gymOwners/g1__${ALICE.email}`).set({ gymId: 'g1', email: ALICE.email }));
+    await assertFails(owner().doc('gymOwners/autre').set({ gymId: 'g1', email: ALICE.email }));
+    await assertFails(owner().doc('gymOwners/g1__ALICE@EXAMPLE.COM').set({ gymId: 'g1', email: 'ALICE@EXAMPLE.COM' }));
+    await assertSucceeds(owner().doc(`gymOwners/g1__${ALICE.email}`).delete());
+  });
+  test('chacun ne lit que ses propres rôles', async () => {
+    await owns('g1');
+    await assertSucceeds(alice().collection('gymOwners').where('email', '==', ALICE.email).get());
+    await assertFails(bob().doc(`gymOwners/g1__${ALICE.email}`).get());
+    await assertFails(bob().collection('gymOwners').get());
+    await assertFails(anon().collection('gymOwners').get());
+    await assertSucceeds(owner().collection('gymOwners').get());
   });
 });
 

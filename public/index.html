@@ -428,7 +428,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, current: null, me: null,
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
 
@@ -828,7 +828,7 @@ function renderDetail() {
   $("dSeq").textContent = seqText(b.holds || []);
   $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
   const own = state.me && b.authorId === state.me;
-  $("dDel").hidden = !(own || isAdmin()); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
+  $("dDel").hidden = !(own || canManageGym(b.gymId)); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
 $("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
@@ -894,13 +894,16 @@ function renderSheet() {
       $("sErr").textContent = "Envoi de la photo…";
       try {
         const ph = await uploadPhoto(file);
-        const gref = await state.db.collection("gyms").add({ name, city, createdAt: Date.now() });
-        await state.db.collection("walls").add({ gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
+        const gref = state.db.collection("gyms").doc(), batch = state.db.batch();
+        batch.set(gref, { name, city, createdAt: Date.now() });
+        batch.set(state.db.collection("walls").doc(), { gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
+        await batch.commit();
         switchGym(gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
       } catch (err) { $("sErr").textContent = "La création a échoué. Vérifiez la photo et réessayez."; }
     });
     return;
   }
+  if (state.sheet === "rewall" && !canManageGym(state.gymId)) state.sheet = "main";
   if (state.sheet === "rewall") {
     const n = state.blocs.filter(b => !isArchived(b)).length;
     s.innerHTML = `<h2 id="sheetTitle">Le mur a été remonté</h2>
@@ -914,10 +917,12 @@ function renderSheet() {
       $("sErr").textContent = "Envoi de la photo…";
       try {
         const ph = await uploadPhoto(file);
-        await state.db.collection("walls").add({ gymId: state.gymId, name: $("rwName").value.trim() || "Spray wall", image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
-        for (const w of wallsOf(state.gymId)) if (w.active) await state.db.collection("walls").doc(w.id).update({ active: false, retiredAt: Date.now() });
+        const batch = state.db.batch();
+        for (const w of wallsOf(state.gymId)) if (w.active) batch.update(state.db.collection("walls").doc(w.id), { active: false, retiredAt: Date.now() });
+        batch.set(state.db.collection("walls").doc(), { gymId: state.gymId, name: $("rwName").value.trim() || "Spray wall", image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
+        await batch.commit();
         clearEditor(); closeSheet(); toast("Nouveau mur en place. Les anciens blocs sont archivés.");
-      } catch { $("sErr").textContent = "Le changement de mur a échoué. Réessayez."; }
+      } catch (err) { $("sErr").textContent = err?.code === "permission-denied" ? "Vous n'avez plus le droit de changer ce mur." : "Le changement de mur a échoué. Réessayez."; }
     });
     return;
   }
@@ -927,7 +932,7 @@ function renderSheet() {
     <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
     ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
       <div class="walllist">${walls.length ? walls.map(w => `<div><span>${esc(w.name)} · photo du ${day(w.createdAt)}</span><b style="color:${w.active ? "var(--fg)" : "var(--muted)"}">${w.active ? "Actuel" : "Démonté"}</b></div>`).join("") : "<div>Aucune photo du mur.</div>"}</div>
-      <button class="btn small" type="button" data-sheet="rewall">${aw ? "Le mur a été remonté : nouvelle photo" : "Ajouter la photo du mur"}</button></section>` : ""}
+      ${canManageGym(g.id) ? `<button class="btn small" type="button" data-sheet="rewall">${aw ? "Le mur a été remonté : nouvelle photo" : "Ajouter la photo du mur"}</button>` : ""}</section>` : ""}
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", e => {
@@ -973,7 +978,7 @@ function go(v) {
 $("tabList").onclick = () => go("list");
 $("tabOut").onclick = () => go("olist");
 $("tabCreate").onclick = () => {
-  if (!state.me && !state.loginShown) { state.loginShown = true; setTimeout(() => promptLogin(state.mode === "out" ? "ajouter une voie" : "publier un bloc"), 150); }
+  if (!state.me) { setTimeout(() => promptLogin(state.mode === "out" ? "ajouter une voie" : "publier un bloc"), 150); }
   state.mode === "out" ? startRoute() : go("create");
 };
 $("backBtn").onclick = () => { if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
@@ -1410,6 +1415,7 @@ function askLogin(errId, what) {
 }
 function promptLogin(what) { state.loginWhat = what || "publier"; openSheet("login"); }
 const isAdmin = () => !!BT.user() && BT.user().email === window.BT_OWNER_EMAIL;
+const canManageGym = id => isAdmin() || state.ownedGyms.has(id);
 const accountFirstName = () => (BT.user()?.displayName || "").trim().split(/\s+/)[0];
 // Les champs de prénom suivent le compte connecté, sauf s'ils ont été saisis à la main.
 let autoName = "";
@@ -1483,6 +1489,13 @@ $("sheet").addEventListener("click", async e => {
     } catch { $("sErr").textContent = "L'envoi a échoué. Réessayez dans un instant."; }
   }
 });
+function subscribeRoles() {
+  state.unsubRoles?.(); state.unsubRoles = null; state.ownedGyms = new Set();
+  const u = BT.user(); if (!u?.email || !state.db) return;
+  state.unsubRoles = state.db.collection("gymOwners").where("email", "==", u.email.toLowerCase()).onSnapshot(sn => {
+    state.ownedGyms = new Set(sn.docs.map(d => d.data().gymId)); rerender();
+  }, () => {});
+}
 function subscribeDrafts() {
   if (state.unsubDrafts) { state.unsubDrafts(); state.unsubDrafts = null; }
   state.drafts = [];
@@ -1496,7 +1509,7 @@ function subscribeDrafts() {
 BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
 BT.onUser(u => {
   state.me = u ? u.uid : null;
-  renderAcct(); subscribeDrafts(); renderEditorChrome();
+  renderAcct(); subscribeDrafts(); subscribeRoles(); renderEditorChrome();
   syncNames();
   if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
   rerender();
@@ -1533,7 +1546,7 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
   }, () => {});
   if (user) {
     try { state.me = await user.id(); } catch {}
-    renderAcct(); subscribeDrafts(); renderEditorChrome();
+    renderAcct(); subscribeDrafts(); subscribeRoles(); renderEditorChrome();
     syncNames();
   }
   let gotG = false, gotW = false;

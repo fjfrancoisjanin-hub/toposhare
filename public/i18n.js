@@ -275,6 +275,7 @@
     ["hier", "yesterday", "ayer"],
     // sélecteur de langue
     ["Langue", "Language", "Idioma"],
+    ["Vous n'avez plus le droit de changer ce mur.", "You no longer have the right to change this wall.", "Ya no tienes permiso para cambiar este muro."],
     ["Environnement de test", "Test environment", "Entorno de prueba"],
   ];
   const MAP = { en: new Map(), es: new Map() };

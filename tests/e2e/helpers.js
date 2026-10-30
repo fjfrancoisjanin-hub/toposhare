@@ -14,6 +14,16 @@ async function login(page, who) {
   await page.locator('#acctBtn[aria-label="Mon compte"]').waitFor({ state: 'attached' });
 }
 
+// Même connexion sur /admin, qui se recharge dès que le compte change.
+async function loginAdminPage(page) {
+  await page.goto('/admin');
+  await page.waitForFunction(() => window.BT && window.firebase);
+  await page.evaluate(async u => {
+    await BT.auth.signInWithCredential(firebase.auth.GoogleAuthProvider.credential(JSON.stringify({ ...u, email_verified: true })));
+  }, ADMIN).catch(() => {});
+  await page.locator('#dash').waitFor();
+}
+
 const toValue = v => {
   if (typeof v === 'string') return { stringValue: v };
   if (typeof v === 'number') return { integerValue: String(v) };
@@ -34,4 +44,4 @@ async function seed(col, id, data) {
   if (!res.ok) throw new Error(`seed ${col}/${id} : ${res.status} ${await res.text()}`);
 }
 
-module.exports = { ADMIN, ALICE, BOB, login, seed };
+module.exports = { ADMIN, ALICE, BOB, login, loginAdminPage, seed };
