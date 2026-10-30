@@ -124,6 +124,9 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
       <p class="note">Une voie où d'autres grimpeurs ont une méthode ne peut être supprimée que par l'admin. À lancer une fois après la mise en ligne, pour les méthodes antérieures :</p>
       <button class="btn ghost" id="recount" type="button">Recalculer les contributeurs</button>
       <div class="log" id="recountLog"></div>
+      <p class="note">Un grimpeur qui supprime son bloc ou sa voie ne peut pas effacer les votes des autres : ils restent invisibles, sans effet.</p>
+      <button class="btn ghost" id="cleanVotes" type="button">Nettoyer les votes orphelins</button>
+      <div class="log" id="cleanVotesLog"></div>
     </section>
     <section class="panel" id="importBox">
       <h2>Reprise des données du prototype</h2>
@@ -273,7 +276,10 @@ function renderManage() {
 }
 $("mgTabs").addEventListener("click", e => { const c = e.target.closest("[data-tab]"); if (c) { D.tab = c.dataset.tab; renderManage(); } });
 const voieDoc = id => BT.fs.collection("voies").doc(id);
-const delDoc = (col, id) => BT.fs.collection(col).doc(id).delete();
+const delDoc = async (col, id) => {
+  if (col === "blocs" || col === "voies") for (const d of (await BT.fs.collection("votes").where("targetId", "==", id).where("kind", "==", col).get()).docs) await d.ref.delete();
+  return BT.fs.collection(col).doc(id).delete();
+};
 const delPhoto = ref => String(ref || "").startsWith("photo:") ? delDoc("photos", ref.slice(6)).catch(() => {}) : null;
 async function cascade(col, id) {
   const [gyms, walls, blocs, secteurs, voies, methodes] = D.all;
@@ -306,6 +312,12 @@ $("mgList").addEventListener("click", async e => {
   catch (err) { b.disabled = false; b.dataset.armed = ""; b.textContent = "Échec"; console.error(err); }
 });
 
+$("cleanVotes").onclick = async () => {
+  const [, , blocs, , voies] = D.all, known = { blocs: new Set(blocs.map(x => x.id)), voies: new Set(voies.map(x => x.id)) };
+  let n = 0;
+  for (const d of (await BT.fs.collection("votes").get()).docs) if (!known[d.data().kind]?.has(d.data().targetId)) { await d.ref.delete(); n++; }
+  $("cleanVotesLog").textContent = `${n} vote(s) supprimé(s).`;
+};
 $("recount").onclick = async () => {
   const [, , , , voies, methodes] = D.all, priv = D.all[7];
   let n = 0;

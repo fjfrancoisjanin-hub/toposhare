@@ -144,6 +144,9 @@ nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background
 nav.tabs .in { max-width: 720px; margin: 0 auto; display: flex; gap: 10px; padding-block: 10px; }
 nav.tabs .tab { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 nav.tabs .tab.plus { flex-grow: 1.3; }
+.rate { display: grid; gap: 6px; padding-top: 8px; }
+.rate .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rating { font-size: 13px; font-weight: 700; padding-top: 2px; }
 .search { width: 100%; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); }
 .home { display: grid; gap: 16px; padding-block: 14px 24px; }
 .home h1 { font-family: var(--f-display); font-size: 26px; margin: 0; }
@@ -312,6 +315,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
       <div>
         <h1 id="dName"></h1>
         <div id="dBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div>
+        <div id="dRate" class="rate"></div>
       </div>
       <div class="grade big" id="dGrade"></div>
     </div>
@@ -347,7 +351,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
   <!-- OUTDOOR: one route -->
   <section id="oVoie" hidden>
     <div class="gut dhead">
-      <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div></div>
+      <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div><div id="ovRate" class="rate"></div></div>
       <div class="grade big" id="ovGrade"></div>
     </div>
     <div class="gut"><div class="filters" id="ovMethods" role="group" aria-label="Afficher" style="padding-top:0"></div></div>
@@ -446,6 +450,7 @@ const TYPES = {
 };
 const FILTERS = [
   { id: "all", label: "Tous", test: () => true },
+  { id: "best", label: "Mieux notés", test: () => true },
   { id: "low", label: "5a → 5c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= 0 && i < GRADES.indexOf("6a"); } },
   { id: "mid", label: "6a → 6c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= GRADES.indexOf("6a") && i < GRADES.indexOf("7a"); } },
   { id: "high", label: "7a et +", test: b => GRADES.indexOf(b.grade) >= GRADES.indexOf("7a") },
@@ -815,6 +820,7 @@ function renderList() {
   const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
   const pool = state.blocs.filter(b => f.id === "old" ? isArchived(b) : !isArchived(b));
   const rows = pool.filter(f.test);
+  if (f.id === "best") rows.sort(byRating);
   if (!activeWall()) { $("list").innerHTML = `<div class="empty"><strong>Pas encore de photo du mur</strong><span>Prenez le pan en photo pour que la salle puisse tracer ses blocs.</span><button class="btn" type="button" data-open-sheet>Ajouter la photo du mur</button></div>`; return; }
   if (!pool.length && f.id !== "old") { $("list").innerHTML = `<div class="empty"><strong>Aucun bloc sur ce mur</strong><span>Tracez le premier : touchez les prises dans l'ordre, choisissez la cotation, publiez. Il apparaîtra ici pour toute la salle.</span><button class="btn" type="button" onclick="go('create')">Tracer le premier bloc</button></div>`; return; }
   if (!rows.length) { $("list").innerHTML = `<div class="empty">Aucun bloc pour ce filtre.</div>`; return; }
@@ -823,7 +829,7 @@ function renderList() {
     return `<button class="card${old ? " old" : ""}" data-id="${esc(b.id)}">
       <div class="thumb">${w ? wallSVG(w, b.holds || [], { mini: true, uid: "t" + b.id.replace(/\W/g, "") }) : ""}</div>
       <div class="meta"><div class="name">${esc(b.name)}</div>
-        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div></div>
+        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div>${ratingLine(b)}</div>
       <div class="grade">${esc(b.grade)}</div>
     </button>`; }).join("");
 }
@@ -851,6 +857,7 @@ function openDetail(id) { state.current = id; state.delArmed = null; go("detail"
 function renderDetail() {
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
   $("dAdminEdit").hidden = !(b && w && isAdmin());
+  renderRating($("dRate"), "blocs", b && w ? b : null, b && w && !isArchived(b));
   const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
   if (!b || !w) { $("dName").textContent = "Bloc introuvable"; $("dBy").textContent = "Il a peut-être été supprimé."; $("dGrade").textContent = ""; $("dSeq").textContent = ""; $("dDesc").hidden = true; wallEl.hidden = true; $("dDel").hidden = $("dDelOk").hidden = $("dEdit").hidden = $("dReplay").hidden = true; $("dOld").hidden = true; return; }
   wallEl.hidden = false;
@@ -894,7 +901,7 @@ function focusB() {
 $("dWall").addEventListener("click", () => openFs("view"));
 $("dWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("view"); } });
 $("dDel").addEventListener("click", () => { state.delArmed = state.current; $("dDel").hidden = true; $("dDelOk").hidden = false; });
-$("dDelOk").addEventListener("click", async () => { try { await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
+$("dDelOk").addEventListener("click", async () => { try { if (isAdmin()) await deleteVotes("blocs", state.current); await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
 
 /* ---------- gyms & walls sheet ---------- */
 function openSheet(panel = "main") { state.sheet = panel; $("sheet").innerHTML = ""; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
@@ -1301,15 +1308,16 @@ function renderOList() {
   if (!state.oLoaded) { el.innerHTML = `<div class="empty">Chargement des secteurs…</div>`; return; }
   if (!secteur()) { el.innerHTML = `<div class="empty"><strong>La falaise, voie par voie</strong><span>Choisissez un secteur ou créez-le, puis ajoutez la photo d'une voie, ses points d'ancrage et votre méthode.</span><button class="btn" type="button" data-open-sectors>Choisir un secteur</button></div>`; return; }
   if (!state.voies.length) { el.innerHTML = `<div class="empty"><strong>Aucune voie dans ce secteur</strong><span>Photographiez une voie, placez ses points d'ancrage et le relais. Chacun pourra ensuite y ajouter sa méthode.</span><button class="btn" type="button" onclick="startRoute()">Ajouter la première voie</button></div>`; return; }
-  el.innerHTML = state.voies.map(v => `
+  const voies = state.voiesBest ? [...state.voies].sort(byRating) : state.voies;
+  el.innerHTML = `<div class="filters" style="padding-top:0"><button class="chip" type="button" id="oBest" aria-pressed="${!!state.voiesBest}">Mieux notés</button></div>` + voies.map(v => `
     <button class="card route" data-voie="${esc(v.id)}">
       <div class="thumb tall">${routeSVG(v, v.anchors || [], [], { mini: true, uid: "o" + v.id.replace(/\W/g, "") })}</div>
       <div class="meta"><div class="name">${esc(v.name)}</div>
-        <div class="by">${(v.anchors || []).filter(a => a.t !== "relais").length} points · ${v.methodCount ? `${v.methodCount} méthode${v.methodCount > 1 ? "s" : ""}` : "ajoutée par " + esc(v.addedBy || "un grimpeur")}</div></div>
+        <div class="by">${(v.anchors || []).filter(a => a.t !== "relais").length} points · ${v.methodCount ? `${v.methodCount} méthode${v.methodCount > 1 ? "s" : ""}` : "ajoutée par " + esc(v.addedBy || "un grimpeur")}</div>${ratingLine(v)}</div>
       <div class="grade">${esc(v.grade)}</div>
     </button>`).join("");
 }
-$("oListEl").addEventListener("click", e => { const c = e.target.closest("[data-voie]"); if (c) openVoie(c.dataset.voie); });
+$("oListEl").addEventListener("click", e => { if (e.target.closest("#oBest")) { state.voiesBest = !state.voiesBest; renderOList(); return; } const c = e.target.closest("[data-voie]"); if (c) openVoie(c.dataset.voie); });
 document.addEventListener("click", e => { if (e.target.closest("[data-open-sectors]")) openSheet("sectors"); });
 
 /* ---------- one route ---------- */
@@ -1321,6 +1329,7 @@ function renderVoie() {
   if (state.oSel !== "anchors" && !selMethod()) state.oSel = "anchors";
   const m = selMethod(), mine = myMethod();
   $("ovName").textContent = v.name; $("ovGrade").textContent = v.grade;
+  renderRating($("ovRate"), "voies", v, true);
   $("ovBy").textContent = `${secteur()?.name || ""} · ajoutée par ${v.addedBy || "un grimpeur"}`;
   $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
     `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">${x.isPrivate ? `<span class="tag">Privée</span> ` : ""}Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
@@ -1369,6 +1378,58 @@ $("ovActions").addEventListener("click", async e => {
     try { await deleteVoie(v); toast("Voie supprimée"); go("olist"); } catch { toast("Suppression impossible"); }
   }
 });
+/* ---------- notes : de 0 à 3 étoiles ---------- */
+const MIN_VOTES = 3;
+const avg = x => (x.ratingSum || 0) / (x.ratingCount || 1);
+const hasRating = x => (x.ratingCount || 0) >= MIN_VOTES;
+const ratingText = x => { const a = avg(x), n = Math.round(a); return `${"★".repeat(n)}${"☆".repeat(3 - n)} ${a.toLocaleString(TS_I18N.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · ${x.ratingCount} avis`; };
+const ratingLine = x => hasRating(x) ? `<div class="rating">${ratingText(x)}</div>` : "";
+// Mieux notés d'abord ; moins de 3 votes en fin de liste.
+const byRating = (a, b) => (hasRating(b) - hasRating(a)) || (hasRating(a) ? avg(b) - avg(a) || b.ratingCount - a.ratingCount : 0);
+const VOTE_CHOICES = [[0, "Sans plus"], [1, "★"], [2, "★★"], [3, "★★★"]];
+const voteRef = (kind, id) => state.db.collection("votes").doc(`${kind}__${id}__${state.me}`);
+function watchVote(kind, id) {
+  const key = state.me && id ? `${kind}__${id}__${state.me}` : null;
+  if (state.voteKey === key) return;
+  state.voteKey = key; state.myVote = null; state.unsubVote?.(); state.unsubVote = null;
+  if (key) state.unsubVote = state.db.collection("votes").doc(key).onSnapshot(d => { state.myVote = d.exists ? d.data().value : null; rerender(); }, () => {});
+}
+function renderRating(el, kind, x, canRate) {
+  if (!x) { el.innerHTML = ""; return; }
+  watchVote(kind, x.id);
+  const n = x.ratingCount || 0, own = state.me && x.authorId === state.me;
+  const summary = hasRating(x) ? `<div class="rating">${ratingText(x)}</div>` : n ? `<div class="note">${n} avis, note affichée à partir de ${MIN_VOTES}</div>` : "";
+  const choices = canRate && !own ? `<div class="chips" data-kind="${kind}" data-target="${esc(x.id)}">${VOTE_CHOICES.map(([v, l]) => `<button class="chip" type="button" data-vote="${v}" aria-pressed="${state.myVote === v}">${l}</button>`).join("")}${state.myVote != null ? `<button class="chip" type="button" data-vote="">Retirer ma note</button>` : ""}</div>` : "";
+  el.innerHTML = summary + choices;
+}
+async function castVote(kind, id, value) {
+  if (!state.me) { promptLogin("noter"); return; }
+  const ref = voteRef(kind, id), target = state.db.collection(kind).doc(id), now = Date.now(), batch = state.db.batch();
+  try {
+    const cur = await ref.get(), before = cur.exists ? cur.data().value : null;
+    if (before === value) return;
+    if (value == null) {
+      batch.delete(ref);
+      batch.update(target, { ratingCount: state.db.increment(-1), ratingSum: state.db.increment(-before) });
+    } else if (before == null) {
+      batch.set(ref, { kind, targetId: id, authorId: state.me, value, createdAt: now, updatedAt: now });
+      batch.update(target, { ratingCount: state.db.increment(1), ratingSum: state.db.increment(value) });
+    } else {
+      batch.update(ref, { value, updatedAt: now });
+      batch.update(target, { ratingSum: state.db.increment(value - before) });
+    }
+    await batch.commit();
+  } catch { toast("Note impossible à enregistrer pour l'instant."); }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-vote]"); if (!b) return;
+  const box = b.closest("[data-kind]");
+  castVote(box.dataset.kind, box.dataset.target, b.dataset.vote === "" ? null : +b.dataset.vote);
+});
+async function deleteVotes(kind, id) {
+  const s = await state.db.collection("votes").where("targetId", "==", id).where("kind", "==", kind).get();
+  await Promise.all(s.docs.map(d => d.ref.delete()));
+}
 const voieRef = id => state.db.collection("voies").doc(id);
 const contribRef = (voieId, uid) => voieRef(voieId).collection("contributeurs").doc(uid);
 async function saveMethod(oe, fields, wantPrivate) {
@@ -1414,6 +1475,7 @@ async function deleteVoie(v) {
     // L'admin emporte aussi les méthodes privées des autres et les marques de contribution.
     (await state.db.collection("methodesPrivees").where("voieId", "==", v.id).get()).forEach(d => batch.delete(d.ref));
     (await voieRef(v.id).collection("contributeurs").get()).forEach(d => batch.delete(d.ref));
+    await deleteVotes("voies", v.id);
   }
   batch.delete(voieRef(v.id));
   await batch.commit();
