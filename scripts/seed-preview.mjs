@@ -48,7 +48,7 @@ const DATA = {
   } },
   methodes: { 'methode-test': {
     voieId: 'voie-test', secteurId: 'secteur-test', authorId: AUTHOR, climber: 'Testeur', note: 'Méthode fictive.', createdAt: NOW, updatedAt: NOW,
-    steps: route.map(([x, y]) => hold('hand', x + 0.05, y - 0.03)),
+    steps: [...route.map(([x, y]) => hold('hand', x + 0.05, y - 0.03)), { ...hold('hand', 0.45, 0.55), viewId: 'vue-l2' }], vueIds: ['vue-l2'],
   } },
 };
 

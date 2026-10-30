@@ -39,6 +39,16 @@ service cloud.firestore {
       return c is map && c.nom is string && c.nom.trim().size() > 0 && c.nom.size() <= 60 && c.simple is string && c.verifie is bool
         && (c.verifie == false || (c.code is string && c.departement is string));
     }
+    // Une méthode ne vise que des vues de sa voie : vueIds liste les vues utilisées (6 au plus, les règles ne savent pas parcourir une liste).
+    function vueOk(i) {
+      let d = request.resource.data;
+      return d.vueIds.size() <= i || get(/databases/$(database)/documents/vues/$(d.vueIds[i])).data.voieId == d.voieId;
+    }
+    function vueIdsOk() {
+      let d = request.resource.data;
+      return !d.keys().hasAny(['vueIds']) || (d.vueIds is list && d.vueIds.size() <= 6
+        && vueOk(0) && vueOk(1) && vueOk(2) && vueOk(3) && vueOk(4) && vueOk(5));
+    }
     function editOk() { return keepsIdentity() && traced(); }
 
     // Rôles : seul l'admin les écrit. Chacun ne lit que les siens.
@@ -120,16 +130,16 @@ service cloud.firestore {
     }
     match /methodes/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
-      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
+      allow create: if (claimsMe() || isAdmin()) && vueIdsOk();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30) && (!changed().hasAny(['vueIds']) || vueIdsOk());
       allow delete: if mine() || isAdmin();
     }
 
     // Méthodes privées : à part des méthodes publiques, lisibles par leur auteur et l'admin seulement.
     match /methodesPrivees/{id} {
       allow read: if mine() || isAdmin();
-      allow create: if claimsMe() || isAdmin();
-      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
+      allow create: if (claimsMe() || isAdmin()) && vueIdsOk();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30) && (!changed().hasAny(['vueIds']) || vueIdsOk());
       allow delete: if mine() || isAdmin();
     }
 

@@ -490,6 +490,30 @@ describe('Longueurs et vues', () => {
   });
 });
 
+describe('Méthodes sur plusieurs vues', () => {
+  const meth = (extra = {}) => ({ voieId: 'v1', authorId: 'bob', climber: 'Bob', steps: [], createdAt: 1, ...extra });
+  test('une méthode vise une vue de sa voie, pas une vue d\'une autre voie ni une vue inexistante', async () => {
+    await seed('vues/a', { voieId: 'v1', authorId: 'alice' });
+    await seed('vues/b', { voieId: 'v2', authorId: 'alice' });
+    for (const col of ['methodes', 'methodesPrivees']) {
+      await assertSucceeds(user('bob').doc(`${col}/ok`).set(meth({ vueIds: ['a'] })));
+      await assertFails(user('bob').doc(`${col}/ko1`).set(meth({ vueIds: ['b'] })));
+      await assertFails(user('bob').doc(`${col}/ko2`).set(meth({ vueIds: ['a', 'b'] })));
+      await assertFails(user('bob').doc(`${col}/ko3`).set(meth({ vueIds: ['absente'] })));
+      await assertFails(user('bob').doc(`${col}/ok`).update({ vueIds: ['b'] }));
+    }
+  });
+  test('au plus 6 vues, et une ancienne méthode sans vueIds reste valide', async () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    for (const i of ids) await seed(`vues/${i}`, { voieId: 'v1', authorId: 'alice' });
+    await assertSucceeds(user('bob').doc('methodes/six').set(meth({ vueIds: ids.slice(0, 6) })));
+    await assertFails(user('bob').doc('methodes/sept').set(meth({ vueIds: ids })));
+    await assertSucceeds(user('bob').doc('methodes/ancienne').set(meth()));
+    await seed('methodes/m1', meth());
+    await assertSucceeds(user('bob').doc('methodes/m1').update(trace('bob', { climber: 'Robert' })));
+  });
+});
+
 describe('Correction des noms', () => {
   const CONTENUS = [
     ['blocs/b1', { authorId: 'alice', gymId: 'g1', wallId: 'w1', createdAt: 1, name: 'Bloc', grade: '6a', setter: 'Alice' }, { setter: 'Alicia', name: 'Bloc v2', grade: '6b' }],

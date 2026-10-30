@@ -210,6 +210,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
 .rp-btns .go { font-size: 19px; }
 .rp-prog { height: 4px; background: #30363C; margin-inline: max(14px, env(safe-area-inset-left, 0px)) max(14px, env(safe-area-inset-right, 0px)); border-radius: 2px; overflow: hidden; }
 .rp-prog i { display: block; height: 100%; width: 0; background: var(--h-start); border-radius: 2px; }
+.rp-vue { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: 90%; padding: 6px 12px; border-radius: 10px; background: rgba(13,15,17,.85); color: #fff; font: 700 14px var(--f-body); pointer-events: none; }
 .rp-hint { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 2fr 3fr; pointer-events: none; }
 .rp-hint span { display: grid; place-items: center; color: #fff; font: 800 18px var(--f-body); text-shadow: 0 1px 6px rgba(0,0,0,.8); }
 .rp-hint span:first-child { background: rgba(13,15,17,.45); border-right: 2px dashed rgba(255,255,255,.5); }
@@ -366,6 +367,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
       </div>
       <div class="seq" id="ovSeq"></div>
       <p class="desc" id="ovNote"></p>
+      <div class="note" id="ovLost" hidden></div>
       <div class="actions" id="ovActions" style="justify-content:flex-start"></div>
     </div>
   </section>
@@ -378,6 +380,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
       <div class="err" id="oePickErr" style="padding-top:8px"></div>
     </div>
     <div id="oeWork">
+      <div class="gut"><div class="filters" id="oeVues" hidden style="padding-top:0"></div></div>
       <div class="wallbox"><div class="wv" id="oeWall"></div><button class="float tr" type="button" id="oeFull">⤢ Plein écran</button></div>
       <div class="gut step"><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
       <div class="gut">
@@ -424,7 +427,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
     <button class="fs-btn go" id="fsClose" type="button">Fermer</button>
   </div>
   <div class="rp-prog" id="rpProg" hidden><i id="rpFill"></i></div>
-  <div class="wv" id="fsWall"><div class="rp-hint" id="rpHint" hidden aria-hidden="true"><span>◀ Revenir</span><span>Avancer ▶</span></div></div>
+  <div class="wv" id="fsWall"><div class="rp-vue" id="rpVue" hidden></div><div class="rp-hint" id="rpHint" hidden aria-hidden="true"><span>◀ Revenir</span><span>Avancer ▶</span></div></div>
   <div class="fs-foot" id="fsFoot">
     <div id="fsIn" style="display:grid;gap:8px"><div class="toolrow" data-tools></div><div class="counts" data-counts></div></div>
     <div id="fsOut" style="display:grid;gap:8px" hidden><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
@@ -1248,7 +1251,7 @@ function subscribeMethods(id) {
   state.unsubMeth?.(); state.unsubMeth = null;
   if (!state.db || !id) return;
   state.unsubVues?.();
-  state.unsubVues = state.db.collection("vues").where("voieId", "==", id).onSnapshot(sn => { state.vues = sn.docs.map(d => ({ id: d.id, ...d.data() })); rerender(); }, () => {});
+  state.unsubVues = state.db.collection("vues").where("voieId", "==", id).onSnapshot(sn => { state.vues = sn.docs.map(d => ({ id: d.id, ...d.data() })); state.vuesLoaded = true; rerender(); }, () => {});
   let pub = [], priv = [];
   const merge = () => { state.methodes = [...pub, ...priv].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); rerender(); };
   const u1 = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => { pub = sn.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, () => {});
@@ -1258,7 +1261,7 @@ function subscribeMethods(id) {
 function openVoie(id, sel) {
   touchRecent("voie", id);
   if (state.voieId !== id) {
-    state.voieId = id; state.methodes = []; state.vues = []; state.ovLen = state.ovVue = null; state.armedAct = null; state.oSel = sel || "anchors";
+    state.voieId = id; state.methodes = []; state.vues = []; state.vuesLoaded = false; state.ovLen = state.ovVue = null; state.armedAct = null; state.oSel = sel || "anchors";
     subscribeMethods(id);
   } else if (sel) state.oSel = sel;
   go("ovoie");
@@ -1296,7 +1299,7 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
       const t = OT[st.t] || OT.hand, [cx, cy] = P(st), r = t.r * k; move++;
       if (st.t === "hand") { if (prevHand) { const [px, py] = P(prevHand); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`; } prevHand = st; lastHand = st; }
       rings += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${10 * k}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${(cur ? 8 : 5.5) * k}"/>`;
-      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(move);
+      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(st.n ?? move);
       rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
       if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 12 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
       if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
@@ -1312,7 +1315,16 @@ const vuesOf = (v, lenId) => [baseVue(v), ...state.vues].filter(x => x && x.long
 const currentLen = v => longueursOf(v).find(l => l.id === state.ovLen) || longueursOf(v)[0];
 const currentVue = v => { const list = vuesOf(v, currentLen(v).id); return list.find(x => x.id === state.ovVue) || list[0] || null; };
 const hardest = lens => lens.map(l => l.grade).sort((a, b) => GRADES.indexOf(b) - GRADES.indexOf(a))[0];
-const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip");
+const vueIdOf = s => s.viewId || BASE_VUE;
+const findVue = (v, id) => id === BASE_VUE ? baseVue(v) : state.vues.find(x => x.id === id && x.voieId === v.id) || null;
+const allVues = v => longueursOf(v).flatMap(l => vuesOf(v, l.id));
+// Une prise sur une vue disparue, ou qui ne vise pas une vue de cette voie, est ignorée.
+const stepAlive = s => { const v = voie(); return !v || !state.vuesLoaded || !!findVue(v, vueIdOf(s)); };
+const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip" && stepAlive(st));
+const lostSteps = m => (m && m.steps || []).filter(st => st.t !== "clip" && !stepAlive(st)).length;
+// Prises d'une seule vue, avec leur numéro dans la méthode entière.
+const stepsOn = (steps, V) => { let n = 0; return steps.map(s => ({ ...s, n: s.t === "clip" ? n : ++n })).filter(s => V && vueIdOf(s) === V.id); };
+const vueTitle = (v, V) => `${longueursOf(v).find(l => l.id === V.longueurId)?.name || ""} · ${V.label}`;
 function methodSummary(steps) {
   const n = t => steps.filter(s => s.t === t).length;
   return `${n("hand")} main${n("hand") > 1 ? "s" : ""} · ${n("foot")} pied${n("foot") > 1 ? "s" : ""}`;
@@ -1357,12 +1369,14 @@ function renderVoie() {
   $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
     `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">${x.isPrivate ? `<span class="tag">Privée</span> ` : ""}Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
   const btn = $("ovWall").querySelector(".float");
-  if (V) { $("ovWall").innerHTML = routeSVG(V, V.anchors || [], V.isBase ? mSteps(m) : [], { uid: "ov" }); $("ovWall").appendChild(btn); }
+  if (V) { $("ovWall").innerHTML = routeSVG(V, V.anchors || [], stepsOn(mSteps(m), V), { uid: "ov" }); $("ovWall").appendChild(btn); }
   const bolts = (V?.anchors || []).filter(a => a.t !== "relais").length, hasR = (V?.anchors || []).some(a => a.t === "relais");
   const shared = state.methodes.filter(x => !x.isPrivate).length;
   $("ovSeq").hidden = !!m;
   $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${shared ? `${shared} méthode${shared > 1 ? "s" : ""} partagée${shared > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
   $("ovNote").textContent = m?.note || ""; $("ovNote").hidden = !m?.note;
+  const lost = m && state.me && m.authorId === state.me ? lostSteps(m) : 0;
+  $("ovLost").hidden = !lost; $("ovLost").textContent = lost ? `${lost} prise${lost > 1 ? "s étaient" : " était"} sur une vue supprimée` : "";
   const acts = [];
   if (m && mSteps(m).length) acts.push(`<button class="btn" type="button" data-act="replay">▶ Répéter la voie</button>`);
   acts.push(mine ? `<button class="btn ${m ? "ghost" : ""} small" type="button" data-act="editm">Modifier ma méthode</button>` : `<button class="btn small" type="button" data-act="newm">Ajouter ma méthode</button>`);
@@ -1388,13 +1402,20 @@ $("ovTabs").addEventListener("click", e => {
   const c = e.target.closest("[data-vue]"); if (c) { state.ovVue = c.dataset.vue; renderVoie(); }
 });
 $("ovNoPhoto").addEventListener("click", e => { if (e.target.closest("[data-act-nophoto]")) startVue(); });
-$("ovMethods").addEventListener("click", e => { const c = e.target.closest("[data-sel]"); if (!c) return; state.oSel = c.dataset.sel; renderVoie(); });
+$("ovMethods").addEventListener("click", e => {
+  const c = e.target.closest("[data-sel]"); if (!c) return;
+  state.oSel = c.dataset.sel;
+  // Si la méthode n'a aucune prise sur la vue affichée, on montre sa première prise.
+  const v = voie(), steps = mSteps(selMethod()), V = v && currentVue(v);
+  if (v && steps.length && !stepsOn(steps, V).length) { const t = findVue(v, vueIdOf(steps[0])); if (t) { state.ovLen = t.longueurId; state.ovVue = t.id; } }
+  renderVoie();
+});
 $("ovWall").addEventListener("click", () => openFs("oview"));
 $("ovWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("oview"); } });
 $("ovActions").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "replay") openFs("replay");
+  if (a === "replay") { state.rpVue = null; openFs("replay"); }
   if (a === "newm" || a === "editm") startMethod();
   if (a === "editr") startRoute(state.voieId);
   if (a === "addvue") startVue();
@@ -1480,6 +1501,13 @@ async function saveMethod(oe, fields, wantPrivate) {
   const v = state.voies.find(x => x.id === oe.voieId), now = Date.now(), batch = state.db.batch(), bump = {};
   const col = isPrivate => state.db.collection(isPrivate ? "methodesPrivees" : "methodes");
   const cur = oe.id ? state.methodes.find(m => m.id === oe.id) : null;
+  const vueIds = [...new Set(fields.steps.map(vueIdOf).filter(x => x !== BASE_VUE))];
+  if (vueIds.length > 6) throw { msg: "Une méthode peut utiliser 6 vues au plus, en plus de la vue d'ensemble." };
+  if (vueIds.some(x => !findVue(v, x))) throw { msg: "Une prise vise une vue qui n'appartient pas à cette voie." };
+  fields = { ...fields, vueIds };
+  const before = cur?.vueIds || [];
+  for (const x of vueIds.filter(x => !before.includes(x))) markVueUse(batch, x, state.me, 1);
+  for (const x of before.filter(x => !vueIds.includes(x))) markVueUse(batch, x, state.me, -1);
   let id = oe.id;
   if (cur && !!cur.isPrivate === wantPrivate) batch.update(col(wantPrivate).doc(id), { ...fields, updatedAt: now, updatedBy: state.me });
   else if (cur) {
@@ -1584,8 +1612,17 @@ function renderLensForm() {
     catch { $("eErr").textContent = "Enregistrement refusé : d'autres grimpeurs contribuent à cette voie, seul l'admin peut retirer une longueur."; }
   });
 }
+// La vue d'un autre grimpeur porte une marque par personne qui s'en sert : son auteur ne peut plus la supprimer.
+function markVueUse(batch, vueId, uid, d) {
+  const vue = state.vues.find(x => x.id === vueId);
+  if (!vue || vue.authorId === uid) return;
+  const ref = state.db.collection("vues").doc(vueId);
+  if (d > 0) batch.set(ref.collection("utilisateurs").doc(uid), { createdAt: Date.now() }); else batch.delete(ref.collection("utilisateurs").doc(uid));
+  batch.update(ref, { foreignUses: state.db.increment(d) });
+}
 async function deleteMethod(m) {
   const v = state.voies.find(x => x.id === m.voieId), batch = state.db.batch(), bump = {};
+  for (const x of m.vueIds || []) markVueUse(batch, x, m.authorId, -1);
   batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
   if (!m.isPrivate && v?.methodCount > 0) bump.methodCount = state.db.increment(-1);
   if (v && m.authorId !== v.authorId && !(await hasOtherContribution(m.voieId, m.authorId, m.id))) {
@@ -1617,8 +1654,12 @@ function renderOFs() {
   if (state.fsMode === "replay") {
     state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
     $("fsTitle").innerHTML = `${esc(v.name)} <small>méthode de ${esc(m?.climber || "?")}</small>`;
-    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "rp", replay: state.rp }), v.w / v.h);
-    const st = steps[state.rp];
+    const st = steps[state.rp], V = (st && findVue(v, vueIdOf(st))) || baseVue(v) || v, onVue = stepsOn(steps, V);
+    fsView.set(routeSVG(V, V.anchors || [], onVue, { uid: "rp", replay: st ? onVue.findIndex(s => s.x === st.x && s.y === st.y && s.t === st.t) : null }), V.w / V.h);
+    if (state.rpVue !== V.id) {
+      state.rpVue = V.id;
+      if (allVues(v).length > 1) { const b = $("rpVue"); b.textContent = vueTitle(v, V); b.hidden = false; clearTimeout(state.rpVueT); state.rpVueT = setTimeout(() => b.hidden = true, 1800); }
+    }
     let move = 0; for (let i = 0; i <= state.rp; i++) if (steps[i].t !== "clip") move++;
     const total = steps.filter(s => s.t !== "clip").length;
     let boltNo = 0; if (st && st.t === "clip") { const a = (v.anchors || [])[st.a]; boltNo = a && a.t === "relais" ? "R" : (v.anchors || []).slice(0, st.a + 1).filter(x => x.t !== "relais").length; }
@@ -1627,13 +1668,13 @@ function renderOFs() {
   } else {
     $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
     const V = currentVue(v) || v;
-    fsView.set(routeSVG(V, V.anchors || [], V.isBase ? steps : [], { uid: "fv" }), V.w / V.h);
+    fsView.set(routeSVG(V, V.anchors || [], stepsOn(steps, V), { uid: "fv" }), V.w / V.h);
   }
 }
 function focusStep() {
   const v = voie(), m = selMethod(); if (!v || !m) return;
   const st = mSteps(m)[state.rp]; if (!st) return;
-  const p = stepPoint(st, v.anchors || []);
+  const V = findVue(v, vueIdOf(st)) || v, p = stepPoint(st, V.anchors || []);
   fsView.focus(p.x, p.y, Math.max(fsView.s, 2.4));
 }
 function rpChrome(i, n) {
@@ -1667,7 +1708,9 @@ function startVue(existing) {
 function startMethod() {
   const v = voie(); if (!v) return;
   const mine = myMethod();
-  state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand" };
+  const V = currentVue(v) || allVues(v)[0];
+  if (!V) { toast("Ajoutez d'abord une photo de la voie."); return; }
+  state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand", viewId: V.id };
   $("oClimber").value = mine?.climber || accountFirstName();
   $(mine && !mine.isPrivate ? "oVisPublic" : "oVisPrivate").checked = true;
   $("oNote").value = mine?.note || ""; $("oErr").textContent = "";
@@ -1677,7 +1720,9 @@ function oeTarget() {
   const oe = state.oe; if (!oe) return null;
   if (oe.vue && oe.id) return state.vues.find(x => x.id === oe.id);
   if (oe.kind === "route" && !oe.id) return oe.photo ? { w: oe.photo.w, h: oe.photo.h, image: oe.photo.preview } : null;
-  return oe.kind === "route" ? state.voies.find(v => v.id === oe.id) : state.voies.find(v => v.id === oe.voieId);
+  if (oe.kind === "route") return state.voies.find(v => v.id === oe.id);
+  const v = state.voies.find(x => x.id === oe.voieId);
+  return v && (findVue(v, oe.viewId) || baseVue(v));
 }
 function oTap(x, y) {
   const oe = state.oe, v = oeTarget(); if (!oe || !v) return;
@@ -1701,8 +1746,8 @@ function oTap(x, y) {
       const ex = oe.steps.findIndex(s => s.t === "clip" && s.a === ai);
       if (ex >= 0) insRemove(oe, oe.steps, ex); else insAdd(oe, oe.steps, { t: "clip", a: ai, x: anchors[ai].x, y: anchors[ai].y });
     } else {
-      const hit = oe.steps.findIndex(s => s.t !== "clip" && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
-      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool });
+      const hit = oe.steps.findIndex(s => s.t !== "clip" && vueIdOf(s) === oe.viewId && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
+      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool, ...(oe.viewId === BASE_VUE ? {} : { viewId: oe.viewId }) });
     }
   }
   $("oErr").textContent = ""; renderOE();
@@ -1749,8 +1794,12 @@ function renderOE() {
   renderOETools();
   if (!v) return;
   $("oeWall").style.aspectRatio = `${v.w} / ${v.h}`;
-  const anchors = isRoute ? oe.anchors : v.anchors || [], steps = isRoute ? [] : oe.steps;
-  const mk = oe.insertAt == null ? -1 : oe.insertAt - 1, marks = isRoute ? { markA: mk } : { markS: mk };
+  const anchors = isRoute ? oe.anchors : v.anchors || [], steps = isRoute ? [] : stepsOn(oe.steps, v);
+  const mk = oe.insertAt == null ? -1 : oe.insertAt - 1, marks = isRoute ? { markA: mk } : { markS: -1 };
+  if (!isRoute && mk >= 0) marks.markS = steps.findIndex(s => { const g = oe.steps[mk]; return g && s.x === g.x && s.y === g.y && s.t === g.t; });
+  const voieDoc = !isRoute && state.voies.find(x => x.id === oe.voieId), vues = voieDoc ? allVues(voieDoc) : [];
+  $("oeVues").hidden = vues.length < 2;
+  $("oeVues").innerHTML = vues.map(x => `<button class="chip" type="button" data-oev="${esc(x.id)}" aria-pressed="${x.id === oe.viewId}">${esc(vueTitle(voieDoc, x))}</button>`).join("");
   oView.set(routeSVG(v, anchors, steps, { uid: "oe", ...marks }), v.w / v.h);
   if (state.fsMode === "oedit") fsView.set(routeSVG(v, anchors, steps, { uid: "of", ...marks }), v.w / v.h);
 }
@@ -1760,6 +1809,10 @@ $("oeFile").addEventListener("change", async e => {
   try { state.oe.photo = await prepPhoto(f); renderOE(); oView.layout(true); } catch { $("oePickErr").textContent = "Cette photo n'a pas pu être lue. Essayez-en une autre."; }
 });
 $("oeFull").addEventListener("click", () => openFs("oedit"));
+$("oeVues").addEventListener("click", e => {
+  const c = e.target.closest("[data-oev]"); if (!c || !state.oe) return;
+  state.oe.viewId = c.dataset.oev; renderOE(); oView.layout(true);
+});
 $("oCancel").addEventListener("click", () => { const oe = state.oe; state.oe = null; oe && (oe.voieId || oe.id) ? go("ovoie") : go("olist"); });
 $("oForm").addEventListener("submit", async e => {
   e.preventDefault();
