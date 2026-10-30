@@ -275,6 +275,9 @@
     ["hier", "yesterday", "ayer"],
     // sélecteur de langue
     ["Langue", "Language", "Idioma"],
+    ["Choisissez une commune dans la liste.", "Choose a town from the list.", "Elige un municipio de la lista."],
+    ["Service des communes indisponible : votre saisie sera enregistrée comme « commune non vérifiée ».", "Town service unavailable: your entry will be saved as “unverified town”.", "Servicio de municipios no disponible: tu entrada se guardará como «municipio no verificado»."],
+    ["ex. Saint-Antonin-Noble-Val", "e.g. Saint-Antonin-Noble-Val", "ej. Saint-Antonin-Noble-Val"],
     ["Visibilité", "Visibility", "Visibilidad"],
     ["Privée (moi seul)", "Private (only me)", "Privado (solo yo)"],
     ["Visible par tous", "Visible to everyone", "Visible para todos"],
@@ -302,6 +305,8 @@
     [/^(\d+) mains$/, m => `${m[1]} hands`, m => `${m[1]} manos`],
     [/^il y a (\d+) j$/, m => `${m[1]} d ago`, m => `hace ${m[1]} d`],
     [/^Environnement de test · PR #(\d+)$/, m => `Test environment · PR #${m[1]}`, m => `Entorno de prueba · PR #${m[1]}`],
+    [/^Déjà référencés à (.+) :$/, m => `Already listed in ${m[1]}:`, m => `Ya registrados en ${m[1]}:`],
+    [/^(.*) · commune non vérifiée$/, m => `${m[1]} · unverified town`, m => `${m[1]} · municipio no verificado`],
     [/^Ouvert par (.+)$/, m => `Set by ${sub(m[1])}`, m => `Trazado por ${sub(m[1])}`],
     [/^modifié le (.+)$/, m => `edited ${m[1]}`, m => `editado el ${m[1]}`],
     [/^ajoutée par (.+)$/, m => `added by ${sub(m[1])}`, m => `añadida por ${sub(m[1])}`],

@@ -31,13 +31,13 @@ const DATA = {
     'mur-test': photo('mur-test.jpg', 1200, 800),
     'voie-test': photo('voie-test.jpg', 600, 1200),
   },
-  gyms: { 'salle-test': { name: 'Salle de test', city: 'Ville de test', createdAt: NOW } },
+  gyms: { 'salle-test': { name: 'Salle de test', city: 'Commune de test', commune: { nom: 'Commune de test', simple: 'commune de test', verifie: false }, createdAt: NOW } },
   walls: { 'mur-test': { gymId: 'salle-test', name: 'Mur de test', image: 'photo:mur-test', w: 1200, h: 800, active: true, createdAt: NOW } },
   blocs: Object.fromEntries([['a', '5c'], ['b', '6a+'], ['c', '7a']].map(([k, grade], i) => [`bloc-test-${k}`, {
     gymId: 'salle-test', wallId: 'mur-test', name: `Bloc de test ${k.toUpperCase()}`, grade, setter: 'Testeur', desc: '', authorId: AUTHOR, createdAt: NOW - i,
     holds: [hold('start', 0.3 + i * 0.1, 0.8), hold('hand', 0.4 + i * 0.1, 0.55), hold('hand', 0.5 + i * 0.1, 0.35), hold('top', 0.55 + i * 0.1, 0.15)],
   }])),
-  secteurs: { 'secteur-test': { name: 'Secteur de test', region: 'Commune de test', authorId: AUTHOR, createdAt: NOW } },
+  secteurs: { 'secteur-test': { name: 'Secteur de test', region: 'Commune de test', commune: { nom: 'Commune de test', simple: 'commune de test', verifie: false }, authorId: AUTHOR, createdAt: NOW } },
   voies: { 'voie-test': {
     secteurId: 'secteur-test', name: 'Voie de test', grade: '6b', image: 'photo:voie-test', w: 600, h: 1200, addedBy: 'Testeur', authorId: AUTHOR, methodCount: 1, createdAt: NOW,
     anchors: [...route.map(([x, y]) => hold('bolt', x, y)), hold('relais', 0.5, 0.12)],

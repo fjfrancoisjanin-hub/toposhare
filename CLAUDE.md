@@ -24,7 +24,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → déployée sur l'environnement de test https://toposhare-test.web.app (projet `toposhare-test`, données fictives remises à zéro à chaque déploiement, une seule URL : la dernière PR déployée s'affiche, voir le bandeau). Le job `preview` n'a aucun accès à la prod.
 
 ## Modèle de données (collections)
-`gyms`, `walls` (photo du mur d'une salle), `blocs`, `secteurs`, `voies` (champ `methodCount`), `methodes` (publiques), `methodesPrivees` (auteur et admin seuls ; changer de visibilité déplace le document), `voies/{id}/contributeurs/{uid}` (marque + `foreignCount` : si d'autres grimpeurs ont contribué, seul l'admin supprime la voie), `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).
+`gyms` et `secteurs` (commune dans `commune`, libellé dans `city` / `region`), `walls` (photo du mur d'une salle), `blocs`, `voies` (champ `methodCount`), `methodes` (publiques), `methodesPrivees` (auteur et admin seuls ; changer de visibilité déplace le document), `voies/{id}/contributeurs/{uid}` (marque + `foreignCount` : si d'autres grimpeurs ont contribué, seul l'admin supprime la voie), `photos`, `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).
 Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les règles : e-mail vérifié) peut tout modérer.
 
 ## Décisions de référence

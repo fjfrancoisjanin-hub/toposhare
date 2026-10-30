@@ -14,6 +14,7 @@ async function openCrag(page, secteurId, extra = {}) {
     localStorage.setItem('pan-sect', s);
     for (const [k, v] of Object.entries(x)) localStorage.setItem(k, v);
   }, [secteurId, extra]);
+  await page.route('**/geo.api.gouv.fr/**', r => r.abort());
   await page.goto('/');
 }
 
