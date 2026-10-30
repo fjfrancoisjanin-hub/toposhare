@@ -9,8 +9,7 @@ async function seedVoie(id, authorId = 'autre-grimpeur') {
   await seed('voies', `v-${id}`, { secteurId: id, name: `Voie ${id}`, grade: '6a', w: 100, h: 100, anchors: [], authorId, addedBy: 'Paul', methodCount: 0, createdAt: 1 });
 }
 async function open(page, id) {
-  await page.addInitScript(s => { localStorage.setItem('pan-mode', 'out'); localStorage.setItem('pan-sect', s); }, id);
-  await page.goto('/');
+  await page.goto(`/#/secteur/${id}`);
 }
 async function addMethod(page, { pub = false } = {}) {
   await page.locator('[data-act="newm"]').click();
@@ -65,7 +64,7 @@ test('une méthode privée ne compte pas dans le nombre de méthodes', async ({ 
   await login(page, ALICE);
   await page.locator('.name', { hasText: `Voie ${id}` }).click();
   await addMethod(page);
-  await page.locator('#tabOut').click();
+  await page.locator('#tabPlace').click();
   await expect(page.locator('.name', { hasText: `Voie ${id}` })).toBeVisible();
   await expect(page.locator('.by', { hasText: 'méthode' })).toHaveCount(0);
 });
@@ -111,7 +110,7 @@ test("l'auteur supprime sa voie sans contributeur, mais plus dès qu'un autre y 
   await expect(page.locator('#ovName')).toBeVisible();
   await expect(page.locator('[data-act="delv"]')).toHaveCount(0);
 
-  await page.locator('#tabOut').click();
+  await page.locator('#tabPlace').click();
   await page.locator('.name', { hasText: `Seconde ${id}` }).click();
   await page.locator('[data-act="delv"]').click();
   await page.locator('[data-act="delv"]').click();

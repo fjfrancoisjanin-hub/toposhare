@@ -10,7 +10,7 @@ async function asTestEnv(page, pr) {
 
 test("le bandeau n'apparaît pas hors environnement de test", async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('#tabList')).toBeVisible();
+  await expect(page.locator('#tabHome')).toBeVisible();
   await expect(page.locator('#tsEnvBanner')).toHaveCount(0);
 });
 
