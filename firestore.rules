@@ -8,13 +8,24 @@ service cloud.firestore {
     // L'auteur d'un document est celui dont l'identifiant est dans authorId.
     function mine() { return signedIn() && resource.data.authorId == request.auth.uid; }
     function claimsMe() { return signedIn() && request.resource.data.authorId == request.auth.uid; }
-    function keepsAuthor() { return request.resource.data.authorId == resource.data.authorId; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    // Auteur réel, date de création et rattachements ne bougent jamais, même pour le propriétaire du site.
+    function keepsIdentity() { return !changed().hasAny(['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId']); }
+    // Un champ n'est contrôlé que s'il change : les anciens documents restent modifiables.
+    function nameOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].trim().size() > 0 && request.resource.data[f].size() <= max); }
+    function optionalOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].size() <= max); }
+    function traced() {
+      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'updatedAt', 'updatedBy'])
+        || (request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is number);
+    }
+    function editOk() { return keepsIdentity() && traced(); }
 
     // Salles et murs : tout le monde lit, un grimpeur connecté peut ajouter une salle ou remonter un mur.
     match /gyms/{id} {
       allow read: if true;
       allow create: if signedIn();
-      allow update, delete: if isOwner();
+      allow update: if isOwner() && editOk() && nameOk('name', 40) && optionalOk('city', 30);
+      allow delete: if isOwner();
     }
     match /walls/{id} {
       allow read: if true;
@@ -26,7 +37,7 @@ service cloud.firestore {
     match /blocs/{id} {
       allow read: if true;
       allow create: if claimsMe() || isOwner();
-      allow update: if (mine() && keepsAuthor()) || isOwner();
+      allow update: if (mine() || isOwner()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30);
       allow delete: if mine() || isOwner();
     }
 
@@ -34,12 +45,13 @@ service cloud.firestore {
     match /secteurs/{id} {
       allow read: if true;
       allow create: if signedIn();
-      allow update, delete: if isOwner();
+      allow update: if isOwner() && editOk() && nameOk('name', 50) && optionalOk('region', 40);
+      allow delete: if isOwner();
     }
     match /voies/{id} {
       allow read: if true;
       allow create: if claimsMe() || isOwner();
-      allow update: if (mine() && keepsAuthor()) || isOwner()
+      allow update: if ((mine() || isOwner()) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
         || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount'])
             && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]
             && request.resource.data.methodCount >= 0);
@@ -48,7 +60,7 @@ service cloud.firestore {
     match /methodes/{id} {
       allow read: if true;
       allow create: if claimsMe() || isOwner();
-      allow update: if (mine() && keepsAuthor()) || isOwner();
+      allow update: if (mine() || isOwner()) && editOk() && nameOk('climber', 30);
       allow delete: if mine() || isOwner();
     }
 
