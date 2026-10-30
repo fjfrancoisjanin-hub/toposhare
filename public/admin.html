@@ -290,6 +290,10 @@ async function cascade(col, id) {
     const v = voies.find(x => x.id === id);
     for (const m of methodes.filter(m => m.voieId === id)) await delDoc("methodes", m.id);
     for (const m of D.all[7].filter(m => m.voieId === id)) await delDoc("methodesPrivees", m.id);
+    for (const x of (await BT.fs.collection("vues").where("voieId", "==", id).get()).docs) {
+      for (const u of (await x.ref.collection("utilisateurs").get()).docs) await u.ref.delete();
+      await delPhoto(x.data().image); await x.ref.delete();
+    }
     for (const d of (await voieDoc(id).collection("contributeurs").get()).docs) await d.ref.delete();
     await delPhoto(v?.image);
   }
@@ -322,7 +326,8 @@ $("recount").onclick = async () => {
   const [, , , , voies, methodes] = D.all, priv = D.all[7];
   let n = 0;
   for (const v of voies) {
-    const others = new Set([...methodes, ...priv].filter(m => m.voieId === v.id && m.authorId && m.authorId !== v.authorId).map(m => m.authorId));
+    const vues = (await BT.fs.collection("vues").where("voieId", "==", v.id).get()).docs.map(d => d.data());
+    const others = new Set([...methodes, ...priv, ...vues].filter(m => (m.voieId === v.id) && m.authorId && m.authorId !== v.authorId).map(m => m.authorId));
     for (const uid of others) await voieDoc(v.id).collection("contributeurs").doc(uid).set({ createdAt: Date.now() });
     if ((v.foreignCount || 0) !== others.size) { await voieDoc(v.id).update({ foreignCount: others.size }); n++; }
   }

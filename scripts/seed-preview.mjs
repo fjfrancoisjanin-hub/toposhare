@@ -5,7 +5,7 @@ import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT = 'toposhare-test';
-const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'photos', 'votes', 'feedback', 'data'];
+const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'vues', 'photos', 'votes', 'feedback', 'data'];
 
 // Ce script efface toute la base : il refuse de tourner avec une autre clé que celle du projet de test.
 const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -39,8 +39,12 @@ const DATA = {
   }])),
   secteurs: { 'secteur-test': { name: 'Secteur de test', region: 'Commune de test', commune: { nom: 'Commune de test', simple: 'commune de test', verifie: false }, authorId: AUTHOR, createdAt: NOW } },
   voies: { 'voie-test': {
-    secteurId: 'secteur-test', name: 'Voie de test', grade: '6b', image: 'photo:voie-test', w: 600, h: 1200, addedBy: 'Testeur', authorId: AUTHOR, methodCount: 1, createdAt: NOW,
+    secteurId: 'secteur-test', name: 'Voie de test', grade: '6c', longueurs: [{ id: 'l1', name: 'L1', grade: '6b' }, { id: 'l2', name: 'L2', grade: '6c' }], longueurIds: ['l1', 'l2'], image: 'photo:voie-test', w: 600, h: 1200, addedBy: 'Testeur', authorId: AUTHOR, methodCount: 1, createdAt: NOW,
     anchors: [...route.map(([x, y]) => hold('bolt', x, y)), hold('relais', 0.5, 0.12)],
+  } },
+  vues: { 'vue-l2': {
+    voieId: 'voie-test', longueurId: 'l2', label: 'L2 depuis le relais', image: 'photo:voie-test', w: 600, h: 1200, authorId: AUTHOR, order: NOW, createdAt: NOW,
+    anchors: [hold('bolt', 0.5, 0.6), hold('relais', 0.5, 0.2)],
   } },
   methodes: { 'methode-test': {
     voieId: 'voie-test', secteurId: 'secteur-test', authorId: AUTHOR, climber: 'Testeur', note: 'Méthode fictive.', createdAt: NOW, updatedAt: NOW,

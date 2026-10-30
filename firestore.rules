@@ -30,7 +30,7 @@ service cloud.firestore {
     function nameOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].trim().size() > 0 && request.resource.data[f].size() <= max); }
     function optionalOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].size() <= max); }
     function traced() {
-      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'commune', 'updatedAt', 'updatedBy'])
+      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'commune', 'label', 'updatedAt', 'updatedBy'])
         || (request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is number);
     }
     // Commune d'un nouveau secteur ou d'une nouvelle salle : issue de la liste officielle, ou saisie libre marquée non vérifiée si le service ne répond pas.
@@ -98,7 +98,11 @@ service cloud.firestore {
       }
       allow read: if true;
       allow create: if (claimsMe() || isAdmin()) && noRating();
-      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignCount']))) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
+      // Retirer une longueur alors que d'autres grimpeurs contribuent à la voie est réservé à l'admin.
+      function keepsLengths() {
+        return resource.data.get('foreignCount', 0) == 0 || request.resource.data.get('longueurIds', ['l1']).hasAll(resource.data.get('longueurIds', ['l1']));
+      }
+      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignCount']) && keepsLengths())) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
         || countersOnly() || ratingOnly('voies', id);
       // Si d'autres grimpeurs ont contribué à la voie, seul l'admin peut la supprimer.
       allow delete: if isAdmin() || (mine() && resource.data.get('foreignCount', 0) == 0);
@@ -153,6 +157,38 @@ service cloud.firestore {
       allow delete: if isAdmin() || (mine()
         && getAfter(target(resource.data)).data.get('ratingCount', 0) == get(target(resource.data)).data.get('ratingCount', 0) - 1
         && getAfter(target(resource.data)).data.get('ratingSum', 0) == get(target(resource.data)).data.get('ratingSum', 0) - resource.data.value);
+    }
+
+    // Vues d'une voie : une photo et ses points. Toute personne connectée en ajoute une sur une longueur existante.
+    match /vues/{id} {
+      function voieOf(voieId) { return get(/databases/$(database)/documents/voies/$(voieId)).data; }
+      function usesOnly() {
+        let mark = /databases/$(database)/documents/vues/$(id)/utilisateurs/$(request.auth.uid);
+        let d = request.resource.data.get('foreignUses', 0) - resource.data.get('foreignUses', 0);
+        return signedIn() && changed().hasOnly(['foreignUses']) && request.resource.data.foreignUses >= 0
+          && ((d == 1 && !exists(mark) && existsAfter(mark)) || (d == -1 && exists(mark) && !existsAfter(mark)));
+      }
+      allow read: if true;
+      allow create: if claimsMe() && request.resource.data.get('foreignUses', 0) == 0
+        && request.resource.data.label is string && request.resource.data.label.trim().size() > 0 && request.resource.data.label.size() <= 40
+        && request.resource.data.longueurId in voieOf(request.resource.data.voieId).get('longueurIds', ['l1'])
+        && (voieOf(request.resource.data.voieId).authorId == request.auth.uid
+          || existsAfter(/databases/$(database)/documents/voies/$(request.resource.data.voieId)/contributeurs/$(request.auth.uid)));
+      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignUses']))) && editOk() && nameOk('label', 40))
+        || (signedIn() && voieOf(resource.data.voieId).authorId == request.auth.uid && changed().hasOnly(['order']))
+        || usesOnly();
+      // Si la méthode d'un autre grimpeur utilise la vue, seul l'admin peut la supprimer.
+      allow delete: if isAdmin() || (mine() && resource.data.get('foreignUses', 0) == 0);
+
+      match /utilisateurs/{uid} {
+        function vueBefore() { return get(/databases/$(database)/documents/vues/$(id)).data; }
+        function vueAfter() { return getAfter(/databases/$(database)/documents/vues/$(id)).data; }
+        allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+        allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && vueBefore().authorId != uid
+          && vueAfter().get('foreignUses', 0) == vueBefore().get('foreignUses', 0) + 1);
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid
+          && vueAfter().get('foreignUses', 0) == vueBefore().get('foreignUses', 0) - 1);
+      }
     }
 
     // Brouillons : privés, visibles par leur auteur seulement.

@@ -411,6 +411,85 @@ describe('Notes', () => {
   });
 });
 
+describe('Longueurs et vues', () => {
+  const voie = (extra = {}) => ({ authorId: 'alice', name: 'V', grade: '6a', methodCount: 0, longueurs: [{ id: 'l1', name: 'L1', grade: '6a' }], longueurIds: ['l1'], ...extra });
+  const vue = (uid, extra = {}) => ({ voieId: 'v1', longueurId: 'l1', label: 'Vue', authorId: uid, anchors: [], order: 1, createdAt: 1, ...extra });
+  function addVue(uid, id = 'x1', extra = {}, count = 1) {
+    const db = user(uid), b = db.batch();
+    b.set(db.doc(`vues/${id}`), vue(uid, extra));
+    b.set(db.doc(`voies/v1/contributeurs/${uid}`), { createdAt: 1 });
+    b.update(db.doc('voies/v1'), { foreignCount: count });
+    return b.commit();
+  }
+  test("un grimpeur non auteur ajoute une vue, mais pas de longueur ni de cotation", async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(addVue('bob'));
+    await assertFails(user('bob').doc('voies/v1').update(trace('bob', { longueurs: [], longueurIds: ['l1', 'l2'] })));
+    await assertFails(user('bob').doc('voies/v1').update(trace('bob', { grade: '9a' })));
+  });
+  test("une vue sans sa marque de contribution, ou sur une longueur inexistante, est refusée", async () => {
+    await seed('voies/v1', voie());
+    await assertFails(user('bob').doc('vues/x1').set(vue('bob')));
+    await assertFails(addVue('bob', 'x2', { longueurId: 'autre' }));
+    await assertFails(addVue('bob', 'x3', { label: '  ' }));
+    await assertFails(user('bob').doc('vues/x4').set(vue('alice')));
+    await assertFails(anon().doc('vues/x5').set(vue('bob')));
+  });
+  test("l'auteur de la voie ajoute une vue sans marque, et un ancien document sans longueurs accepte L1", async () => {
+    await seed('voies/v1', { authorId: 'alice', name: 'V', grade: '6a' });
+    await assertSucceeds(user('alice').doc('vues/x1').set(vue('alice')));
+  });
+  test("un grimpeur ne peut pas modifier la vue d'un autre ; l'auteur et l'admin oui", async () => {
+    await seed('voies/v1', voie());
+    await seed('vues/x1', vue('bob'));
+    await assertFails(user('carole').doc('vues/x1').update(trace('carole', { label: 'Pirate' })));
+    await assertSucceeds(user('bob').doc('vues/x1').update(trace('bob', { label: 'Mieux' })));
+    await assertSucceeds(owner().doc('vues/x1').update(trace('owner', { label: 'Encore' })));
+    await assertFails(user('bob').doc('vues/x1').update(trace('bob', { label: '' })));
+    await assertFails(user('bob').doc('vues/x1').update(trace('bob', { voieId: 'autre' })));
+  });
+  test("l'auteur de la voie range les vues des autres, sans les modifier", async () => {
+    await seed('voies/v1', voie());
+    await seed('vues/x1', vue('bob'));
+    await assertSucceeds(user('alice').doc('vues/x1').update({ order: 5 }));
+    await assertFails(user('alice').doc('vues/x1').update(trace('alice', { label: 'Pirate' })));
+    await assertFails(user('alice').doc('vues/x1').delete());
+    await assertFails(user('carole').doc('vues/x1').update({ order: 5 }));
+  });
+  test("l'auteur ne peut pas supprimer une vue utilisée par la méthode d'un autre ; l'admin le peut", async () => {
+    await seed('voies/v1', voie());
+    await seed('vues/x1', vue('bob'));
+    const db = user('carole'), b = db.batch();
+    b.set(db.doc('vues/x1/utilisateurs/carole'), { createdAt: 1 });
+    b.update(db.doc('vues/x1'), { foreignUses: 1 });
+    await assertSucceeds(b.commit());
+    await assertFails(user('bob').doc('vues/x1').delete());
+    await assertFails(user('bob').doc('vues/x1').update({ foreignUses: 0 }));
+    await assertSucceeds(owner().doc('vues/x1').delete());
+  });
+  test("l'auteur supprime sa vue si personne ne l'utilise", async () => {
+    await seed('voies/v1', voie());
+    await seed('vues/x1', vue('bob'));
+    await assertSucceeds(user('bob').doc('vues/x1').delete());
+  });
+  test("l'auteur d'une voie ne peut pas la supprimer si un autre grimpeur y a une vue, l'admin le peut", async () => {
+    await seed('voies/v1', voie());
+    await assertSucceeds(addVue('bob'));
+    await assertFails(user('alice').doc('voies/v1').delete());
+    await assertSucceeds(owner().doc('voies/v1').delete());
+  });
+  test("retirer une longueur : l'auteur seul sans contributeur, sinon seul l'admin", async () => {
+    const two = { longueurs: [{ id: 'l1', name: 'L1', grade: '6a' }, { id: 'l2', name: 'L2', grade: '6b' }], longueurIds: ['l1', 'l2'] };
+    const one = { longueurs: [{ id: 'l1', name: 'L1', grade: '6a' }], longueurIds: ['l1'] };
+    await seed('voies/v1', voie(two));
+    await assertSucceeds(user('alice').doc('voies/v1').update(trace('alice', one)));
+    await seed('voies/v2', voie({ ...two, foreignCount: 1 }));
+    await assertFails(user('alice').doc('voies/v2').update(trace('alice', one)));
+    await assertSucceeds(user('alice').doc('voies/v2').update(trace('alice', { longueurs: [...two.longueurs, { id: 'l3', name: 'L3', grade: '7a' }], longueurIds: ['l1', 'l2', 'l3'], grade: '7a' })));
+    await assertSucceeds(owner().doc('voies/v2').update(trace('owner', one)));
+  });
+});
+
 describe('Correction des noms', () => {
   const CONTENUS = [
     ['blocs/b1', { authorId: 'alice', gymId: 'g1', wallId: 'w1', createdAt: 1, name: 'Bloc', grade: '6a', setter: 'Alice' }, { setter: 'Alicia', name: 'Bloc v2', grade: '6b' }],
