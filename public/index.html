@@ -304,6 +304,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
         <button class="btn" id="dReplay" type="button">▶ Répéter le bloc</button>
         <span style="flex:1"></span>
         <button class="btn ghost small" id="dEdit" type="button" hidden>Modifier le bloc</button>
+        <button class="btn ghost small" id="dAdminEdit" type="button" hidden>Modifier l'ouvreur</button>
         <button class="btn danger small" id="dDel" type="button" hidden>Supprimer ce bloc</button>
         <button class="btn danger small" id="dDelOk" type="button" hidden>Confirmer la suppression</button>
       </div>
@@ -349,6 +350,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
         <form id="oForm" novalidate>
           <div id="oeRouteF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oName">Nom de la voie</label><input id="oName" maxlength="50" placeholder="ex. Le marché de l'angoisse" autocomplete="off"></div>
+            <div class="field"><label class="label" for="oAddedBy">Ajoutée par</label><input id="oAddedBy" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
             <div class="field"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
           </div>
           <div id="oeMethF" style="display:grid;gap:14px">
@@ -640,13 +642,13 @@ function renderGrades() {
 $("grades").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.grade = b.dataset.g; renderGrades(); saveDraft(); });
 function clearEditor(wipe = true) {
   state.edit = { kind: "new" }; state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null;
-  $("fName").value = ""; $("fDesc").value = ""; $("fErr").textContent = "";
+  $("fName").value = ""; $("fDesc").value = ""; $("fSetter").value = accountFirstName(); $("fErr").textContent = "";
   if (wipe) lsSet("pan-draft", ""); renderEditorChrome(); renderEditor();
 }
 function fillEditor(src) {
   state.holds = (src.holds || []).map(h => ({ ...h }));
   $("fName").value = src.name || ""; $("fDesc").value = src.desc || "";
-  if (src.setter) $("fSetter").value = src.setter;
+  $("fSetter").value = src.setter || accountFirstName();
   state.grade = src.grade || state.grade;
   state.tool = state.holds.some(h => h.t === "start") ? "hand" : "start";
   state.insertAt = state.lastIdx = null; $("fErr").textContent = ""; renderGrades();
@@ -712,9 +714,8 @@ $("form").addEventListener("submit", async e => {
   $("fSave").disabled = true;
   const ed = state.edit;
   try {
-    lsSet("pan-setter", p.setter);
     let id;
-    if (ed.kind === "bloc") { await state.db.collection("blocs").doc(ed.id).update({ ...p, updatedAt: Date.now() }); id = ed.id; }
+    if (ed.kind === "bloc") { await state.db.collection("blocs").doc(ed.id).update({ ...p, updatedAt: Date.now(), updatedBy: state.me }); id = ed.id; }
     else {
       const ref = await state.db.collection("blocs").add({ ...p, gymId: state.gymId, wallId: w.id, authorId: state.me || null, createdAt: Date.now() });
       id = ref.id;
@@ -816,6 +817,7 @@ document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet
 function openDetail(id) { state.current = id; go("detail"); }
 function renderDetail() {
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
+  $("dAdminEdit").hidden = !(b && w && isAdmin());
   const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
   if (!b || !w) { $("dName").textContent = "Bloc introuvable"; $("dBy").textContent = "Il a peut-être été supprimé."; $("dGrade").textContent = ""; $("dSeq").textContent = ""; $("dDesc").hidden = true; wallEl.hidden = true; $("dDel").hidden = $("dDelOk").hidden = $("dEdit").hidden = $("dReplay").hidden = true; $("dOld").hidden = true; return; }
   wallEl.hidden = false;
@@ -829,6 +831,7 @@ function renderDetail() {
   $("dDel").hidden = !(own || isAdmin()); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
+$("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
 $("dReplay").addEventListener("click", () => openFs("breplay"));
 
 /* ---------- bloc replay: départ → mains dans l'ordre → top ---------- */
@@ -866,6 +869,7 @@ function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; if ($("f
 $("sheetBg").addEventListener("click", e => { if (e.target === $("sheetBg")) closeSheet(); });
 $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "sectors" : "main"));
 function renderSheet() {
+  if (state.sheet === "edit") return renderEditSheet();
   if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
   if (state.sheet === "account" || state.sheet === "feedback" || state.sheet === "login") return renderAcctSheet();
   if (state.sheet === "lang") {
@@ -919,7 +923,7 @@ function renderSheet() {
   }
   const walls = g ? wallsOf(g.id) : [];
   s.innerHTML = `<h2 id="sheetTitle">Salles</h2>
-    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
+    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
     ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
       <div class="walllist">${walls.length ? walls.map(w => `<div><span>${esc(w.name)} · photo du ${day(w.createdAt)}</span><b style="color:${w.active ? "var(--fg)" : "var(--muted)"}">${w.active ? "Actuel" : "Démonté"}</b></div>`).join("") : "<div>Aucune photo du mur.</div>"}</div>
@@ -1128,6 +1132,8 @@ function renderVoie() {
   acts.push(mine ? `<button class="btn ${m ? "ghost" : ""} small" type="button" data-act="editm">Modifier ma méthode</button>` : `<button class="btn small" type="button" data-act="newm">Ajouter ma méthode</button>`);
   if (state.me && v.authorId === state.me) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
   if (m && ((mine && m.id === mine.id) || isAdmin())) acts.push(`<button class="btn danger small" type="button" data-act="delm">${mine && m.id === mine.id ? "Supprimer ma méthode" : "Supprimer cette méthode"}</button>`);
+  if (isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminv">Modifier la voie</button>`);
+  if (m && isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminm">Modifier le prénom</button>`);
   if (isAdmin()) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer la voie (admin)</button>`);
   $("ovActions").innerHTML = acts.join("");
 }
@@ -1140,6 +1146,8 @@ $("ovActions").addEventListener("click", async e => {
   if (a === "replay") openFs("replay");
   if (a === "newm" || a === "editm") startMethod();
   if (a === "editr") startRoute(state.voieId);
+  if (a === "adminv") openEdit("voies", state.voieId);
+  if (a === "adminm") openEdit("methodes", selMethod()?.id);
   if (a === "delm") {
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer la suppression"; return; }
     const target = selMethod() || myMethod(); if (!target) return;
@@ -1199,14 +1207,14 @@ function startRoute(id) {
   if (!secteur()) { go("olist"); openSheet("sectors"); return; }
   const v = id ? state.voies.find(x => x.id === id) : null;
   state.oe = { kind: "route", id: v?.id || null, anchors: (v?.anchors || []).map(a => ({ ...a })), tool: "bolt", photo: null, grade: v?.grade || "6a" };
-  $("oName").value = v?.name || ""; $("oErr").textContent = ""; $("oePickErr").textContent = "";
+  $("oName").value = v?.name || ""; $("oAddedBy").value = v?.addedBy || accountFirstName(); $("oErr").textContent = ""; $("oePickErr").textContent = "";
   go("oedit");
 }
 function startMethod() {
   const v = voie(); if (!v) return;
   const mine = myMethod();
   state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand" };
-  $("oClimber").value = mine?.climber || lsGet("pan-setter") || $("fSetter").value || "";
+  $("oClimber").value = mine?.climber || accountFirstName();
   $("oNote").value = mine?.note || ""; $("oErr").textContent = "";
   go("oedit");
 }
@@ -1303,23 +1311,23 @@ $("oForm").addEventListener("submit", async e => {
   $("oSave").disabled = true;
   try {
     if (oe.kind === "route") {
-      const name = $("oName").value.trim();
+      const name = $("oName").value.trim(), addedBy = $("oAddedBy").value.trim();
       if (!name) throw { msg: "Donnez un nom à la voie." };
+      if (!addedBy) throw { msg: "Indiquez votre prénom." };
       if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
-      if (oe.id) { await state.db.collection("voies").doc(oe.id).update({ name, grade: oe.grade, anchors: oe.anchors, updatedAt: Date.now() }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
+      if (oe.id) { await state.db.collection("voies").doc(oe.id).update({ name, grade: oe.grade, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
       else {
         $("oErr").textContent = "Envoi de la photo…";
         const a = await state.assets.upload(oe.photo.blob);
-        const ref = await state.db.collection("voies").add({ secteurId: state.secteurId, name, grade: oe.grade, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, addedBy: lsGet("pan-setter") || $("fSetter").value || "", methodCount: 0, createdAt: Date.now() });
+        const ref = await state.db.collection("voies").add({ secteurId: state.secteurId, name, grade: oe.grade, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, addedBy, methodCount: 0, createdAt: Date.now() });
         state.oe = null; $("oErr").textContent = ""; toast("Voie publiée. Ajoutez maintenant votre méthode."); openVoie(ref.id);
       }
     } else {
       const climber = $("oClimber").value.trim(), note = $("oNote").value.trim();
       if (!oe.steps.length) throw { msg: "Placez au moins une prise." };
       if (!climber) throw { msg: "Indiquez votre prénom." };
-      lsSet("pan-setter", climber);
       let id = oe.id;
-      if (id) await state.db.collection("methodes").doc(id).update({ climber, note, steps: oe.steps, updatedAt: Date.now() });
+      if (id) await state.db.collection("methodes").doc(id).update({ climber, note, steps: oe.steps, updatedAt: Date.now(), updatedBy: state.me });
       else { const ref = await state.db.collection("methodes").add({ voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, climber, note, steps: oe.steps, createdAt: Date.now(), updatedAt: Date.now() }); id = ref.id; bumpCount(oe.voieId, 1); }
       state.oe = null; toast("Méthode enregistrée"); openVoie(voie()?.id || state.voieId, id);
     }
@@ -1339,7 +1347,7 @@ function renderSectorSheet() {
     return;
   }
   s.innerHTML = `<h2 id="sheetTitle">Secteurs de falaise</h2>
-    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
+    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newsector">+ Ajouter un secteur</button></section>
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
@@ -1354,6 +1362,47 @@ $("sheet").addEventListener("click", async e => {
   }
 });
 
+/* ---------- correction des noms par l'admin ---------- */
+const EDITS = {
+  gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 30, false]] },
+  secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 40, false]] },
+  voies: { title: "Modifier la voie", items: () => state.voies, fields: [["name", "Nom de la voie", 50, true], ["addedBy", "Ajoutée par", 30, true]], grade: true },
+  blocs: { title: "Modifier l'ouvreur", items: () => state.blocs, fields: [["setter", "Ouvert par", 30, true]] },
+  methodes: { title: "Modifier le prénom", items: () => state.methodes, fields: [["climber", "Grimpeur", 30, true]] },
+};
+const withEdit = (col, x, row) => isAdmin() ? `<div style="display:flex;gap:8px"><div style="flex:1;min-width:0;display:grid">${row}</div><button class="btn ghost small" type="button" data-edit="${col}:${esc(x.id)}" aria-label="Modifier « ${esc(x.name)} »">Modifier</button></div>` : row;
+function openEdit(col, id) { if (!EDITS[col]?.items().some(x => x.id === id)) return; state.editing = { col, id }; $("sheet").innerHTML = ""; openSheet("edit"); }
+const looseName = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function renderEditSheet() {
+  const { col, id } = state.editing, key = col + ":" + id, spec = EDITS[col], x = spec.items().find(i => i.id === id);
+  if ($("eForm")?.dataset.key === key) return; // Une mise à jour en direct n'efface pas la saisie en cours.
+  if (!x) { closeSheet(); toast("Introuvable"); return; }
+  $("sheet").innerHTML = `<h2 id="sheetTitle">${spec.title}</h2>
+    <form id="eForm" data-key="${esc(key)}" novalidate style="display:grid;gap:14px">
+      ${spec.fields.map(([f, label, max]) => `<div class="field"><label class="label" for="e_${f}">${label}</label><input id="e_${f}" maxlength="${max}" value="${esc(x[f] || "")}" autocomplete="off"></div>`).join("")}
+      ${spec.grade ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
+      <div class="note" id="eWarn" hidden>Un autre secteur porte déjà ce nom dans cette commune.</div>
+      <div class="err" id="eErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>
+    </form>`;
+  const warn = () => { if (col !== "secteurs") return; const n = looseName($("e_name").value), r = looseName($("e_region").value); $("eWarn").hidden = !state.secteurs.some(s => s.id !== id && looseName(s.name) === n && looseName(s.region) === r); };
+  warn();
+  $("eForm").addEventListener("input", warn);
+  $("eGrades")?.addEventListener("click", e => { const c = e.target.closest("[data-g]"); if (!c) return; $("eGrades").dataset.grade = c.dataset.g; $("eGrades").querySelectorAll("[data-g]").forEach(b => b.setAttribute("aria-pressed", b === c)); });
+  $("eForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const p = { updatedAt: Date.now(), updatedBy: state.me };
+    for (const [f, , , required] of spec.fields) {
+      p[f] = $("e_" + f).value.trim();
+      if (required && !p[f]) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
+    }
+    if (spec.grade) p.grade = $("eGrades").dataset.grade;
+    try { await state.db.collection(col).doc(id).update(p); closeSheet(); toast("Modification enregistrée"); }
+    catch { $("eErr").textContent = "Enregistrement impossible pour l'instant. Réessayez."; }
+  });
+}
+$("sheet").addEventListener("click", e => { const b = e.target.closest("[data-edit]"); if (!b) return; const [col, id] = b.dataset.edit.split(":"); openEdit(col, id); });
+
 /* ---------- compte, connexion, avis ---------- */
 function askLogin(errId, what) {
   const box = $(errId); if (box) box.textContent = `Connectez-vous pour ${what}. Votre travail est conservé.`;
@@ -1361,6 +1410,14 @@ function askLogin(errId, what) {
 }
 function promptLogin(what) { state.loginWhat = what || "publier"; openSheet("login"); }
 const isAdmin = () => !!BT.user() && BT.user().email === window.BT_OWNER_EMAIL;
+const accountFirstName = () => (BT.user()?.displayName || "").trim().split(/\s+/)[0];
+// Les champs de prénom suivent le compte connecté, sauf s'ils ont été saisis à la main.
+let autoName = "";
+function syncNames() {
+  const next = accountFirstName();
+  for (const id of ["fSetter", "oAddedBy", "oClimber"]) if (!$(id).value || $(id).value === autoName) $(id).value = next;
+  autoName = next;
+}
 // Un fichier photo ne s'envoie qu'une fois connecté : on propose la connexion avant d'ouvrir le sélecteur pour les salles et les murs.
 document.addEventListener("click", e => {
   const inp = e.target.closest('input[type="file"]'); if (!inp || state.me || inp.id === "oeFile") return;
@@ -1440,7 +1497,7 @@ BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state
 BT.onUser(u => {
   state.me = u ? u.uid : null;
   renderAcct(); subscribeDrafts(); renderEditorChrome();
-  if (u && !$("fSetter").value && u.displayName) $("fSetter").value = u.displayName.split(" ")[0];
+  syncNames();
   if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
   rerender();
 });
@@ -1462,7 +1519,7 @@ document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.
 })();
 
 /* ---------- boot ---------- */
-$("fSetter").value = lsGet("pan-setter") || "";
+try { localStorage.removeItem("pan-setter"); } catch {}
 renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "out" ? "olist" : "list"); renderHeader();
 
 (async () => {
@@ -1477,7 +1534,7 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
   if (user) {
     try { state.me = await user.id(); } catch {}
     renderAcct(); subscribeDrafts(); renderEditorChrome();
-    if (!$("fSetter").value) { try { const me = await user.me(); if (me && me.name) $("fSetter").value = me.name.split(" ")[0]; } catch {} }
+    syncNames();
   }
   let gotG = false, gotW = false;
   const ready = () => {

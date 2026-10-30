@@ -22,6 +22,7 @@ const anon = () => env.unauthenticatedContext().firestore();
 const user = uid => env.authenticatedContext(uid).firestore();
 const owner = () => env.authenticatedContext('owner', OWNER).firestore();
 const seed = (path, data) => env.withSecurityRulesDisabled(ctx => ctx.firestore().doc(path).set(data));
+const trace = (uid, data) => ({ ...data, updatedAt: Date.now(), updatedBy: uid });
 
 describe('Blocs', () => {
   test('tout le monde peut lire un bloc, sans compte', async () => {
@@ -44,7 +45,7 @@ describe('Blocs', () => {
   });
   test("alice modifie son bloc mais ne peut pas en changer l'auteur", async () => {
     await seed('blocs/b1', { authorId: 'alice', name: 'Bloc' });
-    await assertSucceeds(user('alice').doc('blocs/b1').update({ name: 'Bloc v2' }));
+    await assertSucceeds(user('alice').doc('blocs/b1').update(trace('alice', { name: 'Bloc v2' })));
     await assertFails(user('alice').doc('blocs/b1').update({ authorId: 'bob' }));
   });
   test('le propriétaire du site peut supprimer n’importe quel bloc', async () => {
@@ -89,7 +90,7 @@ describe('Salles et murs', () => {
   test('seul le propriétaire modifie une salle', async () => {
     await seed('gyms/g1', { name: 'Altissimo Albi' });
     await assertFails(user('alice').doc('gyms/g1').update({ name: 'Autre' }));
-    await assertSucceeds(owner().doc('gyms/g1').update({ name: 'Altissimo' }));
+    await assertSucceeds(owner().doc('gyms/g1').update(trace('owner', { name: 'Altissimo' })));
   });
   test("un grimpeur quelconque ne doit pas pouvoir remplacer la photo du mur d'une salle", { todo: 'faille connue : rôle admin de salle au backlog' }, async () => {
     await seed('walls/w1', { gymId: 'g1', photo: 'photo:abc', authorId: 'alice' });
@@ -97,6 +98,77 @@ describe('Salles et murs', () => {
   });
   test('un invité ne peut pas créer de salle', async () => {
     await assertFails(anon().doc('gyms/g2').set({ name: 'Nouvelle salle' }));
+  });
+});
+
+describe('Correction des noms', () => {
+  const CONTENUS = [
+    ['blocs/b1', { authorId: 'alice', gymId: 'g1', wallId: 'w1', createdAt: 1, name: 'Bloc', grade: '6a', setter: 'Alice' }, { setter: 'Alicia', name: 'Bloc v2', grade: '6b' }],
+    ['voies/v1', { authorId: 'alice', secteurId: 's1', createdAt: 1, name: 'Voie', grade: '6a', addedBy: 'Paul', methodCount: 0 }, { addedBy: 'Alice', name: 'Voie v2', grade: '6b' }],
+    ['methodes/m1', { authorId: 'alice', voieId: 'v1', secteurId: 's1', createdAt: 1, climber: 'Alice' }, { climber: 'Alicia' }],
+  ];
+  for (const [path, doc, edit] of CONTENUS) {
+    test(`${path} : l'admin et l'auteur corrigent, ni un autre ni un invité`, async () => {
+      await seed(path, doc);
+      await assertSucceeds(owner().doc(path).update(trace('owner', edit)));
+      await assertSucceeds(user('alice').doc(path).update(trace('alice', edit)));
+      await assertFails(user('bob').doc(path).update(trace('bob', edit)));
+      await assertFails(anon().doc(path).update(edit));
+    });
+    test(`${path} : auteur réel, création et rattachements sont intouchables, même pour l'admin`, async () => {
+      await seed(path, doc);
+      for (const f of ['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId']) {
+        await assertFails(owner().doc(path).update(trace('owner', { [f]: f === 'createdAt' ? 2 : 'autre' })));
+        await assertFails(user('alice').doc(path).update(trace('alice', { [f]: f === 'createdAt' ? 2 : 'autre' })));
+      }
+    });
+    test(`${path} : un nom vide ou fait d'espaces est refusé`, async () => {
+      await seed(path, doc);
+      const f = Object.keys(edit)[0];
+      await assertFails(owner().doc(path).update(trace('owner', { [f]: '' })));
+      await assertFails(owner().doc(path).update(trace('owner', { [f]: '   ' })));
+      await assertFails(user('alice').doc(path).update(trace('alice', { [f]: '   ' })));
+    });
+    test(`${path} : un changement de nom doit être signé par celui qui le fait`, async () => {
+      await seed(path, doc);
+      await assertFails(owner().doc(path).update(edit));
+      await assertFails(owner().doc(path).update(trace('alice', edit)));
+    });
+  }
+  test("l'admin modifie une salle et un secteur, un non-admin non, même son auteur", async () => {
+    await seed('gyms/g1', { name: 'Salle', city: 'Albi', createdAt: 1 });
+    await seed('secteurs/s1', { name: 'St Antonin noble val', region: '', authorId: 'alice', createdAt: 1 });
+    await assertSucceeds(owner().doc('gyms/g1').update(trace('owner', { name: 'Altissimo', city: 'Albi (81)' })));
+    await assertSucceeds(owner().doc('secteurs/s1').update(trace('owner', { name: 'Saint-Antonin', region: 'Saint-Antonin-Noble-Val' })));
+    await assertFails(user('bob').doc('gyms/g1').update(trace('bob', { name: 'Piraté' })));
+    await assertFails(user('alice').doc('secteurs/s1').update(trace('alice', { name: 'Piraté' })));
+    await assertFails(anon().doc('secteurs/s1').update({ name: 'Piraté' }));
+  });
+  test('un nom de salle, de secteur ou de voie vide est refusé', async () => {
+    await seed('gyms/g1', { name: 'Salle' });
+    await seed('secteurs/s1', { name: 'Secteur' });
+    await assertFails(owner().doc('gyms/g1').update(trace('owner', { name: '  ' })));
+    await assertFails(owner().doc('secteurs/s1').update(trace('owner', { name: '' })));
+  });
+  test('les longueurs maximales sont celles de la création', async () => {
+    await seed('gyms/g1', { name: 'Salle' });
+    await seed('secteurs/s1', { name: 'Secteur' });
+    await seed('voies/v1', { authorId: 'alice', name: 'Voie' });
+    await assertSucceeds(owner().doc('gyms/g1').update(trace('owner', { name: 'x'.repeat(40) })));
+    await assertFails(owner().doc('gyms/g1').update(trace('owner', { name: 'x'.repeat(41) })));
+    await assertSucceeds(owner().doc('secteurs/s1').update(trace('owner', { name: 'x'.repeat(50) })));
+    await assertFails(owner().doc('secteurs/s1').update(trace('owner', { name: 'x'.repeat(51) })));
+    await assertSucceeds(owner().doc('voies/v1').update(trace('owner', { name: 'x'.repeat(50) })));
+    await assertFails(owner().doc('voies/v1').update(trace('owner', { name: 'x'.repeat(51) })));
+  });
+  test('un ancien document au nom vide reste modifiable sur ses autres champs', async () => {
+    await seed('voies/v1', { authorId: 'alice', name: 'Voie', addedBy: '', anchors: [] });
+    await assertSucceeds(user('alice').doc('voies/v1').update({ anchors: [{ x: 1 }] }));
+  });
+  test('le compteur de méthodes reste ouvert sans signature', async () => {
+    await seed('voies/v1', { authorId: 'alice', name: 'Voie', methodCount: 0 });
+    await assertSucceeds(user('bob').doc('voies/v1').update({ methodCount: 1 }));
+    await assertSucceeds(user('alice').doc('voies/v1').update({ methodCount: 2 }));
   });
 });
 
