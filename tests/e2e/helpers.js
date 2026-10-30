@@ -29,7 +29,7 @@ async function loginAdminPage(page) {
 
 const toValue = v => {
   if (typeof v === 'string') return { stringValue: v };
-  if (typeof v === 'number') return { integerValue: String(v) };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
   if (typeof v === 'boolean') return { booleanValue: v };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue) } };
   return { mapValue: { fields: toFields(v) } };

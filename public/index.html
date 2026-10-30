@@ -354,6 +354,8 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
       <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div><div id="ovRate" class="rate"></div></div>
       <div class="grade big" id="ovGrade"></div>
     </div>
+    <div class="gut" id="ovTabs"><div class="filters" id="ovLens" style="padding-top:0"></div><div class="filters" id="ovVues" style="padding-top:0"></div></div>
+    <div class="gut" id="ovNoPhoto" hidden><div class="empty"><strong>Pas encore de photo</strong><button class="btn" type="button" data-act-nophoto>Ajouter une vue</button></div></div>
     <div class="gut"><div class="filters" id="ovMethods" role="group" aria-label="Afficher" style="padding-top:0"></div></div>
     <div class="dwall" id="ovWall" role="button" tabindex="0" aria-label="Voir la voie en plein écran"><button class="float tr" type="button" tabindex="-1">⤢ Plein écran</button></div>
     <div class="gut">
@@ -383,7 +385,11 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
           <div id="oeRouteF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oName">Nom de la voie</label><input id="oName" maxlength="50" placeholder="ex. Le marché de l'angoisse" autocomplete="off"></div>
             <div class="field"><label class="label" for="oAddedBy">Ajoutée par</label><input id="oAddedBy" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
-            <div class="field"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
+            <div class="field" id="oGradeF"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
+          </div>
+          <div id="oeVueF" style="display:grid;gap:14px">
+            <div class="field"><label class="label" for="oVueLabel">Libellé de la vue</label><input id="oVueLabel" maxlength="40" placeholder="ex. L2 depuis le relais" autocomplete="off"></div>
+            <div class="field"><label class="label" for="oVueLen">Longueur</label><select id="oVueLen" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)"></select></div>
           </div>
           <div id="oeMethF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oClimber">Grimpeur</label><input id="oClimber" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
@@ -465,7 +471,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
 
@@ -911,6 +917,7 @@ $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "se
 function renderSheet() {
   if (state.sheet === "edit") return renderEditSheet();
   if (state.sheet === "newchoice") return renderChoiceSheet();
+  if (state.sheet === "lens") return renderLensSheet();
   // Une mise à jour en direct n'efface pas un formulaire de création en cours.
   if ((state.sheet === "newgym" && $("ngName")) || (state.sheet === "newsector" && $("nsName"))) return;
   if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
@@ -1240,6 +1247,8 @@ function switchSecteur(id) {
 function subscribeMethods(id) {
   state.unsubMeth?.(); state.unsubMeth = null;
   if (!state.db || !id) return;
+  state.unsubVues?.();
+  state.unsubVues = state.db.collection("vues").where("voieId", "==", id).onSnapshot(sn => { state.vues = sn.docs.map(d => ({ id: d.id, ...d.data() })); rerender(); }, () => {});
   let pub = [], priv = [];
   const merge = () => { state.methodes = [...pub, ...priv].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); rerender(); };
   const u1 = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => { pub = sn.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, () => {});
@@ -1249,7 +1258,7 @@ function subscribeMethods(id) {
 function openVoie(id, sel) {
   touchRecent("voie", id);
   if (state.voieId !== id) {
-    state.voieId = id; state.methodes = []; state.armedAct = null; state.oSel = sel || "anchors";
+    state.voieId = id; state.methodes = []; state.vues = []; state.ovLen = state.ovVue = null; state.armedAct = null; state.oSel = sel || "anchors";
     subscribeMethods(id);
   } else if (sel) state.oSel = sel;
   go("ovoie");
@@ -1295,6 +1304,14 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
   }
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${mini ? "slice" : "meet"}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Photo de la voie avec ${anchors.length} points et ${steps.length} étapes"><image href="${esc(img)}" width="${W}" height="${H}"/>${line}${flow}${anc}${rings}${top}</svg>`;
 }
+/* ---------- longueurs et vues : la voie sans longueurs est une longueur L1, sa photo est la vue d'ensemble ---------- */
+const BASE_VUE = "base";
+const longueursOf = v => v.longueurs?.length ? v.longueurs : [{ id: "l1", name: "L1", grade: v.grade }];
+const baseVue = v => v.baseDeleted ? null : { id: BASE_VUE, isBase: true, label: "Vue d'ensemble", longueurId: longueursOf(v)[0].id, image: v.image, w: v.w, h: v.h, anchors: v.anchors || [], authorId: v.authorId, order: v.baseOrder || 0 };
+const vuesOf = (v, lenId) => [baseVue(v), ...state.vues].filter(x => x && x.longueurId === lenId).sort((a, b) => (a.order || 0) - (b.order || 0));
+const currentLen = v => longueursOf(v).find(l => l.id === state.ovLen) || longueursOf(v)[0];
+const currentVue = v => { const list = vuesOf(v, currentLen(v).id); return list.find(x => x.id === state.ovVue) || list[0] || null; };
+const hardest = lens => lens.map(l => l.grade).sort((a, b) => GRADES.indexOf(b) - GRADES.indexOf(a))[0];
 const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip");
 function methodSummary(steps) {
   const n = t => steps.filter(s => s.t === t).length;
@@ -1325,7 +1342,13 @@ function selMethod() { return state.oSel === "anchors" ? null : state.methodes.f
 function renderVoie() {
   const v = voie();
   if (!v) { $("ovName").textContent = "Voie introuvable"; $("ovBy").textContent = ""; $("ovGrade").textContent = ""; $("ovWall").hidden = true; $("ovMethods").innerHTML = ""; $("ovSeq").textContent = ""; $("ovNote").hidden = true; $("ovActions").innerHTML = ""; return; }
-  $("ovWall").hidden = false;
+  const lens = longueursOf(v), V = currentVue(v), lenVues = vuesOf(v, currentLen(v).id);
+  $("ovTabs").hidden = lens.length < 2 && lenVues.length < 2;
+  $("ovLens").hidden = lens.length < 2;
+  $("ovLens").innerHTML = lens.map(l => `<button class="chip" type="button" data-len="${esc(l.id)}" aria-pressed="${l.id === currentLen(v).id}">${esc(l.name)} · ${esc(l.grade)}</button>`).join("");
+  $("ovVues").hidden = lenVues.length < 2;
+  $("ovVues").innerHTML = lenVues.map(x => `<button class="chip" type="button" data-vue="${esc(x.id)}" aria-pressed="${x.id === V?.id}">${esc(x.label)}</button>`).join("");
+  $("ovWall").hidden = !V; $("ovNoPhoto").hidden = !!V;
   if (state.oSel !== "anchors" && !selMethod()) state.oSel = "anchors";
   const m = selMethod(), mine = myMethod();
   $("ovName").textContent = v.name; $("ovGrade").textContent = v.grade;
@@ -1334,8 +1357,8 @@ function renderVoie() {
   $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
     `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">${x.isPrivate ? `<span class="tag">Privée</span> ` : ""}Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
   const btn = $("ovWall").querySelector(".float");
-  $("ovWall").innerHTML = routeSVG(v, v.anchors || [], mSteps(m), { uid: "ov" }); $("ovWall").appendChild(btn);
-  const bolts = (v.anchors || []).filter(a => a.t !== "relais").length, hasR = (v.anchors || []).some(a => a.t === "relais");
+  if (V) { $("ovWall").innerHTML = routeSVG(V, V.anchors || [], V.isBase ? mSteps(m) : [], { uid: "ov" }); $("ovWall").appendChild(btn); }
+  const bolts = (V?.anchors || []).filter(a => a.t !== "relais").length, hasR = (V?.anchors || []).some(a => a.t === "relais");
   const shared = state.methodes.filter(x => !x.isPrivate).length;
   $("ovSeq").hidden = !!m;
   $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${shared ? `${shared} méthode${shared > 1 ? "s" : ""} partagée${shared > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
@@ -1343,7 +1366,13 @@ function renderVoie() {
   const acts = [];
   if (m && mSteps(m).length) acts.push(`<button class="btn" type="button" data-act="replay">▶ Répéter la voie</button>`);
   acts.push(mine ? `<button class="btn ${m ? "ghost" : ""} small" type="button" data-act="editm">Modifier ma méthode</button>` : `<button class="btn small" type="button" data-act="newm">Ajouter ma méthode</button>`);
-  if (state.me && v.authorId === state.me) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
+  if (state.me && v.authorId === state.me && V?.isBase) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
+  acts.push(`<button class="btn ghost small" type="button" data-act="addvue">Ajouter une vue</button>`);
+  const structure = state.me && (v.authorId === state.me || isAdmin());
+  if (structure) acts.push(`<button class="btn ghost small" type="button" data-act="lens">Gérer les longueurs</button>`);
+  if (structure && lenVues.length > 1) acts.push(`<button class="btn ghost small" type="button" data-act="vueup">◀ Déplacer la vue</button><button class="btn ghost small" type="button" data-act="vuedown">Déplacer la vue ▶</button>`);
+  if (V && !V.isBase && (V.authorId === state.me || isAdmin())) acts.push(`<button class="btn ghost small" type="button" data-act="editvue">Modifier cette vue</button>`);
+  if (V && (isAdmin() || (!V.isBase && V.authorId === state.me && !V.foreignUses))) acts.push(`<button class="btn danger small" type="button" data-act="delvue">Supprimer cette vue</button>`);
   if (m && ((mine && m.id === mine.id) || isAdmin())) acts.push(`<button class="btn danger small" type="button" data-act="delm">${mine && m.id === mine.id ? "Supprimer ma méthode" : "Supprimer cette méthode"}</button>`);
   if (isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminv">Modifier la voie</button>`);
   if (m && isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminm">Modifier le prénom</button>`);
@@ -1354,6 +1383,11 @@ function renderVoie() {
   const armed = state.armedAct && $("ovActions").querySelector(`[data-act="${state.armedAct}"]`);
   if (armed) { armed.dataset.armed = "1"; armed.textContent = armed.dataset.act === "delv" ? "Confirmer : voie et méthodes" : "Confirmer la suppression"; }
 }
+$("ovTabs").addEventListener("click", e => {
+  const l = e.target.closest("[data-len]"); if (l) { state.ovLen = l.dataset.len; state.ovVue = null; renderVoie(); return; }
+  const c = e.target.closest("[data-vue]"); if (c) { state.ovVue = c.dataset.vue; renderVoie(); }
+});
+$("ovNoPhoto").addEventListener("click", e => { if (e.target.closest("[data-act-nophoto]")) startVue(); });
 $("ovMethods").addEventListener("click", e => { const c = e.target.closest("[data-sel]"); if (!c) return; state.oSel = c.dataset.sel; renderVoie(); });
 $("ovWall").addEventListener("click", () => openFs("oview"));
 $("ovWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("oview"); } });
@@ -1363,6 +1397,15 @@ $("ovActions").addEventListener("click", async e => {
   if (a === "replay") openFs("replay");
   if (a === "newm" || a === "editm") startMethod();
   if (a === "editr") startRoute(state.voieId);
+  if (a === "addvue") startVue();
+  if (a === "editvue") startVue(currentVue(voie()));
+  if (a === "lens") { state.lensDraft = longueursOf(voie()).map(l => ({ ...l })); openSheet("lens"); }
+  if (a === "vueup" || a === "vuedown") moveVue(a === "vueup" ? -1 : 1);
+  if (a === "delvue") {
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer la suppression"; return; }
+    state.armedAct = null;
+    try { await deleteVue(voie(), currentVue(voie())); state.ovVue = null; toast("Vue supprimée"); } catch { toast("Suppression impossible"); }
+  }
   if (a === "adminv") openEdit("voies", state.voieId);
   if (a === "adminm") openEdit("methodes", selMethod()?.id);
   if (a === "delm") {
@@ -1392,7 +1435,7 @@ function watchVote(kind, id) {
   const key = state.me && id ? `${kind}__${id}__${state.me}` : null;
   if (state.voteKey === key) return;
   state.voteKey = key; state.myVote = null; state.unsubVote?.(); state.unsubVote = null;
-  if (key) state.unsubVote = state.db.collection("votes").doc(key).onSnapshot(d => { state.myVote = d.exists ? d.data().value : null; rerender(); }, () => {});
+  if (key) state.unsubVote = state.db.collection("votes").doc(key).onSnapshot(d => { state.myVote = d.exists ? d.data().value : null; rerender(); }, () => { state.voteKey = null; });
 }
 function renderRating(el, kind, x, canRate) {
   if (!x) { el.innerHTML = ""; return; }
@@ -1419,6 +1462,7 @@ async function castVote(kind, id, value) {
       batch.update(target, { ratingSum: state.db.increment(value - before) });
     }
     await batch.commit();
+    state.myVote = value; rerender();
   } catch { toast("Note impossible à enregistrer pour l'instant."); }
 }
 document.addEventListener("click", e => {
@@ -1457,11 +1501,94 @@ async function saveMethod(oe, fields, wantPrivate) {
   await batch.commit();
   return id;
 }
+async function hasOtherContribution(voieId, uid, except) {
+  return state.vues.some(x => x.authorId === uid && x.id !== except) || state.methodes.some(m => m.authorId === uid && m.id !== except);
+}
+async function saveVue(oe, label, longueurId) {
+  const now = Date.now();
+  if (oe.id) { await state.db.collection("vues").doc(oe.id).update({ label, longueurId, anchors: oe.anchors, updatedAt: now, updatedBy: state.me }); return oe.id; }
+  $("oErr").textContent = "Envoi de la photo…";
+  const a = await state.assets.upload(oe.photo.blob), v = state.voies.find(x => x.id === oe.voieId), batch = state.db.batch(), ref = state.db.collection("vues").doc();
+  batch.set(ref, { voieId: oe.voieId, longueurId, label, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, order: now, createdAt: now });
+  if (v.authorId !== state.me) {
+    const mark = contribRef(oe.voieId, state.me);
+    if (!(await mark.get()).exists) { batch.set(mark, { createdAt: now }); batch.update(voieRef(oe.voieId), { foreignCount: state.db.increment(1) }); }
+  }
+  await batch.commit();
+  return ref.id;
+}
+async function deleteVue(v, V) {
+  if (V.isBase) { await voieRef(v.id).update({ baseDeleted: true, anchors: [], image: "", updatedAt: Date.now(), updatedBy: state.me }); if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {}); return; }
+  const batch = state.db.batch();
+  batch.delete(state.db.collection("vues").doc(V.id));
+  if (isAdmin()) (await state.db.collection("vues").doc(V.id).collection("utilisateurs").get()).forEach(d => batch.delete(d.ref));
+  if (V.authorId !== v.authorId && !(await hasOtherContribution(v.id, V.authorId, V.id))) {
+    const mark = contribRef(v.id, V.authorId);
+    if ((await mark.get()).exists) { batch.delete(mark); batch.update(voieRef(v.id), { foreignCount: state.db.increment(-1) }); }
+  }
+  await batch.commit();
+  if (String(V.image || "").startsWith("photo:")) await state.db.collection("photos").doc(V.image.slice(6)).delete().catch(() => {});
+}
+async function moveVue(d) {
+  const v = voie(), list = vuesOf(v, currentLen(v).id), i = list.findIndex(x => x.id === currentVue(v)?.id), j = i + d;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  // Échange des rangs : un rang identique (vue d'ensemble à 0) est décalé pour rester ordonné.
+  const a = list[i], b = list[j], oa = a.order || 0, ob = b.order === oa ? oa + d : b.order || 0, batch = state.db.batch();
+  const setOrder = (x, o) => x.isBase ? batch.update(voieRef(v.id), { baseOrder: o }) : batch.update(state.db.collection("vues").doc(x.id), { order: o });
+  setOrder(a, ob); setOrder(b, oa);
+  try { await batch.commit(); } catch { toast("Déplacement impossible"); }
+}
+function renderLensSheet() {
+  if ($("lgForm")) return;
+  renderLensForm();
+}
+function renderLensForm() {
+  const v = voie(), draft = state.lensDraft, baseLen = v && !v.baseDeleted ? longueursOf(v)[0].id : null;
+  $("sheet").innerHTML = `<h2 id="sheetTitle">Longueurs de la voie</h2>
+    <form id="lgForm" novalidate style="display:grid;gap:12px">
+      ${draft.map((l, i) => `<div style="display:grid;grid-template-columns:1fr 84px auto;gap:6px;align-items:center" data-row="${i}">
+        <input data-name maxlength="20" value="${esc(l.name)}" aria-label="Nom de la longueur" autocomplete="off">
+        <select data-grade aria-label="Cotation" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)">${GRADES.map(g => `<option${g === l.grade ? " selected" : ""}>${g}</option>`).join("")}</select>
+        <span style="display:flex;gap:4px">
+          <button class="chip" type="button" data-lup aria-label="Monter" ${i ? "" : "disabled"}>↑</button>
+          <button class="chip" type="button" data-ldown aria-label="Descendre" ${i < draft.length - 1 ? "" : "disabled"}>↓</button>
+          <button class="chip" type="button" data-ldel aria-label="Supprimer la longueur" ${draft.length < 2 || l.id === baseLen ? "disabled" : ""}>✕</button>
+        </span></div>`).join("")}
+      <button class="btn ghost small" type="button" data-ladd>+ Ajouter une longueur</button>
+      <div class="err" id="eErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>
+    </form>`;
+  $("lgForm").addEventListener("input", e => {
+    const r = e.target.closest("[data-row]"); if (!r) return;
+    const l = state.lensDraft[+r.dataset.row];
+    if (e.target.matches("[data-name]")) l.name = e.target.value;
+    if (e.target.matches("[data-grade]")) l.grade = e.target.value;
+  });
+  $("lgForm").addEventListener("click", e => {
+    const d = state.lensDraft, r = e.target.closest("[data-row]"), i = r ? +r.dataset.row : -1;
+    if (e.target.closest("[data-ladd]")) d.push({ id: "l" + Date.now().toString(36), name: `L${d.length + 1}`, grade: d[d.length - 1].grade });
+    else if (e.target.closest("[data-lup]")) d.splice(i - 1, 0, d.splice(i, 1)[0]);
+    else if (e.target.closest("[data-ldown]")) d.splice(i + 1, 0, d.splice(i, 1)[0]);
+    else if (e.target.closest("[data-ldel]")) d.splice(i, 1);
+    else return;
+    renderLensForm();
+  });
+  $("lgForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const lens = state.lensDraft.map(l => ({ ...l, name: l.name.trim() }));
+    if (lens.some(l => !l.name)) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
+    const v = voie(), keep = new Set(lens.map(l => l.id)), batch = state.db.batch();
+    for (const x of state.vues) if (!keep.has(x.longueurId)) batch.delete(state.db.collection("vues").doc(x.id));
+    batch.update(voieRef(v.id), { longueurs: lens, longueurIds: lens.map(l => l.id), grade: hardest(lens), updatedAt: Date.now(), updatedBy: state.me });
+    try { await batch.commit(); state.ovLen = null; state.ovVue = null; closeSheet(); toast("Longueurs enregistrées"); }
+    catch { $("eErr").textContent = "Enregistrement refusé : d'autres grimpeurs contribuent à cette voie, seul l'admin peut retirer une longueur."; }
+  });
+}
 async function deleteMethod(m) {
   const v = state.voies.find(x => x.id === m.voieId), batch = state.db.batch(), bump = {};
   batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
   if (!m.isPrivate && v?.methodCount > 0) bump.methodCount = state.db.increment(-1);
-  if (v && m.authorId !== v.authorId) {
+  if (v && m.authorId !== v.authorId && !(await hasOtherContribution(m.voieId, m.authorId, m.id))) {
     const mark = contribRef(m.voieId, m.authorId);
     if ((await mark.get()).exists) { batch.delete(mark); bump.foreignCount = state.db.increment(-1); }
   }
@@ -1477,6 +1604,7 @@ async function deleteVoie(v) {
     (await voieRef(v.id).collection("contributeurs").get()).forEach(d => batch.delete(d.ref));
     await deleteVotes("voies", v.id);
   }
+  for (const x of state.vues) { batch.delete(state.db.collection("vues").doc(x.id)); if (String(x.image || "").startsWith("photo:")) state.db.collection("photos").doc(x.image.slice(6)).delete().catch(() => {}); }
   batch.delete(voieRef(v.id));
   await batch.commit();
   if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
@@ -1498,7 +1626,8 @@ function renderOFs() {
     rpChrome(state.rp, steps.length);
   } else {
     $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
-    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "fv" }), v.w / v.h);
+    const V = currentVue(v) || v;
+    fsView.set(routeSVG(V, V.anchors || [], V.isBase ? steps : [], { uid: "fv" }), V.w / V.h);
   }
 }
 function focusStep() {
@@ -1526,6 +1655,15 @@ function startRoute(id) {
   $("oName").value = v?.name || ""; $("oAddedBy").value = v?.addedBy || accountFirstName(); $("oErr").textContent = ""; $("oePickErr").textContent = "";
   go("oedit");
 }
+function startVue(existing) {
+  const v = voie(); if (!v) return;
+  if (!state.me) { promptLogin("ajouter une vue"); return; }
+  state.oe = { kind: "route", vue: true, id: existing?.id || null, voieId: v.id, anchors: (existing?.anchors || []).map(a => ({ ...a })), tool: "bolt", photo: null, grade: v.grade };
+  $("oVueLabel").value = existing?.label || ""; $("oErr").textContent = ""; $("oePickErr").textContent = "";
+  $("oVueLen").innerHTML = longueursOf(v).map(l => `<option value="${esc(l.id)}">${esc(l.name)} · ${esc(l.grade)}</option>`).join("");
+  $("oVueLen").value = existing?.longueurId || currentLen(v).id;
+  go("oedit");
+}
 function startMethod() {
   const v = voie(); if (!v) return;
   const mine = myMethod();
@@ -1537,6 +1675,7 @@ function startMethod() {
 }
 function oeTarget() {
   const oe = state.oe; if (!oe) return null;
+  if (oe.vue && oe.id) return state.vues.find(x => x.id === oe.id);
   if (oe.kind === "route" && !oe.id) return oe.photo ? { w: oe.photo.w, h: oe.photo.h, image: oe.photo.preview } : null;
   return oe.kind === "route" ? state.voies.find(v => v.id === oe.id) : state.voies.find(v => v.id === oe.voieId);
 }
@@ -1597,14 +1736,15 @@ $("oGrades").addEventListener("click", e => { const b = e.target.closest("[data-
 function renderOE() {
   const oe = state.oe; if (!oe) return;
   const v = oeTarget(), isRoute = oe.kind === "route";
-  $("oeTitle").textContent = isRoute ? (oe.id ? "Modifier les points" : "Nouvelle voie") : `Ma méthode${voie() ? " · " + voie().name : ""}`;
-  $("oeHint").textContent = isRoute
+  $("oeTitle").textContent = oe.vue ? (oe.id ? "Modifier la vue" : "Ajouter une vue") : isRoute ? (oe.id ? "Modifier les points" : "Nouvelle voie") : `Ma méthode${voie() ? " · " + voie().name : ""}`;
+  $("oeHint").textContent = oe.vue ? "Touchez les points d'ancrage visibles sur cette photo, du bas vers le haut. Ils sont propres à cette vue." : isRoute
     ? "Touchez chaque point d'ancrage du bas vers le haut, puis le relais. Ces repères sont communs à tous les grimpeurs."
     : "Touchez mains et pieds dans l'ordre où vous les prenez. Vous pouvez enregistrer une partie et compléter à la prochaine sortie.";
   $("oePick").hidden = !(isRoute && !oe.id && !oe.photo);
   $("oeWork").hidden = !$("oePick").hidden;
-  $("oeRouteF").hidden = !isRoute; $("oeMethF").hidden = isRoute;
-  $("oSave").textContent = isRoute ? (oe.id ? "Enregistrer les points" : "Publier la voie") : "Enregistrer ma méthode";
+  $("oeRouteF").hidden = !isRoute || !!oe.vue; $("oeVueF").hidden = !oe.vue; $("oeMethF").hidden = isRoute;
+  $("oGradeF").hidden = isRoute && !oe.vue && longueursOf(oeTarget() || {}).length > 1;
+  $("oSave").textContent = oe.vue ? "Enregistrer la vue" : isRoute ? (oe.id ? "Enregistrer les points" : "Publier la voie") : "Enregistrer ma méthode";
   if (isRoute) renderOGrades();
   renderOETools();
   if (!v) return;
@@ -1627,12 +1767,20 @@ $("oForm").addEventListener("submit", async e => {
   if (!state.me) { askLogin("oErr", "enregistrer"); return; }
   $("oSave").disabled = true;
   try {
-    if (oe.kind === "route") {
+    if (oe.vue) {
+      const label = $("oVueLabel").value.trim(), longueurId = $("oVueLen").value;
+      if (!label) throw { msg: "Donnez un libellé à la vue." };
+      if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
+      const id = await saveVue(oe, label, longueurId);
+      state.oe = null; state.ovLen = longueurId; state.ovVue = id; $("oErr").textContent = ""; toast("Vue enregistrée"); openVoie(oe.voieId);
+    } else if (oe.kind === "route") {
       const name = $("oName").value.trim(), addedBy = $("oAddedBy").value.trim();
       if (!name) throw { msg: "Donnez un nom à la voie." };
       if (!addedBy) throw { msg: "Indiquez votre prénom." };
       if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
-      if (oe.id) { await state.db.collection("voies").doc(oe.id).update({ name, grade: oe.grade, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
+      if (oe.id) {
+        const cur = state.voies.find(x => x.id === oe.id), lens = cur?.longueurs, multi = lens?.length > 1;
+        await state.db.collection("voies").doc(oe.id).update({ name, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me, ...(multi ? {} : { grade: oe.grade }), ...(lens?.length === 1 ? { longueurs: [{ ...lens[0], grade: oe.grade }] } : {}) }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
       else {
         $("oErr").textContent = "Envoi de la photo…";
         const a = await state.assets.upload(oe.photo.blob);
@@ -1751,7 +1899,7 @@ function renderEditSheet() {
   $("sheet").innerHTML = `<h2 id="sheetTitle">${spec.title}</h2>
     <form id="eForm" data-key="${esc(key)}" novalidate style="display:grid;gap:14px">
       ${spec.fields.map(([f, label, max]) => `<div class="field"><label class="label" for="e_${f}">${label}</label><input id="e_${f}" maxlength="${max}" value="${esc(x[f] || "")}" autocomplete="off"></div>`).join("")}
-      ${spec.grade ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
+      ${spec.grade && !(x.longueurs?.length > 1) ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
       <div id="eCommuneBox" class="gymlist"></div>
       <div class="note" id="eWarn" hidden>Un autre secteur porte déjà ce nom dans cette commune.</div>
       <div class="err" id="eErr"></div>
@@ -1769,7 +1917,7 @@ function renderEditSheet() {
       p[f] = $("e_" + f).value.trim();
       if (required && !p[f]) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
     }
-    if (spec.grade) p.grade = $("eGrades").dataset.grade;
+    if (spec.grade && $("eGrades")) { p.grade = $("eGrades").dataset.grade; if (x.longueurs?.length === 1) p.longueurs = [{ ...x.longueurs[0], grade: p.grade }]; }
     if (picker && p[spec.commune] !== (x[spec.commune] || "")) {
       await picker.check();
       const c = picker.get();
