@@ -275,6 +275,9 @@
     ["hier", "yesterday", "ayer"],
     // sélecteur de langue
     ["Langue", "Language", "Idioma"],
+    ["Ajoutez d'abord une photo de la voie.", "Add a photo of the route first.", "Añade primero una foto de la vía."],
+    ["Une méthode peut utiliser 6 vues au plus, en plus de la vue d'ensemble.", "A beta can use at most 6 views, plus the overview.", "Un método puede usar 6 vistas como máximo, además de la vista general."],
+    ["Une prise vise une vue qui n'appartient pas à cette voie.", "A hold points to a view from another route.", "Una presa apunta a una vista de otra vía."],
     ["Vue d'ensemble", "Overview", "Vista general"],
     ["Pas encore de photo", "No photo yet", "Aún no hay foto"],
     ["Ajouter une vue", "Add a view", "Añadir una vista"],
@@ -367,6 +370,7 @@
     [/^Créer un secteur à (.+)$/, m => `Create a sector in ${m[1]}`, m => `Crear un sector en ${m[1]}`],
     [/^(.+) · (\d+) avis$/, m => `${m[1]} · ${m[2]} ${+m[2] > 1 ? "reviews" : "review"}`, m => `${m[1]} · ${m[2]} ${+m[2] > 1 ? "opiniones" : "opinión"}`],
     [/^(\d+) avis, note affichée à partir de (\d+)$/, m => `${m[1]} ${+m[1] > 1 ? "reviews" : "review"}, rating shown from ${m[2]}`, m => `${m[1]} ${+m[1] > 1 ? "opiniones" : "opinión"}, nota visible a partir de ${m[2]}`],
+    [/^(\d+) prises? (?:étaient|était) sur une vue supprimée$/, m => `${m[1]} hold${+m[1] > 1 ? "s were" : " was"} on a deleted view`, m => `${m[1]} presa${+m[1] > 1 ? "s estaban" : " estaba"} en una vista eliminada`],
     [/^Ouvert par (.+)$/, m => `Set by ${sub(m[1])}`, m => `Trazado por ${sub(m[1])}`],
     [/^modifié le (.+)$/, m => `edited ${m[1]}`, m => `editado el ${m[1]}`],
     [/^ajoutée par (.+)$/, m => `added by ${sub(m[1])}`, m => `añadida por ${sub(m[1])}`],
