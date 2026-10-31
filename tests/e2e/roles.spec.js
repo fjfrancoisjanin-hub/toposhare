@@ -12,8 +12,7 @@ async function seedGym(id, authorId = 'autre-grimpeur') {
   await seed('blocs', `b-${id}`, { gymId: id, wallId: `w-${id}`, name: `Bloc ${id}`, grade: '6a', setter: 'Paul', holds: [], authorId, createdAt: 1 });
 }
 async function openGym(page, id) {
-  await page.addInitScript(g => { localStorage.setItem('pan-mode', 'in'); localStorage.setItem('pan-gym', g); }, id);
-  await page.goto('/');
+  await page.goto(`/#/salle/${id}`);
 }
 
 test("l'admin désigne un propriétaire par e-mail : lui seul voit « Le mur a été remonté », puis le rôle est retiré", async ({ page, browser }, testInfo) => {
@@ -37,7 +36,7 @@ test("l'admin désigne un propriétaire par e-mail : lui seul voit « Le mur a �
   await openGym(bob, id);
   await login(bob, BOB);
   await bob.locator('#gymName').click();
-  await expect(bob.locator('.gymrow').first()).toBeVisible();
+  await expect(bob.locator('#sheet .gymrow').first()).toBeVisible();
   await expect(bob.locator('[data-sheet="rewall"]')).toHaveCount(0);
 
   // Retrait en direct : le bouton disparaît chez la personne concernée.
@@ -56,7 +55,6 @@ test('le propriétaire remonte le mur : un seul mur actif, et les blocs passent 
   await page.locator('[data-sheet="rewall"]').click();
   await page.locator('#rwFile').setInputFiles(WALL_FILE);
   await expect(page.locator('#sheetBg')).toBeHidden();
-  await page.locator('#tabList').click();
   await page.locator('#gymName').click();
   await expect(page.locator('.walllist > div')).toHaveCount(2);
   await expect(page.locator('.walllist')).toContainText('Actuel');
@@ -88,11 +86,14 @@ test('un grimpeur sans rôle ne peut ni supprimer le bloc d\'un autre, ni change
 
 test('un grimpeur connecté crée une salle avec sa photo, sans en devenir propriétaire', async ({ page }, testInfo) => {
   const id = uid(testInfo);
-  await page.goto('/');
+  await seedGym(`base-${id}`);
+  await openGym(page, `base-${id}`);
   await login(page, BOB);
   await page.locator('#gymName').click();
   await page.locator('[data-sheet="newgym"]').click();
+  await page.route('**/geo.api.gouv.fr/**', r => r.abort());
   await page.locator('#ngName').fill(`N ${id}`.slice(0, 40));
+  await page.locator('#ngCity').fill('Albi');
   await page.locator('#ngFile').setInputFiles(WALL_FILE);
   await expect(page.locator('#gymName')).toContainText(`N ${id}`.slice(0, 12));
   await page.locator('#gymName').click();
@@ -106,7 +107,6 @@ test('un invité ouvre l\'écran de connexion à chaque action de création', as
   await expect(page.locator('#sheetTitle')).toBeVisible();
   await page.locator('#sheetBg').click({ position: { x: 5, y: 5 } });
   await expect(page.locator('#sheetBg')).toBeHidden();
-  await page.locator('#tabList').click();
   await page.locator('#tabCreate').click();
   await expect(page.locator('#sheetBg')).toBeVisible();
 });

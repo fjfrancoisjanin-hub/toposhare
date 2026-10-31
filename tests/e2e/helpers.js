@@ -2,12 +2,15 @@
 const PROJECT = 'betatheque';
 const ADMIN = { sub: 'admin-e2e', email: 'fj.francoisjanin@gmail.com', name: 'François Admin' };
 const ALICE = { sub: 'alice-e2e', email: 'alice@example.com', name: 'Alice Martin' };
+const CAROLE = { sub: 'carole-e2e', email: 'carole@example.com', name: 'Carole Petit' };
 const BOB = { sub: 'bob-e2e', email: 'bob@example.com', name: 'Bob Durand' };
 
 // Connexion Google simulée : l'émulateur Auth accepte un jeton non signé.
 async function login(page, who) {
   await page.waitForFunction(() => window.BT && window.firebase);
   await page.evaluate(async u => {
+    // Avant de changer de compte : une écriture encore en attente resterait bloquée avec l'ancien compte.
+    await BT.fs.waitForPendingWrites();
     const cred = firebase.auth.GoogleAuthProvider.credential(JSON.stringify({ ...u, email_verified: true }));
     await BT.auth.signInWithCredential(cred);
   }, who);
@@ -26,7 +29,7 @@ async function loginAdminPage(page) {
 
 const toValue = v => {
   if (typeof v === 'string') return { stringValue: v };
-  if (typeof v === 'number') return { integerValue: String(v) };
+  if (typeof v === 'number') return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
   if (typeof v === 'boolean') return { booleanValue: v };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue) } };
   return { mapValue: { fields: toFields(v) } };
@@ -44,4 +47,4 @@ async function seed(col, id, data) {
   if (!res.ok) throw new Error(`seed ${col}/${id} : ${res.status} ${await res.text()}`);
 }
 
-module.exports = { ADMIN, ALICE, BOB, login, loginAdminPage, seed };
+module.exports = { ADMIN, ALICE, BOB, CAROLE, login, loginAdminPage, seed };

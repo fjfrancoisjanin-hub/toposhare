@@ -15,13 +15,39 @@ service cloud.firestore {
     function claimsMe() { return signedIn() && request.resource.data.authorId == request.auth.uid; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     // Auteur réel, date de création et rattachements ne bougent jamais, même pour le propriétaire du site.
-    function keepsIdentity() { return !changed().hasAny(['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId']); }
+    function keepsIdentity() { return !changed().hasAny(['authorId', 'createdAt', 'gymId', 'wallId', 'secteurId', 'voieId', 'ratingCount', 'ratingSum']); }
+    function noRating() { return !request.resource.data.keys().hasAny(['ratingCount', 'ratingSum']); }
+    // Compteurs de notes : ils ne bougent que du vote de la personne, écrit, modifié ou retiré dans le même lot.
+    function ratingOnly(kind, id) {
+      let v = /databases/$(database)/documents/votes/$(kind + '__' + id + '__' + request.auth.uid);
+      let before = exists(v) ? get(v).data.value : -1;
+      let after = existsAfter(v) ? getAfter(v).data.value : -1;
+      return signedIn() && changed().hasOnly(['ratingCount', 'ratingSum']) && before != after
+        && request.resource.data.get('ratingCount', 0) == resource.data.get('ratingCount', 0) + (after >= 0 ? 1 : 0) - (before >= 0 ? 1 : 0)
+        && request.resource.data.get('ratingSum', 0) == resource.data.get('ratingSum', 0) + (after >= 0 ? after : 0) - (before >= 0 ? before : 0);
+    }
     // Un champ n'est contrôlé que s'il change : les anciens documents restent modifiables.
     function nameOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].trim().size() > 0 && request.resource.data[f].size() <= max); }
     function optionalOk(f, max) { return !changed().hasAny([f]) || (request.resource.data[f] is string && request.resource.data[f].size() <= max); }
     function traced() {
-      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'updatedAt', 'updatedBy'])
+      return !changed().hasAny(['name', 'grade', 'setter', 'addedBy', 'climber', 'city', 'region', 'commune', 'label', 'updatedAt', 'updatedBy'])
         || (request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt is number);
+    }
+    // Commune d'un nouveau secteur ou d'une nouvelle salle : issue de la liste officielle, ou saisie libre marquée non vérifiée si le service ne répond pas.
+    function communeOk() {
+      let c = request.resource.data.commune;
+      return c is map && c.nom is string && c.nom.trim().size() > 0 && c.nom.size() <= 60 && c.simple is string && c.verifie is bool
+        && (c.verifie == false || (c.code is string && c.departement is string));
+    }
+    // Une méthode ne vise que des vues de sa voie : vueIds liste les vues utilisées (6 au plus, les règles ne savent pas parcourir une liste).
+    function vueOk(i) {
+      let d = request.resource.data;
+      return d.vueIds.size() <= i || get(/databases/$(database)/documents/vues/$(d.vueIds[i])).data.voieId == d.voieId;
+    }
+    function vueIdsOk() {
+      let d = request.resource.data;
+      return !d.keys().hasAny(['vueIds']) || (d.vueIds is list && d.vueIds.size() <= 6
+        && vueOk(0) && vueOk(1) && vueOk(2) && vueOk(3) && vueOk(4) && vueOk(5));
     }
     function editOk() { return keepsIdentity() && traced(); }
 
@@ -37,8 +63,8 @@ service cloud.firestore {
     // Ensuite, seuls le propriétaire de la salle et l'admin peuvent ajouter, activer ou désactiver un mur.
     match /gyms/{id} {
       allow read: if true;
-      allow create: if signedIn();
-      allow update: if isAdmin() && editOk() && nameOk('name', 40) && optionalOk('city', 30);
+      allow create: if isAdmin() || (signedIn() && communeOk());
+      allow update: if isAdmin() && editOk() && nameOk('name', 40) && optionalOk('city', 60);
       allow delete: if isAdmin();
     }
     match /walls/{id} {
@@ -56,32 +82,123 @@ service cloud.firestore {
     // Blocs : seul l'ouvreur (ou le propriétaire du site) modifie ou supprime.
     match /blocs/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
-      allow update: if (mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30);
+      allow create: if (claimsMe() || isAdmin()) && noRating();
+      allow update: if ((mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30))
+        || ratingOnly('blocs', id);
       allow delete: if mine() || isAdmin() || isGymOwner(resource.data.gymId);
     }
 
     // Falaise : secteurs, voies (points d'ancrage communs), méthodes par grimpeur.
     match /secteurs/{id} {
       allow read: if true;
-      allow create: if signedIn();
-      allow update: if isAdmin() && editOk() && nameOk('name', 50) && optionalOk('region', 40);
+      allow create: if isAdmin() || (signedIn() && communeOk());
+      allow update: if isAdmin() && editOk() && nameOk('name', 50) && optionalOk('region', 60);
       allow delete: if isAdmin();
     }
     match /voies/{id} {
+      // Compteurs : methodCount bouge de ±1 ; foreignCount seulement avec la marque du grimpeur, écrite ou retirée dans le même lot.
+      function countersOnly() {
+        let mark = /databases/$(database)/documents/voies/$(id)/contributeurs/$(request.auth.uid);
+        let d = request.resource.data.get('foreignCount', 0) - resource.data.get('foreignCount', 0);
+        return signedIn() && changed().hasOnly(['methodCount', 'foreignCount'])
+          && request.resource.data.get('methodCount', 0) - resource.data.get('methodCount', 0) in [-1, 0, 1]
+          && request.resource.data.get('methodCount', 0) >= 0
+          && request.resource.data.get('foreignCount', 0) >= 0
+          && (d == 0 || (d == 1 && !exists(mark) && existsAfter(mark)) || (d == -1 && exists(mark) && !existsAfter(mark)));
+      }
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
-      allow update: if ((mine() || isAdmin()) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
-        || (signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['methodCount'])
-            && request.resource.data.methodCount - resource.data.get('methodCount', 0) in [1, -1]
-            && request.resource.data.methodCount >= 0);
-      allow delete: if mine() || isAdmin();
+      allow create: if (claimsMe() || isAdmin()) && noRating();
+      // Retirer une longueur alors que d'autres grimpeurs contribuent à la voie est réservé à l'admin.
+      function keepsLengths() {
+        return resource.data.get('foreignCount', 0) == 0 || request.resource.data.get('longueurIds', ['l1']).hasAll(resource.data.get('longueurIds', ['l1']));
+      }
+      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignCount']) && keepsLengths())) && editOk() && nameOk('name', 50) && nameOk('grade', 10) && nameOk('addedBy', 30))
+        || countersOnly() || ratingOnly('voies', id);
+      // Si d'autres grimpeurs ont contribué à la voie, seul l'admin peut la supprimer.
+      allow delete: if isAdmin() || (mine() && resource.data.get('foreignCount', 0) == 0);
+
+      // Une marque par grimpeur autre que l'auteur ayant contribué à la voie. Elle ne bouge qu'avec le compteur foreignCount.
+      match /contributeurs/{uid} {
+        function voieBefore() { return get(/databases/$(database)/documents/voies/$(id)).data; }
+        function voieAfter() { return getAfter(/databases/$(database)/documents/voies/$(id)).data; }
+        allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+        allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && voieBefore().authorId != uid
+          && voieAfter().get('foreignCount', 0) == voieBefore().get('foreignCount', 0) + 1);
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid
+          && voieAfter().get('foreignCount', 0) == voieBefore().get('foreignCount', 0) - 1);
+      }
     }
     match /methodes/{id} {
       allow read: if true;
-      allow create: if claimsMe() || isAdmin();
-      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30);
+      allow create: if (claimsMe() || isAdmin()) && vueIdsOk();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30) && (!changed().hasAny(['vueIds']) || vueIdsOk());
       allow delete: if mine() || isAdmin();
+    }
+
+    // Méthodes privées : à part des méthodes publiques, lisibles par leur auteur et l'admin seulement.
+    match /methodesPrivees/{id} {
+      allow read: if mine() || isAdmin();
+      allow create: if (claimsMe() || isAdmin()) && vueIdsOk();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('climber', 30) && (!changed().hasAny(['vueIds']) || vueIdsOk());
+      allow delete: if mine() || isAdmin();
+    }
+
+    // Notes : un vote par personne (l'identifiant le garantit), visible par son auteur et l'admin seulement.
+    match /votes/{id} {
+      function target(data) { return /databases/$(database)/documents/$(data.kind)/$(data.targetId); }
+      function archived(t) { return t.get('wallId', '') != '' && get(/databases/$(database)/documents/walls/$(t.wallId)).data.get('active', true) == false; }
+      function shapeOk() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['kind', 'targetId', 'authorId', 'value', 'createdAt', 'updatedAt'])
+          && d.kind in ['blocs', 'voies'] && d.authorId == request.auth.uid && d.value is int && d.value >= 0 && d.value <= 3
+          && id == d.kind + '__' + d.targetId + '__' + request.auth.uid;
+      }
+      // Lire son propre vote doit aussi marcher quand il n'existe pas encore : on se fie à l'identifiant, qui finit par l'uid.
+      allow read: if (signedIn() && id.matches('^(blocs|voies)__.+__' + request.auth.uid + '$')) || isAdmin();
+      allow create: if signedIn() && shapeOk()
+        && get(target(request.resource.data)).data.authorId != request.auth.uid
+        && !archived(get(target(request.resource.data)).data)
+        && getAfter(target(request.resource.data)).data.get('ratingCount', 0) == get(target(request.resource.data)).data.get('ratingCount', 0) + 1
+        && getAfter(target(request.resource.data)).data.get('ratingSum', 0) == get(target(request.resource.data)).data.get('ratingSum', 0) + request.resource.data.value;
+      allow update: if mine() && shapeOk() && !changed().hasAny(['kind', 'targetId', 'authorId'])
+        && !archived(get(target(resource.data)).data)
+        && getAfter(target(resource.data)).data.get('ratingCount', 0) == get(target(resource.data)).data.get('ratingCount', 0)
+        && getAfter(target(resource.data)).data.get('ratingSum', 0) == get(target(resource.data)).data.get('ratingSum', 0) + request.resource.data.value - resource.data.value;
+      allow delete: if isAdmin() || (mine()
+        && getAfter(target(resource.data)).data.get('ratingCount', 0) == get(target(resource.data)).data.get('ratingCount', 0) - 1
+        && getAfter(target(resource.data)).data.get('ratingSum', 0) == get(target(resource.data)).data.get('ratingSum', 0) - resource.data.value);
+    }
+
+    // Vues d'une voie : une photo et ses points. Toute personne connectée en ajoute une sur une longueur existante.
+    match /vues/{id} {
+      function voieOf(voieId) { return get(/databases/$(database)/documents/voies/$(voieId)).data; }
+      function usesOnly() {
+        let mark = /databases/$(database)/documents/vues/$(id)/utilisateurs/$(request.auth.uid);
+        let d = request.resource.data.get('foreignUses', 0) - resource.data.get('foreignUses', 0);
+        return signedIn() && changed().hasOnly(['foreignUses']) && request.resource.data.foreignUses >= 0
+          && ((d == 1 && !exists(mark) && existsAfter(mark)) || (d == -1 && exists(mark) && !existsAfter(mark)));
+      }
+      allow read: if true;
+      allow create: if claimsMe() && request.resource.data.get('foreignUses', 0) == 0
+        && request.resource.data.label is string && request.resource.data.label.trim().size() > 0 && request.resource.data.label.size() <= 40
+        && request.resource.data.longueurId in voieOf(request.resource.data.voieId).get('longueurIds', ['l1'])
+        && (voieOf(request.resource.data.voieId).authorId == request.auth.uid
+          || existsAfter(/databases/$(database)/documents/voies/$(request.resource.data.voieId)/contributeurs/$(request.auth.uid)));
+      allow update: if ((isAdmin() || (mine() && !changed().hasAny(['foreignUses']))) && editOk() && nameOk('label', 40))
+        || (signedIn() && voieOf(resource.data.voieId).authorId == request.auth.uid && changed().hasOnly(['order']))
+        || usesOnly();
+      // Si la méthode d'un autre grimpeur utilise la vue, seul l'admin peut la supprimer.
+      allow delete: if isAdmin() || (mine() && resource.data.get('foreignUses', 0) == 0);
+
+      match /utilisateurs/{uid} {
+        function vueBefore() { return get(/databases/$(database)/documents/vues/$(id)).data; }
+        function vueAfter() { return getAfter(/databases/$(database)/documents/vues/$(id)).data; }
+        allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+        allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && vueBefore().authorId != uid
+          && vueAfter().get('foreignUses', 0) == vueBefore().get('foreignUses', 0) + 1);
+        allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid
+          && vueAfter().get('foreignUses', 0) == vueBefore().get('foreignUses', 0) - 1);
+      }
     }
 
     // Brouillons : privés, visibles par leur auteur seulement.

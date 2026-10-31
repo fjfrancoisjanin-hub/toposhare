@@ -5,7 +5,7 @@ import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT = 'toposhare-test';
-const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'photos', 'feedback', 'data'];
+const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'vues', 'photos', 'votes', 'feedback', 'data'];
 
 // Ce script efface toute la base : il refuse de tourner avec une autre clé que celle du projet de test.
 const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -31,20 +31,24 @@ const DATA = {
     'mur-test': photo('mur-test.jpg', 1200, 800),
     'voie-test': photo('voie-test.jpg', 600, 1200),
   },
-  gyms: { 'salle-test': { name: 'Salle de test', city: 'Ville de test', createdAt: NOW } },
+  gyms: { 'salle-test': { name: 'Salle de test', city: 'Commune de test', commune: { nom: 'Commune de test', simple: 'commune de test', verifie: false }, createdAt: NOW } },
   walls: { 'mur-test': { gymId: 'salle-test', name: 'Mur de test', image: 'photo:mur-test', w: 1200, h: 800, active: true, createdAt: NOW } },
   blocs: Object.fromEntries([['a', '5c'], ['b', '6a+'], ['c', '7a']].map(([k, grade], i) => [`bloc-test-${k}`, {
     gymId: 'salle-test', wallId: 'mur-test', name: `Bloc de test ${k.toUpperCase()}`, grade, setter: 'Testeur', desc: '', authorId: AUTHOR, createdAt: NOW - i,
     holds: [hold('start', 0.3 + i * 0.1, 0.8), hold('hand', 0.4 + i * 0.1, 0.55), hold('hand', 0.5 + i * 0.1, 0.35), hold('top', 0.55 + i * 0.1, 0.15)],
   }])),
-  secteurs: { 'secteur-test': { name: 'Secteur de test', region: 'Commune de test', authorId: AUTHOR, createdAt: NOW } },
+  secteurs: { 'secteur-test': { name: 'Secteur de test', region: 'Commune de test', commune: { nom: 'Commune de test', simple: 'commune de test', verifie: false }, authorId: AUTHOR, createdAt: NOW } },
   voies: { 'voie-test': {
-    secteurId: 'secteur-test', name: 'Voie de test', grade: '6b', image: 'photo:voie-test', w: 600, h: 1200, addedBy: 'Testeur', authorId: AUTHOR, methodCount: 1, createdAt: NOW,
+    secteurId: 'secteur-test', name: 'Voie de test', grade: '6c', longueurs: [{ id: 'l1', name: 'L1', grade: '6b' }, { id: 'l2', name: 'L2', grade: '6c' }], longueurIds: ['l1', 'l2'], image: 'photo:voie-test', w: 600, h: 1200, addedBy: 'Testeur', authorId: AUTHOR, methodCount: 1, createdAt: NOW,
     anchors: [...route.map(([x, y]) => hold('bolt', x, y)), hold('relais', 0.5, 0.12)],
+  } },
+  vues: { 'vue-l2': {
+    voieId: 'voie-test', longueurId: 'l2', label: 'L2 depuis le relais', image: 'photo:voie-test', w: 600, h: 1200, authorId: AUTHOR, order: NOW, createdAt: NOW,
+    anchors: [hold('bolt', 0.5, 0.6), hold('relais', 0.5, 0.2)],
   } },
   methodes: { 'methode-test': {
     voieId: 'voie-test', secteurId: 'secteur-test', authorId: AUTHOR, climber: 'Testeur', note: 'Méthode fictive.', createdAt: NOW, updatedAt: NOW,
-    steps: route.map(([x, y]) => hold('hand', x + 0.05, y - 0.03)),
+    steps: [...route.map(([x, y]) => hold('hand', x + 0.05, y - 0.03)), { ...hold('hand', 0.45, 0.55), viewId: 'vue-l2' }], vueIds: ['vue-l2'],
   } },
 };
 

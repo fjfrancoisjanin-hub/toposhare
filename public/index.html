@@ -141,7 +141,26 @@ textarea { min-height: 60px; resize: vertical; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; padding-block: 18px 24px; justify-content: flex-end; }
 
 nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 10px; padding-block: 10px; }
+nav.tabs .in { max-width: 720px; margin: 0 auto; display: flex; gap: 10px; padding-block: 10px; }
+nav.tabs .tab { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+nav.tabs .tab.plus { flex-grow: 1.3; }
+.rate { display: grid; gap: 6px; padding-top: 8px; }
+.rate .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.rating { font-size: 13px; font-weight: 700; padding-top: 2px; }
+.search { width: 100%; font: inherit; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg); }
+.home { display: grid; gap: 16px; padding-block: 14px 24px; }
+.home h1 { font-family: var(--f-display); font-size: 26px; margin: 0; }
+.home section { display: grid; gap: 8px; }
+.resume { appearance: none; border: 0; padding: 0; position: relative; display: block; width: 100%; min-height: 150px; border-radius: 16px; overflow: hidden; background: var(--stage); color: #fff; text-align: left; cursor: pointer; }
+.resume img, .placehero img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.resume .txt, .placehero .txt { position: relative; display: grid; gap: 2px; padding: 40px 14px 12px; background: linear-gradient(transparent, rgba(0,0,0,.75)); }
+.resume b, .placehero b { font: 800 19px var(--f-display); overflow-wrap: anywhere; }
+.resume small, .placehero small { opacity: .85; }
+.placehero { position: relative; border-radius: 14px; overflow: hidden; background: var(--stage); color: #fff; margin-block: 10px; }
+.placehero .bar { position: relative; display: flex; gap: 8px; justify-content: space-between; padding: 8px; }
+.placehero .bar button { appearance: none; border: 0; border-radius: 10px; padding: 8px 10px; font: 700 13px var(--f-body); background: rgba(0,0,0,.55); color: #fff; cursor: pointer; }
+.placehero .bar div { display: flex; gap: 8px; }
+mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
 .tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 700 15px var(--f-body); padding: 10px; border-radius: 12px; cursor: pointer; }
 .tab[aria-current="page"] { color: var(--fg); background: var(--bg); }
 .tab.plus { background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
@@ -191,6 +210,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
 .rp-btns .go { font-size: 19px; }
 .rp-prog { height: 4px; background: #30363C; margin-inline: max(14px, env(safe-area-inset-left, 0px)) max(14px, env(safe-area-inset-right, 0px)); border-radius: 2px; overflow: hidden; }
 .rp-prog i { display: block; height: 100%; width: 0; background: var(--h-start); border-radius: 2px; }
+.rp-vue { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: 90%; padding: 6px 12px; border-radius: 10px; background: rgba(13,15,17,.85); color: #fff; font: 700 14px var(--f-body); pointer-events: none; }
 .rp-hint { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 2fr 3fr; pointer-events: none; }
 .rp-hint span { display: grid; place-items: center; color: #fff; font: 800 18px var(--f-body); text-shadow: 0 1px 6px rgba(0,0,0,.8); }
 .rp-hint span:first-child { background: rgba(13,15,17,.45); border-right: 2px dashed rgba(255,255,255,.5); }
@@ -234,9 +254,21 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
     <button class="gymbtn" id="gymBtn" type="button" aria-label="Changer de salle"><b id="gymName">Chargement…</b><small id="gymSub"></small></button>
   </header>
 
+  <!-- HOME -->
+  <section id="vHome">
+    <div class="gut home">
+      <h1 id="hTitle" hidden>Où grimpes-tu aujourd'hui ?</h1>
+      <input class="search" id="hSearch" type="search" placeholder="Salle, secteur, commune, voie" aria-label="Rechercher" autocomplete="off">
+      <div id="hResults" style="display:grid;gap:14px" aria-live="polite"></div>
+      <div id="hBody" style="display:grid;gap:16px"></div>
+      <button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button>
+    </div>
+  </section>
+
   <!-- LIST -->
-  <section id="vList">
+  <section id="vList" hidden>
     <div class="gut">
+      <div class="placehero" data-hero="salle"></div>
       <div class="banner" id="offline" hidden>Impossible de joindre la base. Vérifiez votre connexion puis rechargez la page.</div>
       <div class="filters" role="group" aria-label="Filtrer" id="filters"></div>
       <div class="list" id="list" aria-live="polite"></div>
@@ -284,6 +316,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
       <div>
         <h1 id="dName"></h1>
         <div id="dBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div>
+        <div id="dRate" class="rate"></div>
       </div>
       <div class="grade big" id="dGrade"></div>
     </div>
@@ -313,15 +346,17 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
 
   <!-- OUTDOOR: route list -->
   <section id="oList" hidden>
-    <div class="gut"><div class="list" id="oListEl" aria-live="polite"></div><button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button></div>
+    <div class="gut"><div class="placehero" data-hero="secteur"></div><div class="list" id="oListEl" aria-live="polite"></div><button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button></div>
   </section>
 
   <!-- OUTDOOR: one route -->
   <section id="oVoie" hidden>
     <div class="gut dhead">
-      <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div></div>
+      <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div><div id="ovRate" class="rate"></div></div>
       <div class="grade big" id="ovGrade"></div>
     </div>
+    <div class="gut" id="ovTabs"><div class="filters" id="ovLens" style="padding-top:0"></div><div class="filters" id="ovVues" style="padding-top:0"></div></div>
+    <div class="gut" id="ovNoPhoto" hidden><div class="empty"><strong>Pas encore de photo</strong><button class="btn" type="button" data-act-nophoto>Ajouter une vue</button></div></div>
     <div class="gut"><div class="filters" id="ovMethods" role="group" aria-label="Afficher" style="padding-top:0"></div></div>
     <div class="dwall" id="ovWall" role="button" tabindex="0" aria-label="Voir la voie en plein écran"><button class="float tr" type="button" tabindex="-1">⤢ Plein écran</button></div>
     <div class="gut">
@@ -332,6 +367,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
       </div>
       <div class="seq" id="ovSeq"></div>
       <p class="desc" id="ovNote"></p>
+      <div class="note" id="ovLost" hidden></div>
       <div class="actions" id="ovActions" style="justify-content:flex-start"></div>
     </div>
   </section>
@@ -344,6 +380,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
       <div class="err" id="oePickErr" style="padding-top:8px"></div>
     </div>
     <div id="oeWork">
+      <div class="gut"><div class="filters" id="oeVues" hidden style="padding-top:0"></div></div>
       <div class="wallbox"><div class="wv" id="oeWall"></div><button class="float tr" type="button" id="oeFull">⤢ Plein écran</button></div>
       <div class="gut step"><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
       <div class="gut">
@@ -351,10 +388,18 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
           <div id="oeRouteF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oName">Nom de la voie</label><input id="oName" maxlength="50" placeholder="ex. Le marché de l'angoisse" autocomplete="off"></div>
             <div class="field"><label class="label" for="oAddedBy">Ajoutée par</label><input id="oAddedBy" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
-            <div class="field"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
+            <div class="field" id="oGradeF"><span class="label" id="ogLbl">Cotation</span><div class="grades" id="oGrades" role="group" aria-labelledby="ogLbl"></div></div>
+          </div>
+          <div id="oeVueF" style="display:grid;gap:14px">
+            <div class="field"><label class="label" for="oVueLabel">Libellé de la vue</label><input id="oVueLabel" maxlength="40" placeholder="ex. L2 depuis le relais" autocomplete="off"></div>
+            <div class="field"><label class="label" for="oVueLen">Longueur</label><select id="oVueLen" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)"></select></div>
           </div>
           <div id="oeMethF" style="display:grid;gap:14px">
             <div class="field"><label class="label" for="oClimber">Grimpeur</label><input id="oClimber" maxlength="30" placeholder="Votre prénom" autocomplete="off"></div>
+            <div class="field"><span class="label">Visibilité</span><div style="display:grid;gap:6px">
+              <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="oVis" id="oVisPrivate" value="private">Privée (moi seul)</label>
+              <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="oVis" id="oVisPublic" value="public">Visible par tous</label>
+            </div></div>
             <div class="field"><label class="label" for="oNote">Notes de méthode (optionnel)</label><textarea id="oNote" maxlength="400" placeholder="ex. Repos genou après le 3e point, crux entre le 4e et le 5e"></textarea></div>
           </div>
           <div class="err" id="oErr"></div>
@@ -369,9 +414,9 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
 </div>
 
 <nav class="tabs"><div class="in">
-  <button class="tab" id="tabList" aria-current="page">Salle</button>
-  <button class="tab" id="tabOut">Falaise</button>
-  <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau bloc</span></button>
+  <button class="tab" id="tabHome" aria-current="page">Accueil</button>
+  <button class="tab" id="tabPlace" hidden></button>
+  <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau</span></button>
 </div></nav>
 
 <!-- FULLSCREEN -->
@@ -382,7 +427,7 @@ nav.tabs .in { max-width: 720px; margin: 0 auto; display: grid; grid-template-co
     <button class="fs-btn go" id="fsClose" type="button">Fermer</button>
   </div>
   <div class="rp-prog" id="rpProg" hidden><i id="rpFill"></i></div>
-  <div class="wv" id="fsWall"><div class="rp-hint" id="rpHint" hidden aria-hidden="true"><span>◀ Revenir</span><span>Avancer ▶</span></div></div>
+  <div class="wv" id="fsWall"><div class="rp-vue" id="rpVue" hidden></div><div class="rp-hint" id="rpHint" hidden aria-hidden="true"><span>◀ Revenir</span><span>Avancer ▶</span></div></div>
   <div class="fs-foot" id="fsFoot">
     <div id="fsIn" style="display:grid;gap:8px"><div class="toolrow" data-tools></div><div class="counts" data-counts></div></div>
     <div id="fsOut" style="display:grid;gap:8px" hidden><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
@@ -414,6 +459,7 @@ const TYPES = {
 };
 const FILTERS = [
   { id: "all", label: "Tous", test: () => true },
+  { id: "best", label: "Mieux notés", test: () => true },
   { id: "low", label: "5a → 5c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= 0 && i < GRADES.indexOf("6a"); } },
   { id: "mid", label: "6a → 6c+", test: b => { const i = GRADES.indexOf(b.grade); return i >= GRADES.indexOf("6a") && i < GRADES.indexOf("7a"); } },
   { id: "high", label: "7a et +", test: b => GRADES.indexOf(b.grade) >= GRADES.indexOf("7a") },
@@ -428,7 +474,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], methodes: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
 
@@ -775,6 +821,7 @@ function renderFilters() {
 }
 $("filters").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.filter = b.dataset.f; renderFilters(); renderList(); });
 function renderList() {
+  renderHero();
   renderFilters();
   if (!state.loaded) { $("list").innerHTML = `<div class="empty">Chargement des blocs…</div>`; return; }
   if (!gym()) { $("list").innerHTML = `<div class="empty"><strong>Choisissez votre salle</strong><span>Sélectionnez une salle existante ou ajoutez la vôtre avec une photo de son mur.</span><button class="btn" type="button" data-open-sheet>Choisir une salle</button></div>`; return; }
@@ -782,6 +829,7 @@ function renderList() {
   const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
   const pool = state.blocs.filter(b => f.id === "old" ? isArchived(b) : !isArchived(b));
   const rows = pool.filter(f.test);
+  if (f.id === "best") rows.sort(byRating);
   if (!activeWall()) { $("list").innerHTML = `<div class="empty"><strong>Pas encore de photo du mur</strong><span>Prenez le pan en photo pour que la salle puisse tracer ses blocs.</span><button class="btn" type="button" data-open-sheet>Ajouter la photo du mur</button></div>`; return; }
   if (!pool.length && f.id !== "old") { $("list").innerHTML = `<div class="empty"><strong>Aucun bloc sur ce mur</strong><span>Tracez le premier : touchez les prises dans l'ordre, choisissez la cotation, publiez. Il apparaîtra ici pour toute la salle.</span><button class="btn" type="button" onclick="go('create')">Tracer le premier bloc</button></div>`; return; }
   if (!rows.length) { $("list").innerHTML = `<div class="empty">Aucun bloc pour ce filtre.</div>`; return; }
@@ -790,7 +838,7 @@ function renderList() {
     return `<button class="card${old ? " old" : ""}" data-id="${esc(b.id)}">
       <div class="thumb">${w ? wallSVG(w, b.holds || [], { mini: true, uid: "t" + b.id.replace(/\W/g, "") }) : ""}</div>
       <div class="meta"><div class="name">${esc(b.name)}</div>
-        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div></div>
+        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div>${ratingLine(b)}</div>
       <div class="grade">${esc(b.grade)}</div>
     </button>`; }).join("");
 }
@@ -814,10 +862,11 @@ $("list").addEventListener("click", e => {
 document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet]")) openSheet(); });
 
 /* ---------- detail ---------- */
-function openDetail(id) { state.current = id; go("detail"); }
+function openDetail(id) { state.current = id; state.delArmed = null; go("detail"); }
 function renderDetail() {
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
   $("dAdminEdit").hidden = !(b && w && isAdmin());
+  renderRating($("dRate"), "blocs", b && w ? b : null, b && w && !isArchived(b));
   const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
   if (!b || !w) { $("dName").textContent = "Bloc introuvable"; $("dBy").textContent = "Il a peut-être été supprimé."; $("dGrade").textContent = ""; $("dSeq").textContent = ""; $("dDesc").hidden = true; wallEl.hidden = true; $("dDel").hidden = $("dDelOk").hidden = $("dEdit").hidden = $("dReplay").hidden = true; $("dOld").hidden = true; return; }
   wallEl.hidden = false;
@@ -828,7 +877,7 @@ function renderDetail() {
   $("dSeq").textContent = seqText(b.holds || []);
   $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
   const own = state.me && b.authorId === state.me;
-  $("dDel").hidden = !(own || canManageGym(b.gymId)); $("dDelOk").hidden = true; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
+  $("dDel").hidden = !(own || canManageGym(b.gymId)) || state.delArmed === b.id; $("dDelOk").hidden = state.delArmed !== b.id; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
 $("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
@@ -860,16 +909,20 @@ function focusB() {
 }
 $("dWall").addEventListener("click", () => openFs("view"));
 $("dWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("view"); } });
-$("dDel").addEventListener("click", () => { $("dDel").hidden = true; $("dDelOk").hidden = false; });
-$("dDelOk").addEventListener("click", async () => { try { await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
+$("dDel").addEventListener("click", () => { state.delArmed = state.current; $("dDel").hidden = true; $("dDelOk").hidden = false; });
+$("dDelOk").addEventListener("click", async () => { try { if (isAdmin()) await deleteVotes("blocs", state.current); await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
 
 /* ---------- gyms & walls sheet ---------- */
-function openSheet(panel = "main") { state.sheet = panel; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
-function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; if ($("fs").hidden) document.body.classList.remove("locked"); }
+function openSheet(panel = "main") { state.sheet = panel; $("sheet").innerHTML = ""; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
+function closeSheet() { $("sheetBg").hidden = true; state.sheet = null; state.afterPick = false; if ($("fs").hidden) document.body.classList.remove("locked"); }
 $("sheetBg").addEventListener("click", e => { if (e.target === $("sheetBg")) closeSheet(); });
 $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "sectors" : "main"));
 function renderSheet() {
   if (state.sheet === "edit") return renderEditSheet();
+  if (state.sheet === "newchoice") return renderChoiceSheet();
+  if (state.sheet === "lens") return renderLensSheet();
+  // Une mise à jour en direct n'efface pas un formulaire de création en cours.
+  if ((state.sheet === "newgym" && $("ngName")) || (state.sheet === "newsector" && $("nsName"))) return;
   if (state.sheet === "sectors" || state.sheet === "newsector") return renderSectorSheet();
   if (state.sheet === "account" || state.sheet === "feedback" || state.sheet === "login") return renderAcctSheet();
   if (state.sheet === "lang") {
@@ -882,23 +935,27 @@ function renderSheet() {
   if (state.sheet === "newgym") {
     s.innerHTML = `<h2 id="sheetTitle">Ajouter une salle</h2>
       <div class="field"><label class="label" for="ngName">Nom de la salle</label><input id="ngName" maxlength="40" placeholder="ex. Altissimo" autocomplete="off"></div>
-      <div class="field"><label class="label" for="ngCity">Ville</label><input id="ngCity" maxlength="30" placeholder="ex. Albi" autocomplete="off"></div>
+      <div class="field"><label class="label" for="ngCity">Ville</label><input id="ngCity" maxlength="60" placeholder="ex. Albi" autocomplete="off"><div id="ngCityBox" class="gymlist"></div></div>
       <div class="field"><label class="label" for="ngWall">Nom du mur</label><input id="ngWall" maxlength="30" value="Spray wall" autocomplete="off"></div>
       <div class="note">Prenez le mur bien de face, en entier, avec un bon éclairage. La photo devient le support de tous les blocs.</div>
       ${photoNote}<div class="err" id="sErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><label class="btn filebtn" ${noAssets ? 'style="opacity:.45"' : ""}>Photographier le mur et créer<input type="file" accept="image/*" id="ngFile" ${noAssets ? "disabled" : ""}></label><button class="btn ghost" type="button" data-sheet="main">Annuler</button></div>`;
+    state.ngPicker = communePicker($("ngCity"), $("ngCityBox"));
     $("ngFile")?.addEventListener("change", async e => {
       const file = e.target.files[0]; e.target.value = ""; if (!file) return;
-      const name = $("ngName").value.trim(), city = $("ngCity").value.trim(), wname = $("ngWall").value.trim() || "Spray wall";
+      const name = $("ngName").value.trim(), wname = $("ngWall").value.trim() || "Spray wall";
       if (!name) { $("sErr").textContent = "Donnez un nom à la salle."; return; }
+      await state.ngPicker.check();
+      const commune = state.ngPicker.get();
+      if (!commune) { $("sErr").textContent = "Choisissez une commune dans la liste."; return; }
       $("sErr").textContent = "Envoi de la photo…";
       try {
         const ph = await uploadPhoto(file);
         const gref = state.db.collection("gyms").doc(), batch = state.db.batch();
-        batch.set(gref, { name, city, createdAt: Date.now() });
+        batch.set(gref, { name, city: communeLabel(commune), commune, createdAt: Date.now() });
         batch.set(state.db.collection("walls").doc(), { gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
         await batch.commit();
-        switchGym(gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
+        openPlace("salle", gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
       } catch (err) { $("sErr").textContent = "La création a échoué. Vérifiez la photo et réessayez."; }
     });
     return;
@@ -928,7 +985,7 @@ function renderSheet() {
   }
   const walls = g ? wallsOf(g.id) : [];
   s.innerHTML = `<h2 id="sheetTitle">Salles</h2>
-    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
+    <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}${unverified(x)}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
     ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
       <div class="walllist">${walls.length ? walls.map(w => `<div><span>${esc(w.name)} · photo du ${day(w.createdAt)}</span><b style="color:${w.active ? "var(--fg)" : "var(--muted)"}">${w.active ? "Actuel" : "Démonté"}</b></div>`).join("") : "<div>Aucune photo du mur.</div>"}</div>
@@ -938,7 +995,7 @@ function renderSheet() {
 $("sheet").addEventListener("click", e => {
   const p = e.target.closest("[data-sheet]"); if (p) { state.sheet = p.dataset.sheet; renderSheet(); return; }
   if (e.target.closest("[data-close-sheet]")) { closeSheet(); return; }
-  const gb = e.target.closest("[data-gym]"); if (gb) { switchGym(gb.dataset.gym); closeSheet(); }
+  const gb = e.target.closest("[data-gym]"); if (gb) { const after = state.afterPick; openPlace("salle", gb.dataset.gym); closeSheet(); if (after) $("tabCreate").click(); }
 });
 async function prepPhoto(file) {
   const url = URL.createObjectURL(file), img = new Image(); img.src = url; await img.decode();
@@ -956,17 +1013,160 @@ async function uploadPhoto(file) {
   return { url: a.url, w: p.w, h: p.h };
 }
 
+/* ---------- accueil : lieu en cours, favoris, récents (gardés sur le téléphone) ---------- */
+const lsJson = k => { try { return JSON.parse(lsGet(k) || "[]"); } catch { return []; } };
+const placeOf = (type, id) => type === "salle" ? state.gyms.find(g => g.id === id) : type === "secteur" ? state.secteurs.find(x => x.id === id) : type === "voie" ? state.allVoies.find(v => v.id === id) : null;
+const liveRecents = () => lsJson("ts-recents").filter(r => placeOf(r.type, r.id));
+const currentPlace = () => liveRecents().find(r => r.type !== "voie") || null;
+function touchRecent(type, id) { lsSet("ts-recents", JSON.stringify([{ type, id, t: Date.now() }, ...lsJson("ts-recents").filter(r => !(r.type === type && r.id === id))].slice(0, 20))); }
+const isFav = (type, id) => lsJson("ts-favs").some(f => f.type === type && f.id === id);
+function toggleFav(type, id) { const favs = lsJson("ts-favs"); lsSet("ts-favs", JSON.stringify(isFav(type, id) ? favs.filter(f => !(f.type === type && f.id === id)) : [...favs, { type, id }])); }
+const placeCommune = (type, x) => type === "salle" ? x.city : type === "secteur" ? x.region : state.secteurs.find(s => s.id === x.secteurId)?.name;
+const placePhoto = (type, id) => { const ref = type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image; return ref ? BT.img(ref) : ""; };
+const placeUrl = (type, id) => `${location.origin}/#/${type}/${id}`;
+function openPlace(type, id) {
+  touchRecent(type, id);
+  if (type === "salle") { if (state.gymId !== id) switchGym(id); go("list"); }
+  else { if (state.secteurId !== id) switchSecteur(id); go("olist"); }
+}
+function renderTabs() {
+  const p = currentPlace(), x = p && placeOf(p.type, p.id), tab = $("tabPlace");
+  tab.hidden = !x;
+  if (x) { tab.textContent = `${p.type === "salle" ? "🧗" : "⛰️"} ${x.name}`; tab.setAttribute("aria-label", x.name); }
+  const editing = p?.type === "salle" && (state.edit.kind !== "new" || state.holds.length);
+  $("tabCreateLbl").textContent = !p ? "Nouveau" : p.type === "secteur" ? "Nouvelle voie" : editing ? "Bloc en cours" : "Nouveau bloc";
+}
+function renderHero() {
+  for (const el of document.querySelectorAll("[data-hero]")) {
+    const type = el.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId, x = placeOf(type, id);
+    if (!x) { el.innerHTML = ""; el.hidden = true; continue; }
+    const photo = placePhoto(type, id), fav = isFav(type, id);
+    el.hidden = false;
+    el.innerHTML = `${photo ? `<img src="${esc(photo)}" alt="">` : ""}
+      <div class="bar"><button type="button" data-home>← Accueil</button><div>
+        <button type="button" data-share>Partager le lien</button>
+        <button type="button" data-star aria-pressed="${fav}" aria-label="${fav ? "Retirer des favoris" : "Ajouter aux favoris"}">${fav ? "★" : "☆"}</button></div></div>
+      <div class="txt"><b>${esc(x.name)}</b><small>${esc(placeCommune(type, x) || "")}</small></div>`;
+  }
+}
+document.addEventListener("click", async e => {
+  const h = e.target.closest("[data-hero]"); if (!h) return;
+  const type = h.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId;
+  if (e.target.closest("[data-home]")) go("home");
+  if (e.target.closest("[data-star]")) { toggleFav(type, id); renderHero(); }
+  if (e.target.closest("[data-share]")) {
+    const url = placeUrl(type, id);
+    try { if (navigator.share) await navigator.share({ title: placeOf(type, id)?.name, url }); else { await navigator.clipboard.writeText(url); toast("Lien copié"); } }
+    catch (err) { if (err?.name !== "AbortError") prompt("Lien à copier", url); }
+  }
+});
+const placeRow = (r, sub) => { const x = placeOf(r.type, r.id); return `<button class="gymrow" type="button" data-go="${r.type}:${esc(r.id)}"><span><b>${esc(x.name)}</b> <small>${esc(sub ?? placeCommune(r.type, x) ?? "")}</small></span><small>${TYPE_LABEL[r.type]}</small></button>`; };
+const TYPE_LABEL = { salle: "Salle", secteur: "Secteur", voie: "Voie" };
+function renderHome() {
+  renderSearch();
+  const recents = liveRecents(), p = recents.find(r => r.type !== "voie"), firstRun = !lsJson("ts-recents").length;
+  $("hTitle").hidden = !firstRun;
+  $("hBody").hidden = !!$("hSearch").value.trim();
+  if (!state.loaded || !state.oLoaded) { $("hBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  if (!p && !recents.length) {
+    $("hBody").innerHTML = `<section>${[...state.gyms.map(g => placeRow({ type: "salle", id: g.id })), ...state.secteurs.map(x => placeRow({ type: "secteur", id: x.id }))].join("")}</section>
+      <button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
+    return;
+  }
+  const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id)), others = recents.filter(r => !(p && r.type === p.type && r.id === p.id)).slice(0, 5);
+  let html = "";
+  if (p) {
+    const x = placeOf(p.type, p.id), photo = placePhoto(p.type, p.id);
+    html += `<button class="resume" id="hResume" data-go="${p.type}:${esc(p.id)}">${photo ? `<img src="${esc(photo)}" alt="">` : ""}<span class="txt"><b>Reprendre : ${esc(x.name)}</b><small>${[TYPE_LABEL[p.type], placeCommune(p.type, x), ago(p.t)].filter(Boolean).map(esc).join(" · ")}</small></span></button>`;
+  }
+  if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
+  if (others.length) html += `<section><div class="label">Récents</div>${others.map(r => placeRow(r)).join("")}</section>`;
+  $("hBody").innerHTML = html;
+}
+// Recherche sur le contenu public seulement : aucune méthode ni aucun brouillon.
+const foldChars = s => [...(s || "")].map(c => { const f = c.normalize("NFD")[0].toLowerCase(); return /[a-z0-9]/.test(f) ? f : " "; }).join("");
+function highlight(text, q) {
+  const folded = foldChars(text), needle = [q, q.replace(/\bsaint\b/g, "st"), q.replace(/\bsainte\b/g, "ste")].find(n => folded.includes(n));
+  if (!needle) return esc(text);
+  const i = folded.indexOf(needle), chars = [...text];
+  return esc(chars.slice(0, i).join("")) + "<mark>" + esc(chars.slice(i, i + needle.length).join("")) + "</mark>" + esc(chars.slice(i + needle.length).join(""));
+}
+function renderSearch() {
+  const raw = $("hSearch").value.trim(), q = simplify(raw), box = $("hResults");
+  $("hBody").hidden = !!raw;
+  if (!q) { box.innerHTML = ""; return; }
+  const hit = s => simplify(s).includes(q), groups = [];
+  const row = (attr, name, sub, kind) => `<button class="gymrow" type="button" ${attr}><span><b>${highlight(name, q)}</b> <small>${esc(sub || "")}</small></span><small>${kind}</small></button>`;
+  const communes = new Map();
+  for (const x of [...state.secteurs.map(s => [s, s.region]), ...state.gyms.map(g => [g, g.city])]) if (x[1] && hit(x[1])) communes.set(simplify(x[1]), x[1]);
+  if (communes.size) groups.push(["Commune", [...communes.values()].map(c => row(`data-q="${esc(c)}"`, c, "", "Commune"))]);
+  const secteurs = state.secteurs.filter(s => hit(s.name) || hit(s.region));
+  if (secteurs.length) groups.push(["Secteurs", secteurs.map(s => row(`data-go="secteur:${esc(s.id)}"`, s.name, s.region, "Secteur"))]);
+  const voies = state.allVoies.filter(v => hit(v.name));
+  if (voies.length) groups.push(["Voies", voies.map(v => row(`data-go="voie:${esc(v.id)}"`, v.name, state.secteurs.find(s => s.id === v.secteurId)?.name, "Voie"))]);
+  const salles = state.gyms.filter(g => hit(g.name) || hit(g.city));
+  if (salles.length) groups.push(["Salles", salles.map(g => row(`data-go="salle:${esc(g.id)}"`, g.name, g.city, "Salle"))]);
+  const satisfied = secteurs.length || voies.length || salles.length;
+  box.innerHTML = groups.map(([t, rows]) => `<section style="display:grid;gap:8px"><div class="label">${t}</div>${rows.join("")}</section>`).join("")
+    + (satisfied ? "" : `<div class="note">Aucun résultat.</div><button class="btn ghost small" type="button" data-new-sector>Créer un secteur à ${esc(raw)}</button>`);
+}
+$("hSearch").addEventListener("input", renderSearch);
+function openVoieById(id) {
+  const v = state.allVoies.find(x => x.id === id); if (!v) return false;
+  openPlace("secteur", v.secteurId);
+  openVoie(id);
+  return true;
+}
+$("vHome").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) { const [type, id] = g.dataset.go.split(/:(.*)/s); type === "voie" ? openVoieById(id) : openPlace(type, id); return; }
+  const c = e.target.closest("[data-q]");
+  if (c) { $("hSearch").value = c.dataset.q; renderSearch(); return; }
+  if (e.target.closest("[data-add-place]")) { state.me ? openSheet("newchoice") : promptLogin("ajouter du contenu"); return; }
+  if (e.target.closest("[data-new-sector]")) {
+    if (!state.me) { promptLogin("créer un secteur"); return; }
+    const q = $("hSearch").value.trim();
+    openSheet("newsector");
+    $("nsRegion").value = q; $("nsRegion").dispatchEvent(new Event("input"));
+  }
+});
+function renderChoiceSheet() {
+  $("sheet").innerHTML = `<h2 id="sheetTitle">Que veux-tu ajouter ?</h2>
+    <div style="display:grid;gap:10px"><button class="btn" type="button" data-pick-after="main">Nouveau bloc</button><button class="btn" type="button" data-pick-after="sectors">Nouvelle voie</button>
+    <button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>`;
+}
+$("sheet").addEventListener("click", e => { const b = e.target.closest("[data-pick-after]"); if (!b) return; state.afterPick = true; state.sheet = b.dataset.pickAfter; renderSheet(); });
+// Liens directs : /#/salle/id, /#/secteur/id, /#/voie/id, /#/bloc/id. Un lien n'ouvre que la consultation.
+async function routeFromHash() {
+  const m = location.hash.match(/^#\/(salle|secteur|voie|bloc)\/(.+)$/);
+  if (!m) return;
+  const [, type, id] = m;
+  history.replaceState(null, "", location.pathname + location.search);
+  const gone = () => { toast("Ce contenu n'existe plus"); go("home"); };
+  if (type === "salle" || type === "secteur") { placeOf(type, id) ? openPlace(type, id) : gone(); return; }
+  try {
+    const d = await state.db.collection(type === "voie" ? "voies" : "blocs").doc(id).get();
+    if (!d.exists) return gone();
+    const x = d.data();
+    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x }); openPlace("secteur", x.secteurId); openVoie(id); }
+    else { if (!placeOf("salle", x.gymId)) return gone(); openPlace("salle", x.gymId); openDetail(id); }
+  } catch { gone(); }
+}
+window.addEventListener("hashchange", () => { if (state.booted) routeFromHash(); });
+function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); routeFromHash(); }
+
 /* ---------- navigation ---------- */
-const VIEWS = { list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+const VIEWS = { home: "vHome", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
   state.view = v; state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode);
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
-  $("tabList").setAttribute("aria-current", state.mode === "in" && v !== "create" ? "page" : "false");
-  $("tabOut").setAttribute("aria-current", state.mode === "out" && v !== "oedit" ? "page" : "false");
+  $("gymBtn").hidden = v === "home";
+  $("tabHome").setAttribute("aria-current", v === "home" ? "page" : "false");
+  $("tabPlace").setAttribute("aria-current", ["list", "olist", "detail", "ovoie"].includes(v) ? "page" : "false");
   $("tabCreate").setAttribute("aria-current", v === "create" || v === "oedit" ? "page" : "false");
-  $("tabCreateLbl").textContent = state.mode === "out" ? "Nouvelle voie" : (state.edit.kind !== "new" || state.holds.length ? "Bloc en cours" : "Nouveau bloc");
   renderHeader();
+  if (v === "home") renderHome();
   if (v === "olist") renderOList();
   if (v === "ovoie") renderVoie();
   if (v === "oedit") { renderOE(); oView.layout(true); }
@@ -975,16 +1175,21 @@ function go(v) {
   if (v === "detail") renderDetail();
   window.scrollTo(0, 0);
 }
-$("tabList").onclick = () => go("list");
-$("tabOut").onclick = () => go("olist");
+$("tabHome").onclick = () => go("home");
+$("tabPlace").onclick = () => { const p = currentPlace(); if (p) openPlace(p.type, p.id); };
 $("tabCreate").onclick = () => {
-  if (!state.me) { setTimeout(() => promptLogin(state.mode === "out" ? "ajouter une voie" : "publier un bloc"), 150); }
-  state.mode === "out" ? startRoute() : go("create");
+  const p = currentPlace();
+  if (!p && !state.me) { promptLogin("ajouter du contenu"); return; }
+  if (!p) { openSheet("newchoice"); return; }
+  if (!state.me) { setTimeout(() => promptLogin(p.type === "secteur" ? "ajouter une voie" : "publier un bloc"), 150); }
+  if (p.type === "secteur") { if (state.secteurId !== p.id) switchSecteur(p.id); startRoute(); }
+  else { if (state.gymId !== p.id) switchGym(p.id); go("create"); }
 };
 $("backBtn").onclick = () => { if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
 let tt; function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
 
 function renderHeader() {
+  renderTabs();
   if (state.mode === "out") {
     const sc = secteur();
     $("gymName").textContent = sc ? sc.name : (state.oLoaded ? "Choisir un secteur" : "Chargement…");
@@ -997,6 +1202,7 @@ function renderHeader() {
 }
 function rerender() {
   renderHeader();
+  if (state.view === "home") renderHome();
   if (state.view === "list") renderList();
   if (state.view === "detail") renderDetail();
   if (state.view === "create") renderEditor();
@@ -1035,18 +1241,28 @@ function switchSecteur(id) {
   if (state.unsubVoies) state.unsubVoies(); state.unsubVoies = null;
   if (state.db && id) state.unsubVoies = state.db.collection("voies").where("secteurId", "==", id).onSnapshot(sn => {
     state.voies = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+    state.allVoies = [...state.allVoies.filter(v => v.secteurId !== id), ...state.voies];
     rerender();
   }, () => toast("Impossible de charger les voies pour l'instant."));
   if (state.mode === "out" && state.view !== "olist") go("olist"); else rerender();
 }
+// Méthodes publiques de la voie, plus les méthodes privées de l'utilisateur : les règles refusent toute autre lecture.
+function subscribeMethods(id) {
+  state.unsubMeth?.(); state.unsubMeth = null;
+  if (!state.db || !id) return;
+  state.unsubVues?.();
+  state.unsubVues = state.db.collection("vues").where("voieId", "==", id).onSnapshot(sn => { state.vues = sn.docs.map(d => ({ id: d.id, ...d.data() })); state.vuesLoaded = true; rerender(); }, () => {});
+  let pub = [], priv = [];
+  const merge = () => { state.methodes = [...pub, ...priv].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); rerender(); };
+  const u1 = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => { pub = sn.docs.map(d => ({ id: d.id, ...d.data() })); merge(); }, () => {});
+  const u2 = state.me ? state.db.collection("methodesPrivees").where("voieId", "==", id).where("authorId", "==", state.me).onSnapshot(sn => { priv = sn.docs.map(d => ({ id: d.id, ...d.data(), isPrivate: true })); merge(); }, () => {}) : null;
+  state.unsubMeth = () => { u1(); u2?.(); };
+}
 function openVoie(id, sel) {
+  touchRecent("voie", id);
   if (state.voieId !== id) {
-    state.voieId = id; state.methodes = []; state.oSel = sel || "anchors";
-    if (state.unsubMeth) state.unsubMeth(); state.unsubMeth = null;
-    if (state.db) state.unsubMeth = state.db.collection("methodes").where("voieId", "==", id).onSnapshot(sn => {
-      state.methodes = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      rerender();
-    }, () => {});
+    state.voieId = id; state.methodes = []; state.vues = []; state.vuesLoaded = false; state.ovLen = state.ovVue = null; state.armedAct = null; state.oSel = sel || "anchors";
+    subscribeMethods(id);
   } else if (sel) state.oSel = sel;
   go("ovoie");
 }
@@ -1083,7 +1299,7 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
       const t = OT[st.t] || OT.hand, [cx, cy] = P(st), r = t.r * k; move++;
       if (st.t === "hand") { if (prevHand) { const [px, py] = P(prevHand); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`; } prevHand = st; lastHand = st; }
       rings += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${10 * k}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${(cur ? 8 : 5.5) * k}"/>`;
-      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(move);
+      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(st.n ?? move);
       rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
       if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 12 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
       if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
@@ -1091,7 +1307,24 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
   }
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${mini ? "slice" : "meet"}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Photo de la voie avec ${anchors.length} points et ${steps.length} étapes"><image href="${esc(img)}" width="${W}" height="${H}"/>${line}${flow}${anc}${rings}${top}</svg>`;
 }
-const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip");
+/* ---------- longueurs et vues : la voie sans longueurs est une longueur L1, sa photo est la vue d'ensemble ---------- */
+const BASE_VUE = "base";
+const longueursOf = v => v.longueurs?.length ? v.longueurs : [{ id: "l1", name: "L1", grade: v.grade }];
+const baseVue = v => v.baseDeleted ? null : { id: BASE_VUE, isBase: true, label: "Vue d'ensemble", longueurId: longueursOf(v)[0].id, image: v.image, w: v.w, h: v.h, anchors: v.anchors || [], authorId: v.authorId, order: v.baseOrder || 0 };
+const vuesOf = (v, lenId) => [baseVue(v), ...state.vues].filter(x => x && x.longueurId === lenId).sort((a, b) => (a.order || 0) - (b.order || 0));
+const currentLen = v => longueursOf(v).find(l => l.id === state.ovLen) || longueursOf(v)[0];
+const currentVue = v => { const list = vuesOf(v, currentLen(v).id); return list.find(x => x.id === state.ovVue) || list[0] || null; };
+const hardest = lens => lens.map(l => l.grade).sort((a, b) => GRADES.indexOf(b) - GRADES.indexOf(a))[0];
+const vueIdOf = s => s.viewId || BASE_VUE;
+const findVue = (v, id) => id === BASE_VUE ? baseVue(v) : state.vues.find(x => x.id === id && x.voieId === v.id) || null;
+const allVues = v => longueursOf(v).flatMap(l => vuesOf(v, l.id));
+// Une prise sur une vue disparue, ou qui ne vise pas une vue de cette voie, est ignorée.
+const stepAlive = s => { const v = voie(); return !v || !state.vuesLoaded || !!findVue(v, vueIdOf(s)); };
+const mSteps = m => (m && m.steps || []).filter(st => st.t !== "clip" && stepAlive(st));
+const lostSteps = m => (m && m.steps || []).filter(st => st.t !== "clip" && !stepAlive(st)).length;
+// Prises d'une seule vue, avec leur numéro dans la méthode entière.
+const stepsOn = (steps, V) => { let n = 0; return steps.map(s => ({ ...s, n: s.t === "clip" ? n : ++n })).filter(s => V && vueIdOf(s) === V.id); };
+const vueTitle = (v, V) => `${longueursOf(v).find(l => l.id === V.longueurId)?.name || ""} · ${V.label}`;
 function methodSummary(steps) {
   const n = t => steps.filter(s => s.t === t).length;
   return `${n("hand")} main${n("hand") > 1 ? "s" : ""} · ${n("foot")} pied${n("foot") > 1 ? "s" : ""}`;
@@ -1099,19 +1332,21 @@ function methodSummary(steps) {
 
 /* ---------- route list ---------- */
 function renderOList() {
+  renderHero();
   const el = $("oListEl");
   if (!state.oLoaded) { el.innerHTML = `<div class="empty">Chargement des secteurs…</div>`; return; }
   if (!secteur()) { el.innerHTML = `<div class="empty"><strong>La falaise, voie par voie</strong><span>Choisissez un secteur ou créez-le, puis ajoutez la photo d'une voie, ses points d'ancrage et votre méthode.</span><button class="btn" type="button" data-open-sectors>Choisir un secteur</button></div>`; return; }
   if (!state.voies.length) { el.innerHTML = `<div class="empty"><strong>Aucune voie dans ce secteur</strong><span>Photographiez une voie, placez ses points d'ancrage et le relais. Chacun pourra ensuite y ajouter sa méthode.</span><button class="btn" type="button" onclick="startRoute()">Ajouter la première voie</button></div>`; return; }
-  el.innerHTML = state.voies.map(v => `
+  const voies = state.voiesBest ? [...state.voies].sort(byRating) : state.voies;
+  el.innerHTML = `<div class="filters" style="padding-top:0"><button class="chip" type="button" id="oBest" aria-pressed="${!!state.voiesBest}">Mieux notés</button></div>` + voies.map(v => `
     <button class="card route" data-voie="${esc(v.id)}">
       <div class="thumb tall">${routeSVG(v, v.anchors || [], [], { mini: true, uid: "o" + v.id.replace(/\W/g, "") })}</div>
       <div class="meta"><div class="name">${esc(v.name)}</div>
-        <div class="by">${(v.anchors || []).filter(a => a.t !== "relais").length} points · ${v.methodCount ? `${v.methodCount} méthode${v.methodCount > 1 ? "s" : ""}` : "ajoutée par " + esc(v.addedBy || "un grimpeur")}</div></div>
+        <div class="by">${(v.anchors || []).filter(a => a.t !== "relais").length} points · ${v.methodCount ? `${v.methodCount} méthode${v.methodCount > 1 ? "s" : ""}` : "ajoutée par " + esc(v.addedBy || "un grimpeur")}</div>${ratingLine(v)}</div>
       <div class="grade">${esc(v.grade)}</div>
     </button>`).join("");
 }
-$("oListEl").addEventListener("click", e => { const c = e.target.closest("[data-voie]"); if (c) openVoie(c.dataset.voie); });
+$("oListEl").addEventListener("click", e => { if (e.target.closest("#oBest")) { state.voiesBest = !state.voiesBest; renderOList(); return; } const c = e.target.closest("[data-voie]"); if (c) openVoie(c.dataset.voie); });
 document.addEventListener("click", e => { if (e.target.closest("[data-open-sectors]")) openSheet("sectors"); });
 
 /* ---------- one route ---------- */
@@ -1119,57 +1354,298 @@ function selMethod() { return state.oSel === "anchors" ? null : state.methodes.f
 function renderVoie() {
   const v = voie();
   if (!v) { $("ovName").textContent = "Voie introuvable"; $("ovBy").textContent = ""; $("ovGrade").textContent = ""; $("ovWall").hidden = true; $("ovMethods").innerHTML = ""; $("ovSeq").textContent = ""; $("ovNote").hidden = true; $("ovActions").innerHTML = ""; return; }
-  $("ovWall").hidden = false;
+  const lens = longueursOf(v), V = currentVue(v), lenVues = vuesOf(v, currentLen(v).id);
+  $("ovTabs").hidden = lens.length < 2 && lenVues.length < 2;
+  $("ovLens").hidden = lens.length < 2;
+  $("ovLens").innerHTML = lens.map(l => `<button class="chip" type="button" data-len="${esc(l.id)}" aria-pressed="${l.id === currentLen(v).id}">${esc(l.name)} · ${esc(l.grade)}</button>`).join("");
+  $("ovVues").hidden = lenVues.length < 2;
+  $("ovVues").innerHTML = lenVues.map(x => `<button class="chip" type="button" data-vue="${esc(x.id)}" aria-pressed="${x.id === V?.id}">${esc(x.label)}</button>`).join("");
+  $("ovWall").hidden = !V; $("ovNoPhoto").hidden = !!V;
   if (state.oSel !== "anchors" && !selMethod()) state.oSel = "anchors";
   const m = selMethod(), mine = myMethod();
   $("ovName").textContent = v.name; $("ovGrade").textContent = v.grade;
+  renderRating($("ovRate"), "voies", v, true);
   $("ovBy").textContent = `${secteur()?.name || ""} · ajoutée par ${v.addedBy || "un grimpeur"}`;
   $("ovMethods").innerHTML = `<button class="chip" data-sel="anchors" aria-pressed="${!m}">Points seuls</button>` + state.methodes.map(x =>
-    `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
+    `<button class="chip" data-sel="${esc(x.id)}" aria-pressed="${m && m.id === x.id}">${x.isPrivate ? `<span class="tag">Privée</span> ` : ""}Méthode de ${esc(x.climber || "?")}${state.me && x.authorId === state.me ? " (vous)" : ""}</button>`).join("");
   const btn = $("ovWall").querySelector(".float");
-  $("ovWall").innerHTML = routeSVG(v, v.anchors || [], mSteps(m), { uid: "ov" }); $("ovWall").appendChild(btn);
-  const bolts = (v.anchors || []).filter(a => a.t !== "relais").length, hasR = (v.anchors || []).some(a => a.t === "relais");
+  if (V) { $("ovWall").innerHTML = routeSVG(V, V.anchors || [], stepsOn(mSteps(m), V), { uid: "ov" }); $("ovWall").appendChild(btn); }
+  const bolts = (V?.anchors || []).filter(a => a.t !== "relais").length, hasR = (V?.anchors || []).some(a => a.t === "relais");
+  const shared = state.methodes.filter(x => !x.isPrivate).length;
   $("ovSeq").hidden = !!m;
-  $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${state.methodes.length ? `${state.methodes.length} méthode${state.methodes.length > 1 ? "s" : ""} partagée${state.methodes.length > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
+  $("ovSeq").textContent = m ? "" : `${bolts} point${bolts > 1 ? "s" : ""} d'ancrage${hasR ? " + relais" : ""} · ${shared ? `${shared} méthode${shared > 1 ? "s" : ""} partagée${shared > 1 ? "s" : ""}` : "aucune méthode partagée"}`;
   $("ovNote").textContent = m?.note || ""; $("ovNote").hidden = !m?.note;
+  const lost = m && state.me && m.authorId === state.me ? lostSteps(m) : 0;
+  $("ovLost").hidden = !lost; $("ovLost").textContent = lost ? `${lost} prise${lost > 1 ? "s étaient" : " était"} sur une vue supprimée` : "";
   const acts = [];
   if (m && mSteps(m).length) acts.push(`<button class="btn" type="button" data-act="replay">▶ Répéter la voie</button>`);
   acts.push(mine ? `<button class="btn ${m ? "ghost" : ""} small" type="button" data-act="editm">Modifier ma méthode</button>` : `<button class="btn small" type="button" data-act="newm">Ajouter ma méthode</button>`);
-  if (state.me && v.authorId === state.me) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
+  if (state.me && v.authorId === state.me && V?.isBase) acts.push(`<button class="btn ghost small" type="button" data-act="editr">Modifier les points</button>`);
+  acts.push(`<button class="btn ghost small" type="button" data-act="addvue">Ajouter une vue</button>`);
+  const structure = state.me && (v.authorId === state.me || isAdmin());
+  if (structure) acts.push(`<button class="btn ghost small" type="button" data-act="lens">Gérer les longueurs</button>`);
+  if (structure && lenVues.length > 1) acts.push(`<button class="btn ghost small" type="button" data-act="vueup">◀ Déplacer la vue</button><button class="btn ghost small" type="button" data-act="vuedown">Déplacer la vue ▶</button>`);
+  if (V && !V.isBase && (V.authorId === state.me || isAdmin())) acts.push(`<button class="btn ghost small" type="button" data-act="editvue">Modifier cette vue</button>`);
+  if (V && (isAdmin() || (!V.isBase && V.authorId === state.me && !V.foreignUses))) acts.push(`<button class="btn danger small" type="button" data-act="delvue">Supprimer cette vue</button>`);
   if (m && ((mine && m.id === mine.id) || isAdmin())) acts.push(`<button class="btn danger small" type="button" data-act="delm">${mine && m.id === mine.id ? "Supprimer ma méthode" : "Supprimer cette méthode"}</button>`);
   if (isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminv">Modifier la voie</button>`);
   if (m && isAdmin()) acts.push(`<button class="btn ghost small" type="button" data-act="adminm">Modifier le prénom</button>`);
   if (isAdmin()) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer la voie (admin)</button>`);
+  else if (state.me && v.authorId === state.me && !v.foreignCount) acts.push(`<button class="btn danger small" type="button" data-act="delv">Supprimer ma voie</button>`);
   $("ovActions").innerHTML = acts.join("");
+  // Une mise à jour en direct ne doit pas annuler une suppression en attente de confirmation.
+  const armed = state.armedAct && $("ovActions").querySelector(`[data-act="${state.armedAct}"]`);
+  if (armed) { armed.dataset.armed = "1"; armed.textContent = armed.dataset.act === "delv" ? "Confirmer : voie et méthodes" : "Confirmer la suppression"; }
 }
-$("ovMethods").addEventListener("click", e => { const c = e.target.closest("[data-sel]"); if (!c) return; state.oSel = c.dataset.sel; renderVoie(); });
+$("ovTabs").addEventListener("click", e => {
+  const l = e.target.closest("[data-len]"); if (l) { state.ovLen = l.dataset.len; state.ovVue = null; renderVoie(); return; }
+  const c = e.target.closest("[data-vue]"); if (c) { state.ovVue = c.dataset.vue; renderVoie(); }
+});
+$("ovNoPhoto").addEventListener("click", e => { if (e.target.closest("[data-act-nophoto]")) startVue(); });
+$("ovMethods").addEventListener("click", e => {
+  const c = e.target.closest("[data-sel]"); if (!c) return;
+  state.oSel = c.dataset.sel;
+  // Si la méthode n'a aucune prise sur la vue affichée, on montre sa première prise.
+  const v = voie(), steps = mSteps(selMethod()), V = v && currentVue(v);
+  if (v && steps.length && !stepsOn(steps, V).length) { const t = findVue(v, vueIdOf(steps[0])); if (t) { state.ovLen = t.longueurId; state.ovVue = t.id; } }
+  renderVoie();
+});
 $("ovWall").addEventListener("click", () => openFs("oview"));
 $("ovWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("oview"); } });
 $("ovActions").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "replay") openFs("replay");
+  if (a === "replay") { state.rpVue = null; openFs("replay"); }
   if (a === "newm" || a === "editm") startMethod();
   if (a === "editr") startRoute(state.voieId);
+  if (a === "addvue") startVue();
+  if (a === "editvue") startVue(currentVue(voie()));
+  if (a === "lens") { state.lensDraft = longueursOf(voie()).map(l => ({ ...l })); openSheet("lens"); }
+  if (a === "vueup" || a === "vuedown") moveVue(a === "vueup" ? -1 : 1);
+  if (a === "delvue") {
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer la suppression"; return; }
+    state.armedAct = null;
+    try { await deleteVue(voie(), currentVue(voie())); state.ovVue = null; toast("Vue supprimée"); } catch { toast("Suppression impossible"); }
+  }
   if (a === "adminv") openEdit("voies", state.voieId);
   if (a === "adminm") openEdit("methodes", selMethod()?.id);
   if (a === "delm") {
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer la suppression"; return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer la suppression"; return; }
+    state.armedAct = null;
     const target = selMethod() || myMethod(); if (!target) return;
-    try { await state.db.collection("methodes").doc(target.id).delete(); bumpCount(state.voieId, -1); state.oSel = "anchors"; toast("Méthode supprimée"); } catch { toast("Suppression impossible"); }
+    try { await deleteMethod(target); state.oSel = "anchors"; toast("Méthode supprimée"); } catch { toast("Suppression impossible"); }
   }
   if (a === "delv") {
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirmer : voie et méthodes"; return; }
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; state.armedAct = a; b.textContent = "Confirmer : voie et méthodes"; return; }
+    state.armedAct = null;
     const v = voie(); if (!v) return;
-    try {
-      for (const m of state.methodes) await state.db.collection("methodes").doc(m.id).delete();
-      if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
-      await state.db.collection("voies").doc(v.id).delete();
-      toast("Voie supprimée"); go("olist");
-    } catch { toast("Suppression impossible"); }
+    try { await deleteVoie(v); toast("Voie supprimée"); go("olist"); } catch { toast("Suppression impossible"); }
   }
 });
-function bumpCount(voieId, d) { const v = state.voies.find(x => x.id === voieId); if (!v || !state.db) return; state.db.collection("voies").doc(voieId).update({ methodCount: Math.max(0, (v.methodCount || 0) + d) }).catch(() => {}); }
+/* ---------- notes : de 0 à 3 étoiles ---------- */
+const MIN_VOTES = 3;
+const avg = x => (x.ratingSum || 0) / (x.ratingCount || 1);
+const hasRating = x => (x.ratingCount || 0) >= MIN_VOTES;
+const ratingText = x => { const a = avg(x), n = Math.round(a); return `${"★".repeat(n)}${"☆".repeat(3 - n)} ${a.toLocaleString(TS_I18N.locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} · ${x.ratingCount} avis`; };
+const ratingLine = x => hasRating(x) ? `<div class="rating">${ratingText(x)}</div>` : "";
+// Mieux notés d'abord ; moins de 3 votes en fin de liste.
+const byRating = (a, b) => (hasRating(b) - hasRating(a)) || (hasRating(a) ? avg(b) - avg(a) || b.ratingCount - a.ratingCount : 0);
+const VOTE_CHOICES = [[0, "Sans plus"], [1, "★"], [2, "★★"], [3, "★★★"]];
+const voteRef = (kind, id) => state.db.collection("votes").doc(`${kind}__${id}__${state.me}`);
+function watchVote(kind, id) {
+  const key = state.me && id ? `${kind}__${id}__${state.me}` : null;
+  if (state.voteKey === key) return;
+  state.voteKey = key; state.myVote = null; state.unsubVote?.(); state.unsubVote = null;
+  if (key) state.unsubVote = state.db.collection("votes").doc(key).onSnapshot(d => { state.myVote = d.exists ? d.data().value : null; rerender(); }, () => { state.voteKey = null; });
+}
+function renderRating(el, kind, x, canRate) {
+  if (!x) { el.innerHTML = ""; return; }
+  watchVote(kind, x.id);
+  const n = x.ratingCount || 0, own = state.me && x.authorId === state.me;
+  const summary = hasRating(x) ? `<div class="rating">${ratingText(x)}</div>` : n ? `<div class="note">${n} avis, note affichée à partir de ${MIN_VOTES}</div>` : "";
+  const choices = canRate && !own ? `<div class="chips" data-kind="${kind}" data-target="${esc(x.id)}">${VOTE_CHOICES.map(([v, l]) => `<button class="chip" type="button" data-vote="${v}" aria-pressed="${state.myVote === v}">${l}</button>`).join("")}${state.myVote != null ? `<button class="chip" type="button" data-vote="">Retirer ma note</button>` : ""}</div>` : "";
+  el.innerHTML = summary + choices;
+}
+async function castVote(kind, id, value) {
+  if (!state.me) { promptLogin("noter"); return; }
+  const ref = voteRef(kind, id), target = state.db.collection(kind).doc(id), now = Date.now(), batch = state.db.batch();
+  try {
+    const cur = await ref.get(), before = cur.exists ? cur.data().value : null;
+    if (before === value) return;
+    if (value == null) {
+      batch.delete(ref);
+      batch.update(target, { ratingCount: state.db.increment(-1), ratingSum: state.db.increment(-before) });
+    } else if (before == null) {
+      batch.set(ref, { kind, targetId: id, authorId: state.me, value, createdAt: now, updatedAt: now });
+      batch.update(target, { ratingCount: state.db.increment(1), ratingSum: state.db.increment(value) });
+    } else {
+      batch.update(ref, { value, updatedAt: now });
+      batch.update(target, { ratingSum: state.db.increment(value - before) });
+    }
+    await batch.commit();
+    state.myVote = value; rerender();
+  } catch { toast("Note impossible à enregistrer pour l'instant."); }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-vote]"); if (!b) return;
+  const box = b.closest("[data-kind]");
+  castVote(box.dataset.kind, box.dataset.target, b.dataset.vote === "" ? null : +b.dataset.vote);
+});
+async function deleteVotes(kind, id) {
+  const s = await state.db.collection("votes").where("targetId", "==", id).where("kind", "==", kind).get();
+  await Promise.all(s.docs.map(d => d.ref.delete()));
+}
+const voieRef = id => state.db.collection("voies").doc(id);
+const contribRef = (voieId, uid) => voieRef(voieId).collection("contributeurs").doc(uid);
+async function saveMethod(oe, fields, wantPrivate) {
+  const v = state.voies.find(x => x.id === oe.voieId), now = Date.now(), batch = state.db.batch(), bump = {};
+  const col = isPrivate => state.db.collection(isPrivate ? "methodesPrivees" : "methodes");
+  const cur = oe.id ? state.methodes.find(m => m.id === oe.id) : null;
+  const vueIds = [...new Set(fields.steps.map(vueIdOf).filter(x => x !== BASE_VUE))];
+  if (vueIds.length > 6) throw { msg: "Une méthode peut utiliser 6 vues au plus, en plus de la vue d'ensemble." };
+  if (vueIds.some(x => !findVue(v, x))) throw { msg: "Une prise vise une vue qui n'appartient pas à cette voie." };
+  fields = { ...fields, vueIds };
+  const before = cur?.vueIds || [];
+  for (const x of vueIds.filter(x => !before.includes(x))) markVueUse(batch, x, state.me, 1);
+  for (const x of before.filter(x => !vueIds.includes(x))) markVueUse(batch, x, state.me, -1);
+  let id = oe.id;
+  if (cur && !!cur.isPrivate === wantPrivate) batch.update(col(wantPrivate).doc(id), { ...fields, updatedAt: now, updatedBy: state.me });
+  else if (cur) {
+    // Changer de visibilité déplace la méthode, sous le même identifiant.
+    const { id: _, isPrivate: __, ...kept } = cur;
+    batch.delete(col(!wantPrivate).doc(id));
+    batch.set(col(wantPrivate).doc(id), { ...kept, ...fields, updatedAt: now, updatedBy: state.me });
+    if (wantPrivate ? v.methodCount > 0 : true) bump.methodCount = state.db.increment(wantPrivate ? -1 : 1);
+  } else {
+    const ref = col(wantPrivate).doc(); id = ref.id;
+    batch.set(ref, { voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, ...fields, createdAt: now, updatedAt: now });
+    if (!wantPrivate) bump.methodCount = state.db.increment(1);
+    if (v.authorId !== state.me) {
+      const mark = contribRef(oe.voieId, state.me);
+      if (!(await mark.get()).exists) { batch.set(mark, { createdAt: now }); bump.foreignCount = state.db.increment(1); }
+    }
+  }
+  if (Object.keys(bump).length) batch.update(voieRef(oe.voieId), bump);
+  await batch.commit();
+  return id;
+}
+async function hasOtherContribution(voieId, uid, except) {
+  return state.vues.some(x => x.authorId === uid && x.id !== except) || state.methodes.some(m => m.authorId === uid && m.id !== except);
+}
+async function saveVue(oe, label, longueurId) {
+  const now = Date.now();
+  if (oe.id) { await state.db.collection("vues").doc(oe.id).update({ label, longueurId, anchors: oe.anchors, updatedAt: now, updatedBy: state.me }); return oe.id; }
+  $("oErr").textContent = "Envoi de la photo…";
+  const a = await state.assets.upload(oe.photo.blob), v = state.voies.find(x => x.id === oe.voieId), batch = state.db.batch(), ref = state.db.collection("vues").doc();
+  batch.set(ref, { voieId: oe.voieId, longueurId, label, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, order: now, createdAt: now });
+  if (v.authorId !== state.me) {
+    const mark = contribRef(oe.voieId, state.me);
+    if (!(await mark.get()).exists) { batch.set(mark, { createdAt: now }); batch.update(voieRef(oe.voieId), { foreignCount: state.db.increment(1) }); }
+  }
+  await batch.commit();
+  return ref.id;
+}
+async function deleteVue(v, V) {
+  if (V.isBase) { await voieRef(v.id).update({ baseDeleted: true, anchors: [], image: "", updatedAt: Date.now(), updatedBy: state.me }); if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {}); return; }
+  const batch = state.db.batch();
+  batch.delete(state.db.collection("vues").doc(V.id));
+  if (isAdmin()) (await state.db.collection("vues").doc(V.id).collection("utilisateurs").get()).forEach(d => batch.delete(d.ref));
+  if (V.authorId !== v.authorId && !(await hasOtherContribution(v.id, V.authorId, V.id))) {
+    const mark = contribRef(v.id, V.authorId);
+    if ((await mark.get()).exists) { batch.delete(mark); batch.update(voieRef(v.id), { foreignCount: state.db.increment(-1) }); }
+  }
+  await batch.commit();
+  if (String(V.image || "").startsWith("photo:")) await state.db.collection("photos").doc(V.image.slice(6)).delete().catch(() => {});
+}
+async function moveVue(d) {
+  const v = voie(), list = vuesOf(v, currentLen(v).id), i = list.findIndex(x => x.id === currentVue(v)?.id), j = i + d;
+  if (i < 0 || j < 0 || j >= list.length) return;
+  // Échange des rangs : un rang identique (vue d'ensemble à 0) est décalé pour rester ordonné.
+  const a = list[i], b = list[j], oa = a.order || 0, ob = b.order === oa ? oa + d : b.order || 0, batch = state.db.batch();
+  const setOrder = (x, o) => x.isBase ? batch.update(voieRef(v.id), { baseOrder: o }) : batch.update(state.db.collection("vues").doc(x.id), { order: o });
+  setOrder(a, ob); setOrder(b, oa);
+  try { await batch.commit(); } catch { toast("Déplacement impossible"); }
+}
+function renderLensSheet() {
+  if ($("lgForm")) return;
+  renderLensForm();
+}
+function renderLensForm() {
+  const v = voie(), draft = state.lensDraft, baseLen = v && !v.baseDeleted ? longueursOf(v)[0].id : null;
+  $("sheet").innerHTML = `<h2 id="sheetTitle">Longueurs de la voie</h2>
+    <form id="lgForm" novalidate style="display:grid;gap:12px">
+      ${draft.map((l, i) => `<div style="display:grid;grid-template-columns:1fr 84px auto;gap:6px;align-items:center" data-row="${i}">
+        <input data-name maxlength="20" value="${esc(l.name)}" aria-label="Nom de la longueur" autocomplete="off">
+        <select data-grade aria-label="Cotation" style="font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg)">${GRADES.map(g => `<option${g === l.grade ? " selected" : ""}>${g}</option>`).join("")}</select>
+        <span style="display:flex;gap:4px">
+          <button class="chip" type="button" data-lup aria-label="Monter" ${i ? "" : "disabled"}>↑</button>
+          <button class="chip" type="button" data-ldown aria-label="Descendre" ${i < draft.length - 1 ? "" : "disabled"}>↓</button>
+          <button class="chip" type="button" data-ldel aria-label="Supprimer la longueur" ${draft.length < 2 || l.id === baseLen ? "disabled" : ""}>✕</button>
+        </span></div>`).join("")}
+      <button class="btn ghost small" type="button" data-ladd>+ Ajouter une longueur</button>
+      <div class="err" id="eErr"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>
+    </form>`;
+  $("lgForm").addEventListener("input", e => {
+    const r = e.target.closest("[data-row]"); if (!r) return;
+    const l = state.lensDraft[+r.dataset.row];
+    if (e.target.matches("[data-name]")) l.name = e.target.value;
+    if (e.target.matches("[data-grade]")) l.grade = e.target.value;
+  });
+  $("lgForm").addEventListener("click", e => {
+    const d = state.lensDraft, r = e.target.closest("[data-row]"), i = r ? +r.dataset.row : -1;
+    if (e.target.closest("[data-ladd]")) d.push({ id: "l" + Date.now().toString(36), name: `L${d.length + 1}`, grade: d[d.length - 1].grade });
+    else if (e.target.closest("[data-lup]")) d.splice(i - 1, 0, d.splice(i, 1)[0]);
+    else if (e.target.closest("[data-ldown]")) d.splice(i + 1, 0, d.splice(i, 1)[0]);
+    else if (e.target.closest("[data-ldel]")) d.splice(i, 1);
+    else return;
+    renderLensForm();
+  });
+  $("lgForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const lens = state.lensDraft.map(l => ({ ...l, name: l.name.trim() }));
+    if (lens.some(l => !l.name)) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
+    const v = voie(), keep = new Set(lens.map(l => l.id)), batch = state.db.batch();
+    for (const x of state.vues) if (!keep.has(x.longueurId)) batch.delete(state.db.collection("vues").doc(x.id));
+    batch.update(voieRef(v.id), { longueurs: lens, longueurIds: lens.map(l => l.id), grade: hardest(lens), updatedAt: Date.now(), updatedBy: state.me });
+    try { await batch.commit(); state.ovLen = null; state.ovVue = null; closeSheet(); toast("Longueurs enregistrées"); }
+    catch { $("eErr").textContent = "Enregistrement refusé : d'autres grimpeurs contribuent à cette voie, seul l'admin peut retirer une longueur."; }
+  });
+}
+// La vue d'un autre grimpeur porte une marque par personne qui s'en sert : son auteur ne peut plus la supprimer.
+function markVueUse(batch, vueId, uid, d) {
+  const vue = state.vues.find(x => x.id === vueId);
+  if (!vue || vue.authorId === uid) return;
+  const ref = state.db.collection("vues").doc(vueId);
+  if (d > 0) batch.set(ref.collection("utilisateurs").doc(uid), { createdAt: Date.now() }); else batch.delete(ref.collection("utilisateurs").doc(uid));
+  batch.update(ref, { foreignUses: state.db.increment(d) });
+}
+async function deleteMethod(m) {
+  const v = state.voies.find(x => x.id === m.voieId), batch = state.db.batch(), bump = {};
+  for (const x of m.vueIds || []) markVueUse(batch, x, m.authorId, -1);
+  batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
+  if (!m.isPrivate && v?.methodCount > 0) bump.methodCount = state.db.increment(-1);
+  if (v && m.authorId !== v.authorId && !(await hasOtherContribution(m.voieId, m.authorId, m.id))) {
+    const mark = contribRef(m.voieId, m.authorId);
+    if ((await mark.get()).exists) { batch.delete(mark); bump.foreignCount = state.db.increment(-1); }
+  }
+  if (Object.keys(bump).length) batch.update(voieRef(m.voieId), bump);
+  await batch.commit();
+}
+async function deleteVoie(v) {
+  const batch = state.db.batch();
+  for (const m of state.methodes) batch.delete(state.db.collection(m.isPrivate ? "methodesPrivees" : "methodes").doc(m.id));
+  if (isAdmin()) {
+    // L'admin emporte aussi les méthodes privées des autres et les marques de contribution.
+    (await state.db.collection("methodesPrivees").where("voieId", "==", v.id).get()).forEach(d => batch.delete(d.ref));
+    (await voieRef(v.id).collection("contributeurs").get()).forEach(d => batch.delete(d.ref));
+    await deleteVotes("voies", v.id);
+  }
+  for (const x of state.vues) { batch.delete(state.db.collection("vues").doc(x.id)); if (String(x.image || "").startsWith("photo:")) state.db.collection("photos").doc(x.image.slice(6)).delete().catch(() => {}); }
+  batch.delete(voieRef(v.id));
+  await batch.commit();
+  if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
+}
 
 /* ---------- fullscreen view & mental replay ---------- */
 function renderOFs() {
@@ -1178,8 +1654,12 @@ function renderOFs() {
   if (state.fsMode === "replay") {
     state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
     $("fsTitle").innerHTML = `${esc(v.name)} <small>méthode de ${esc(m?.climber || "?")}</small>`;
-    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "rp", replay: state.rp }), v.w / v.h);
-    const st = steps[state.rp];
+    const st = steps[state.rp], V = (st && findVue(v, vueIdOf(st))) || baseVue(v) || v, onVue = stepsOn(steps, V);
+    fsView.set(routeSVG(V, V.anchors || [], onVue, { uid: "rp", replay: st ? onVue.findIndex(s => s.x === st.x && s.y === st.y && s.t === st.t) : null }), V.w / V.h);
+    if (state.rpVue !== V.id) {
+      state.rpVue = V.id;
+      if (allVues(v).length > 1) { const b = $("rpVue"); b.textContent = vueTitle(v, V); b.hidden = false; clearTimeout(state.rpVueT); state.rpVueT = setTimeout(() => b.hidden = true, 1800); }
+    }
     let move = 0; for (let i = 0; i <= state.rp; i++) if (steps[i].t !== "clip") move++;
     const total = steps.filter(s => s.t !== "clip").length;
     let boltNo = 0; if (st && st.t === "clip") { const a = (v.anchors || [])[st.a]; boltNo = a && a.t === "relais" ? "R" : (v.anchors || []).slice(0, st.a + 1).filter(x => x.t !== "relais").length; }
@@ -1187,13 +1667,14 @@ function renderOFs() {
     rpChrome(state.rp, steps.length);
   } else {
     $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
-    fsView.set(routeSVG(v, v.anchors || [], steps, { uid: "fv" }), v.w / v.h);
+    const V = currentVue(v) || v;
+    fsView.set(routeSVG(V, V.anchors || [], stepsOn(steps, V), { uid: "fv" }), V.w / V.h);
   }
 }
 function focusStep() {
   const v = voie(), m = selMethod(); if (!v || !m) return;
   const st = mSteps(m)[state.rp]; if (!st) return;
-  const p = stepPoint(st, v.anchors || []);
+  const V = findVue(v, vueIdOf(st)) || v, p = stepPoint(st, V.anchors || []);
   fsView.focus(p.x, p.y, Math.max(fsView.s, 2.4));
 }
 function rpChrome(i, n) {
@@ -1215,18 +1696,33 @@ function startRoute(id) {
   $("oName").value = v?.name || ""; $("oAddedBy").value = v?.addedBy || accountFirstName(); $("oErr").textContent = ""; $("oePickErr").textContent = "";
   go("oedit");
 }
+function startVue(existing) {
+  const v = voie(); if (!v) return;
+  if (!state.me) { promptLogin("ajouter une vue"); return; }
+  state.oe = { kind: "route", vue: true, id: existing?.id || null, voieId: v.id, anchors: (existing?.anchors || []).map(a => ({ ...a })), tool: "bolt", photo: null, grade: v.grade };
+  $("oVueLabel").value = existing?.label || ""; $("oErr").textContent = ""; $("oePickErr").textContent = "";
+  $("oVueLen").innerHTML = longueursOf(v).map(l => `<option value="${esc(l.id)}">${esc(l.name)} · ${esc(l.grade)}</option>`).join("");
+  $("oVueLen").value = existing?.longueurId || currentLen(v).id;
+  go("oedit");
+}
 function startMethod() {
   const v = voie(); if (!v) return;
   const mine = myMethod();
-  state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand" };
+  const V = currentVue(v) || allVues(v)[0];
+  if (!V) { toast("Ajoutez d'abord une photo de la voie."); return; }
+  state.oe = { kind: "method", voieId: v.id, id: mine?.id || null, steps: mSteps(mine).map(s => ({ ...s })), tool: "hand", viewId: V.id };
   $("oClimber").value = mine?.climber || accountFirstName();
+  $(mine && !mine.isPrivate ? "oVisPublic" : "oVisPrivate").checked = true;
   $("oNote").value = mine?.note || ""; $("oErr").textContent = "";
   go("oedit");
 }
 function oeTarget() {
   const oe = state.oe; if (!oe) return null;
+  if (oe.vue && oe.id) return state.vues.find(x => x.id === oe.id);
   if (oe.kind === "route" && !oe.id) return oe.photo ? { w: oe.photo.w, h: oe.photo.h, image: oe.photo.preview } : null;
-  return oe.kind === "route" ? state.voies.find(v => v.id === oe.id) : state.voies.find(v => v.id === oe.voieId);
+  if (oe.kind === "route") return state.voies.find(v => v.id === oe.id);
+  const v = state.voies.find(x => x.id === oe.voieId);
+  return v && (findVue(v, oe.viewId) || baseVue(v));
 }
 function oTap(x, y) {
   const oe = state.oe, v = oeTarget(); if (!oe || !v) return;
@@ -1250,8 +1746,8 @@ function oTap(x, y) {
       const ex = oe.steps.findIndex(s => s.t === "clip" && s.a === ai);
       if (ex >= 0) insRemove(oe, oe.steps, ex); else insAdd(oe, oe.steps, { t: "clip", a: ai, x: anchors[ai].x, y: anchors[ai].y });
     } else {
-      const hit = oe.steps.findIndex(s => s.t !== "clip" && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
-      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool });
+      const hit = oe.steps.findIndex(s => s.t !== "clip" && vueIdOf(s) === oe.viewId && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
+      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool, ...(oe.viewId === BASE_VUE ? {} : { viewId: oe.viewId }) });
     }
   }
   $("oErr").textContent = ""; renderOE();
@@ -1285,20 +1781,25 @@ $("oGrades").addEventListener("click", e => { const b = e.target.closest("[data-
 function renderOE() {
   const oe = state.oe; if (!oe) return;
   const v = oeTarget(), isRoute = oe.kind === "route";
-  $("oeTitle").textContent = isRoute ? (oe.id ? "Modifier les points" : "Nouvelle voie") : `Ma méthode${voie() ? " · " + voie().name : ""}`;
-  $("oeHint").textContent = isRoute
+  $("oeTitle").textContent = oe.vue ? (oe.id ? "Modifier la vue" : "Ajouter une vue") : isRoute ? (oe.id ? "Modifier les points" : "Nouvelle voie") : `Ma méthode${voie() ? " · " + voie().name : ""}`;
+  $("oeHint").textContent = oe.vue ? "Touchez les points d'ancrage visibles sur cette photo, du bas vers le haut. Ils sont propres à cette vue." : isRoute
     ? "Touchez chaque point d'ancrage du bas vers le haut, puis le relais. Ces repères sont communs à tous les grimpeurs."
     : "Touchez mains et pieds dans l'ordre où vous les prenez. Vous pouvez enregistrer une partie et compléter à la prochaine sortie.";
   $("oePick").hidden = !(isRoute && !oe.id && !oe.photo);
   $("oeWork").hidden = !$("oePick").hidden;
-  $("oeRouteF").hidden = !isRoute; $("oeMethF").hidden = isRoute;
-  $("oSave").textContent = isRoute ? (oe.id ? "Enregistrer les points" : "Publier la voie") : "Enregistrer ma méthode";
+  $("oeRouteF").hidden = !isRoute || !!oe.vue; $("oeVueF").hidden = !oe.vue; $("oeMethF").hidden = isRoute;
+  $("oGradeF").hidden = isRoute && !oe.vue && longueursOf(oeTarget() || {}).length > 1;
+  $("oSave").textContent = oe.vue ? "Enregistrer la vue" : isRoute ? (oe.id ? "Enregistrer les points" : "Publier la voie") : "Enregistrer ma méthode";
   if (isRoute) renderOGrades();
   renderOETools();
   if (!v) return;
   $("oeWall").style.aspectRatio = `${v.w} / ${v.h}`;
-  const anchors = isRoute ? oe.anchors : v.anchors || [], steps = isRoute ? [] : oe.steps;
-  const mk = oe.insertAt == null ? -1 : oe.insertAt - 1, marks = isRoute ? { markA: mk } : { markS: mk };
+  const anchors = isRoute ? oe.anchors : v.anchors || [], steps = isRoute ? [] : stepsOn(oe.steps, v);
+  const mk = oe.insertAt == null ? -1 : oe.insertAt - 1, marks = isRoute ? { markA: mk } : { markS: -1 };
+  if (!isRoute && mk >= 0) marks.markS = steps.findIndex(s => { const g = oe.steps[mk]; return g && s.x === g.x && s.y === g.y && s.t === g.t; });
+  const voieDoc = !isRoute && state.voies.find(x => x.id === oe.voieId), vues = voieDoc ? allVues(voieDoc) : [];
+  $("oeVues").hidden = vues.length < 2;
+  $("oeVues").innerHTML = vues.map(x => `<button class="chip" type="button" data-oev="${esc(x.id)}" aria-pressed="${x.id === oe.viewId}">${esc(vueTitle(voieDoc, x))}</button>`).join("");
   oView.set(routeSVG(v, anchors, steps, { uid: "oe", ...marks }), v.w / v.h);
   if (state.fsMode === "oedit") fsView.set(routeSVG(v, anchors, steps, { uid: "of", ...marks }), v.w / v.h);
 }
@@ -1308,6 +1809,10 @@ $("oeFile").addEventListener("change", async e => {
   try { state.oe.photo = await prepPhoto(f); renderOE(); oView.layout(true); } catch { $("oePickErr").textContent = "Cette photo n'a pas pu être lue. Essayez-en une autre."; }
 });
 $("oeFull").addEventListener("click", () => openFs("oedit"));
+$("oeVues").addEventListener("click", e => {
+  const c = e.target.closest("[data-oev]"); if (!c || !state.oe) return;
+  state.oe.viewId = c.dataset.oev; renderOE(); oView.layout(true);
+});
 $("oCancel").addEventListener("click", () => { const oe = state.oe; state.oe = null; oe && (oe.voieId || oe.id) ? go("ovoie") : go("olist"); });
 $("oForm").addEventListener("submit", async e => {
   e.preventDefault();
@@ -1315,12 +1820,20 @@ $("oForm").addEventListener("submit", async e => {
   if (!state.me) { askLogin("oErr", "enregistrer"); return; }
   $("oSave").disabled = true;
   try {
-    if (oe.kind === "route") {
+    if (oe.vue) {
+      const label = $("oVueLabel").value.trim(), longueurId = $("oVueLen").value;
+      if (!label) throw { msg: "Donnez un libellé à la vue." };
+      if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
+      const id = await saveVue(oe, label, longueurId);
+      state.oe = null; state.ovLen = longueurId; state.ovVue = id; $("oErr").textContent = ""; toast("Vue enregistrée"); openVoie(oe.voieId);
+    } else if (oe.kind === "route") {
       const name = $("oName").value.trim(), addedBy = $("oAddedBy").value.trim();
       if (!name) throw { msg: "Donnez un nom à la voie." };
       if (!addedBy) throw { msg: "Indiquez votre prénom." };
       if (!oe.anchors.length) throw { msg: "Placez au moins un point d'ancrage." };
-      if (oe.id) { await state.db.collection("voies").doc(oe.id).update({ name, grade: oe.grade, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
+      if (oe.id) {
+        const cur = state.voies.find(x => x.id === oe.id), lens = cur?.longueurs, multi = lens?.length > 1;
+        await state.db.collection("voies").doc(oe.id).update({ name, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me, ...(multi ? {} : { grade: oe.grade }), ...(lens?.length === 1 ? { longueurs: [{ ...lens[0], grade: oe.grade }] } : {}) }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
       else {
         $("oErr").textContent = "Envoi de la photo…";
         const a = await state.assets.upload(oe.photo.blob);
@@ -1331,14 +1844,60 @@ $("oForm").addEventListener("submit", async e => {
       const climber = $("oClimber").value.trim(), note = $("oNote").value.trim();
       if (!oe.steps.length) throw { msg: "Placez au moins une prise." };
       if (!climber) throw { msg: "Indiquez votre prénom." };
-      let id = oe.id;
-      if (id) await state.db.collection("methodes").doc(id).update({ climber, note, steps: oe.steps, updatedAt: Date.now(), updatedBy: state.me });
-      else { const ref = await state.db.collection("methodes").add({ voieId: oe.voieId, secteurId: state.secteurId, authorId: state.me, climber, note, steps: oe.steps, createdAt: Date.now(), updatedAt: Date.now() }); id = ref.id; bumpCount(oe.voieId, 1); }
+      const id = await saveMethod(oe, { climber, note, steps: oe.steps }, $("oVisPrivate").checked);
       state.oe = null; toast("Méthode enregistrée"); openVoie(voie()?.id || state.voieId, id);
     }
   } catch (err) { $("oErr").textContent = err && err.msg ? err.msg : "Enregistrement impossible pour l'instant. Réessayez."; }
   finally { $("oSave").disabled = false; }
 });
+
+/* ---------- commune : liste officielle (geo.api.gouv.fr) ---------- */
+const simplify = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\bst\b/g, "saint").replace(/\bste\b/g, "sainte");
+const communeLabel = c => c.departement ? `${c.nom} (${c.departement})` : c.nom;
+const unverified = x => x.commune?.verifie === false ? " · commune non vérifiée" : "";
+function communePicker(input, box, onPick = () => {}) {
+  let picked = null, down = false, timer = null, query = "", running = Promise.resolve(), seq = 0;
+  const lookup = async q => {
+    const my = ++seq;
+    try {
+      const r = await fetch(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(q)}&fields=nom,code,codeDepartement,centre&boost=population&limit=20`, { signal: AbortSignal.timeout(4000) });
+      if (!r.ok) throw new Error(r.status);
+      const list = await r.json();
+      if (my !== seq) return;
+      down = false;
+      box.style.cssText = "max-height:220px;overflow-y:auto";
+      box.innerHTML = list.map((c, i) => `<button class="gymrow" type="button" data-commune="${i}"><span><b>${esc(c.nom)}</b></span><small>${esc(c.codeDepartement)}</small></button>`).join("");
+      box.onclick = e => {
+        const b = e.target.closest("[data-commune]"); if (!b) return;
+        const c = list[+b.dataset.commune], [lon, lat] = c.centre?.coordinates || [];
+        picked = { nom: c.nom, code: c.code, departement: c.codeDepartement, lat: lat ?? null, lon: lon ?? null, simple: simplify(c.nom), verifie: true };
+        input.value = communeLabel(picked); box.innerHTML = ""; onPick(picked);
+      };
+    } catch {
+      if (my !== seq) return;
+      down = true;
+      box.innerHTML = `<div class="note">Service des communes indisponible : votre saisie sera enregistrée comme « commune non vérifiée ».</div>`;
+    }
+  };
+  input.addEventListener("input", () => {
+    picked = null; onPick(null); clearTimeout(timer); timer = null;
+    query = simplify(input.value);
+    if (query.length < 2) { seq++; box.innerHTML = ""; return; }
+    timer = setTimeout(() => { timer = null; running = lookup(query); }, 200);
+  });
+  return {
+    // Attend la réponse en cours : sans elle, on ne sait pas encore si le service répond.
+    async check() {
+      if (timer) { clearTimeout(timer); timer = null; running = lookup(query); }
+      await running;
+    },
+    get() {
+      if (picked) return picked;
+      const nom = input.value.trim();
+      return down && nom ? { nom, simple: simplify(nom), verifie: false } : null;
+    },
+  };
+}
 
 /* ---------- sector sheet ---------- */
 function renderSectorSheet() {
@@ -1346,38 +1905,46 @@ function renderSectorSheet() {
   if (state.sheet === "newsector") {
     s.innerHTML = `<h2 id="sheetTitle">Nouveau secteur</h2>
       <div class="field"><label class="label" for="nsName">Nom du secteur</label><input id="nsName" maxlength="50" placeholder="Nom du secteur sur le topo" autocomplete="off"></div>
-      <div class="field"><label class="label" for="nsRegion">Site ou commune</label><input id="nsRegion" maxlength="40" placeholder="Site ou commune" autocomplete="off"></div>
+      <div class="field"><label class="label" for="nsRegion">Commune</label><input id="nsRegion" maxlength="60" placeholder="ex. Saint-Antonin-Noble-Val" autocomplete="off"><div id="nsRegionBox" class="gymlist"></div></div>
+      <div id="nsKnown" hidden style="display:grid;gap:8px"></div>
       <div class="err" id="sErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-sect-create>Créer le secteur</button><button class="btn ghost" type="button" data-sheet="sectors">Annuler</button></div>`;
+    state.nsPicker = communePicker($("nsRegion"), $("nsRegionBox"), c => {
+      const known = c ? state.secteurs.filter(x => x.commune?.code === c.code || simplify(x.region) === c.simple) : [];
+      $("nsKnown").hidden = !known.length;
+      $("nsKnown").innerHTML = known.length ? `<div class="label">Déjà référencés à ${esc(c.nom)} :</div>${known.map(x => `<button class="gymrow" type="button" data-sect="${esc(x.id)}"><span><b>${esc(x.name)}</b></span><small>Choisir</small></button>`).join("")}` : "";
+    });
     return;
   }
   s.innerHTML = `<h2 id="sheetTitle">Secteurs de falaise</h2>
-    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
+    <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}${unverified(x)}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newsector">+ Ajouter un secteur</button></section>
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", async e => {
-  const sb = e.target.closest("[data-sect]"); if (sb) { switchSecteur(sb.dataset.sect); closeSheet(); return; }
+  const sb = e.target.closest("[data-sect]"); if (sb) { const after = state.afterPick; openPlace("secteur", sb.dataset.sect); closeSheet(); if (after) $("tabCreate").click(); return; }
   if (e.target.closest("[data-sect-create]")) {
-    const name = $("nsName").value.trim(), region = $("nsRegion").value.trim();
+    const name = $("nsName").value.trim();
     if (!name) { $("sErr").textContent = "Donnez un nom au secteur."; return; }
     if (!state.me) { askLogin("sErr", "créer un secteur"); return; }
-    try { const ref = await state.db.collection("secteurs").add({ name, region, authorId: state.me || null, createdAt: Date.now() }); switchSecteur(ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
+    await state.nsPicker.check();
+    const commune = state.nsPicker.get();
+    if (!commune) { $("sErr").textContent = "Choisissez une commune dans la liste."; return; }
+    try { const ref = await state.db.collection("secteurs").add({ name, region: communeLabel(commune), commune, authorId: state.me || null, createdAt: Date.now() }); state.secteurs.push({ id: ref.id, name, region: communeLabel(commune), commune }); openPlace("secteur", ref.id); closeSheet(); toast(`Secteur ${name} créé`); }
     catch { $("sErr").textContent = "La création a échoué. Réessayez."; }
   }
 });
 
 /* ---------- correction des noms par l'admin ---------- */
 const EDITS = {
-  gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 30, false]] },
-  secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 40, false]] },
+  gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 60, false]], commune: "city" },
+  secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 60, false]], commune: "region" },
   voies: { title: "Modifier la voie", items: () => state.voies, fields: [["name", "Nom de la voie", 50, true], ["addedBy", "Ajoutée par", 30, true]], grade: true },
   blocs: { title: "Modifier l'ouvreur", items: () => state.blocs, fields: [["setter", "Ouvert par", 30, true]] },
   methodes: { title: "Modifier le prénom", items: () => state.methodes, fields: [["climber", "Grimpeur", 30, true]] },
 };
 const withEdit = (col, x, row) => isAdmin() ? `<div style="display:flex;gap:8px"><div style="flex:1;min-width:0;display:grid">${row}</div><button class="btn ghost small" type="button" data-edit="${col}:${esc(x.id)}" aria-label="Modifier « ${esc(x.name)} »">Modifier</button></div>` : row;
 function openEdit(col, id) { if (!EDITS[col]?.items().some(x => x.id === id)) return; state.editing = { col, id }; $("sheet").innerHTML = ""; openSheet("edit"); }
-const looseName = s => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 function renderEditSheet() {
   const { col, id } = state.editing, key = col + ":" + id, spec = EDITS[col], x = spec.items().find(i => i.id === id);
   if ($("eForm")?.dataset.key === key) return; // Une mise à jour en direct n'efface pas la saisie en cours.
@@ -1385,14 +1952,16 @@ function renderEditSheet() {
   $("sheet").innerHTML = `<h2 id="sheetTitle">${spec.title}</h2>
     <form id="eForm" data-key="${esc(key)}" novalidate style="display:grid;gap:14px">
       ${spec.fields.map(([f, label, max]) => `<div class="field"><label class="label" for="e_${f}">${label}</label><input id="e_${f}" maxlength="${max}" value="${esc(x[f] || "")}" autocomplete="off"></div>`).join("")}
-      ${spec.grade ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
+      ${spec.grade && !(x.longueurs?.length > 1) ? `<div class="field"><span class="label">Cotation</span><div class="grades" id="eGrades" data-grade="${esc(x.grade || "")}">${GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${x.grade === g}">${g}</button>`).join("")}</div></div>` : ""}
+      <div id="eCommuneBox" class="gymlist"></div>
       <div class="note" id="eWarn" hidden>Un autre secteur porte déjà ce nom dans cette commune.</div>
       <div class="err" id="eErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="submit">Enregistrer</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>
     </form>`;
-  const warn = () => { if (col !== "secteurs") return; const n = looseName($("e_name").value), r = looseName($("e_region").value); $("eWarn").hidden = !state.secteurs.some(s => s.id !== id && looseName(s.name) === n && looseName(s.region) === r); };
+  const warn = () => { if (col !== "secteurs") return; const n = simplify($("e_name").value), r = simplify($("e_region").value); $("eWarn").hidden = !state.secteurs.some(s => s.id !== id && simplify(s.name) === n && simplify(s.region) === r); };
   warn();
   $("eForm").addEventListener("input", warn);
+  const picker = spec.commune ? communePicker($("e_" + spec.commune), $("eCommuneBox"), warn) : null;
   $("eGrades")?.addEventListener("click", e => { const c = e.target.closest("[data-g]"); if (!c) return; $("eGrades").dataset.grade = c.dataset.g; $("eGrades").querySelectorAll("[data-g]").forEach(b => b.setAttribute("aria-pressed", b === c)); });
   $("eForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -1401,7 +1970,13 @@ function renderEditSheet() {
       p[f] = $("e_" + f).value.trim();
       if (required && !p[f]) { $("eErr").textContent = "Ce champ ne peut pas être vide."; return; }
     }
-    if (spec.grade) p.grade = $("eGrades").dataset.grade;
+    if (spec.grade && $("eGrades")) { p.grade = $("eGrades").dataset.grade; if (x.longueurs?.length === 1) p.longueurs = [{ ...x.longueurs[0], grade: p.grade }]; }
+    if (picker && p[spec.commune] !== (x[spec.commune] || "")) {
+      await picker.check();
+      const c = picker.get();
+      if (p[spec.commune] && !c) { $("eErr").textContent = "Choisissez une commune dans la liste."; return; }
+      p.commune = c; if (c) p[spec.commune] = communeLabel(c);
+    }
     try { await state.db.collection(col).doc(id).update(p); closeSheet(); toast("Modification enregistrée"); }
     catch { $("eErr").textContent = "Enregistrement impossible pour l'instant. Réessayez."; }
   });
@@ -1509,7 +2084,7 @@ function subscribeDrafts() {
 BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
 BT.onUser(u => {
   state.me = u ? u.uid : null;
-  renderAcct(); subscribeDrafts(); subscribeRoles(); renderEditorChrome();
+  renderAcct(); subscribeDrafts(); subscribeRoles(); subscribeMethods(state.voieId); renderEditorChrome();
   syncNames();
   if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
   rerender();
@@ -1533,7 +2108,7 @@ document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.
 
 /* ---------- boot ---------- */
 try { localStorage.removeItem("pan-setter"); } catch {}
-renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "out" ? "olist" : "list"); renderHeader();
+renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
 
 (async () => {
   const [db, user, assets] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("assets")]);
@@ -1541,7 +2116,7 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
   if (!db) { state.loaded = state.oLoaded = true; $("offline").hidden = false; renderHeader(); renderList(); if (state.mode === "out") renderOList(); return; }
   db.collection("secteurs").onSnapshot(sn => {
     state.secteurs = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
-    if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); }
+    if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); bootRoute(); }
     rerender();
   }, () => {});
   if (user) {
@@ -1556,9 +2131,11 @@ renderGrades(); renderTools(); renderEditorChrome(); go(lsGet("pan-mode") === "o
       state.loaded = true;
       if (!state.gyms.some(g => g.id === state.gymId)) state.gymId = state.gyms[0]?.id || null;
       if (state.gymId) switchGym(state.gymId); else rerender();
+      bootRoute();
     } else rerender();
   };
   const fail = () => { $("offline").hidden = false; };
+  db.collection("voies").get().then(s => { const known = new Set(state.allVoies.map(v => v.id)); state.allVoies.push(...s.docs.filter(d => !known.has(d.id)).map(d => ({ id: d.id, ...d.data() }))); rerender(); }).catch(() => {});
   db.collection("gyms").onSnapshot(s => { state.gyms = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); gotG = true; ready(); }, fail);
   db.collection("walls").onSnapshot(s => { state.walls = s.docs.map(d => ({ id: d.id, ...d.data() })); gotW = true; ready(); }, fail);
 })();
