@@ -21,7 +21,8 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - `npm run dev` : émulateurs (Auth, Firestore sur :8085, Hosting sur http://localhost:5000, UI sur :4000). Jamais de données de prod en local.
 - `npm test` : règles Firestore puis E2E Playwright (Pixel 7 + iPhone 14). Nécessite Java 21.
 - `npm run test:rules` / `npm run test:e2e` séparément.
-- Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → déployée sur l'environnement de test https://toposhare-test.web.app (projet `toposhare-test`, données fictives remises à zéro à chaque déploiement, une seule URL : la dernière PR déployée s'affiche, voir le bandeau). Le job `preview` n'a aucun accès à la prod.
+- Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → déployée sur l'environnement de test https://toposhare-test.web.app (projet `toposhare-test`, remis à zéro à chaque déploiement, une seule URL : la dernière PR déployée s'affiche, voir le bandeau). Le job `preview` n'a aucun accès à la prod.
+- Données du site de test : la référence figée (données publiques de la prod, collection `reference` du projet de test, jamais dans Git) plus le jeu fictif. Pour la rafraîchir : action « Figer la référence » dans l'onglet Actions, lecture de la prod sans clé. Votes, méthodes privées, avis, brouillons, propriétaires et contributeurs ne sont pas copiés.
 
 ## Navigation
 Accueil, lieu en cours et bouton de création. Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.

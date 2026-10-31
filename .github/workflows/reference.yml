@@ -1,0 +1,36 @@
+# Fige les données publiques de la prod comme référence du site de test. À lancer à la main depuis l'onglet Actions.
+# Aucune clé de prod ici : la lecture se fait comme un visiteur sans compte.
+name: Figer la référence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    # Même file que les déploiements de PR, pour ne pas remettre le site à zéro pendant l'un d'eux.
+    concurrency:
+      group: preview
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Clé du projet de test
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TOPOSHARE_TEST }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Figer les données publiques
+        run: node scripts/freeze-reference.mjs
+
+      - name: Remettre le site de test à zéro depuis cette référence
+        run: node scripts/seed-preview.mjs

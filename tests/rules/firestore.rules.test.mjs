@@ -623,3 +623,15 @@ describe('Avis', () => {
     await assertSucceeds(owner().doc('feedback/f1').get());
   });
 });
+
+describe('Référence du site de test', () => {
+  test("l'appli ne lit ni n'écrit la référence, même en admin : seule la clé de service y accède", async () => {
+    await seed('reference/voies/docs/v1', { name: 'Voie' });
+    await assertSucceeds(env.withSecurityRulesDisabled(ctx => ctx.firestore().doc('reference/voies/docs/v1').get()));
+    for (const db of [anon(), user('alice'), owner()]) {
+      await assertFails(db.doc('reference/voies/docs/v1').get());
+      await assertFails(db.collection('reference/voies/docs').get());
+      await assertFails(db.doc('reference/voies/docs/v1').set({ name: 'Autre' }));
+    }
+  });
+});
