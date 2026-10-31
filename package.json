@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "firebase emulators:start --project betatheque",
     "test": "npm run test:config && npm run test:rules && npm run test:e2e",
-    "test:config": "node --test tests/config/config.test.mjs",
+    "test:config": "node --test tests/config/config.test.mjs tests/config/reference.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-toposhare \"node --test tests/rules/firestore.rules.test.mjs\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project betatheque \"playwright test\"",
     "deploy": "firebase deploy",

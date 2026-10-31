@@ -1,21 +1,15 @@
-// Remet à zéro le projet de test et y écrit un jeu de données entièrement fictif. Lancé par la CI après chaque déploiement de prévisualisation.
+// Remet à zéro le projet de test : données publiques figées de la prod (voir freeze-reference.mjs) et jeu de données fictif. Lancé par la CI après chaque déploiement de prévisualisation.
 // Usage : GOOGLE_APPLICATION_CREDENTIALS=clé-du-projet-de-test.json node scripts/seed-preview.mjs
 import { readFileSync } from 'node:fs';
 import { applicationDefault, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { PUBLIC_COLLECTIONS, TEST_PROJECT, referenceDocs, requireTestKey } from './reference-lib.mjs';
 
-const PROJECT = 'toposhare-test';
+// La collection reference n'est pas dans cette liste : elle survit à la remise à zéro.
 const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'vues', 'photos', 'votes', 'feedback', 'data'];
 
-// Ce script efface toute la base : il refuse de tourner avec une autre clé que celle du projet de test.
-const keyFile = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const keyProject = keyFile && JSON.parse(readFileSync(keyFile, 'utf8')).project_id;
-if (keyProject !== PROJECT) {
-  console.error(`Refusé : ce script ne s'exécute que sur ${PROJECT} (clé reçue : ${keyProject || 'aucune'}).`);
-  process.exit(1);
-}
-
-initializeApp({ credential: applicationDefault(), projectId: PROJECT });
+requireTestKey();
+initializeApp({ credential: applicationDefault(), projectId: TEST_PROJECT });
 const db = getFirestore();
 
 const AUTHOR = 'grimpeur-fictif', NOW = Date.now();
@@ -53,8 +47,13 @@ const DATA = {
 };
 
 for (const col of COLLECTIONS) await db.recursiveDelete(db.collection(col));
+for (const col of PUBLIC_COLLECTIONS) {
+  const docs = await referenceDocs(db, col).get();
+  for (const d of docs.docs) await db.collection(col).doc(d.id).set(d.data());
+  console.log(`référence ${col} : ${docs.size}`);
+}
 for (const [col, docs] of Object.entries(DATA)) {
   for (const [id, doc] of Object.entries(docs)) await db.collection(col).doc(id).set(doc);
-  console.log(`${col} : ${Object.keys(docs).length}`);
+  console.log(`fictif ${col} : ${Object.keys(docs).length}`);
 }
-console.log(`Jeu de test écrit dans ${PROJECT}.`);
+console.log(`Site de test remis à zéro dans ${TEST_PROJECT}.`);

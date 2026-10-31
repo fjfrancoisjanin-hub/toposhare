@@ -67,7 +67,7 @@ jobs:
       - name: Site et règles sur le projet de test
         run: npx firebase deploy --config firebase.preview.json --only hosting,firestore:rules --project toposhare-test --non-interactive
 
-      - name: Jeu de données fictif
+      - name: Référence figée et jeu de données fictif
         run: node scripts/seed-preview.mjs
 
       - name: Contrôle du site en ligne
