@@ -13,6 +13,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 ## Fichiers
 - `public/index.html` : l'appli (un seul fichier, ~110 Ko).
 - `public/admin.html` : `/admin`, suivi d'activité, avis, import du seed, modération. Réservé à l'admin.
+- `public/mesure.js` : mesure d'audience Umami, chargée sur `toposhare.web.app` seulement. Seuls le slug de la salle (identifiant du secteur pour une voie) et le type partent dans les événements.
 - `public/config.js` : config Firebase (publique par nature), prod seulement sur les adresses listées, projet de test partout ailleurs. Tout nouveau domaine de prod doit y être ajouté. Contient aussi l'e-mail de l'admin.
 - `firestore.rules` : seule vraie barrière de sécurité. Tout changement de règle = test dans `tests/rules/`.
 - `redirect/` : site `betatheque` qui redirige.
@@ -26,6 +27,15 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 
 ## Navigation
 Accueil, lieu en cours et bouton de création. Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
+
+## Mesure d'audience
+Tableau de bord : Umami Cloud. Le suivi automatique est coupé, chaque écran est envoyé depuis `go()`, avec des adresses `/salle/id`, `/bloc/id`, etc. QR code d'une salle : `/?src=qr#/salle/id` (`docs/qr/`, régénéré par `node scripts/make-qr.mjs <slug>`).
+
+**Exclure ses propres visites :** Umami ignore un navigateur qui porte la marque `umami.disabled`. À faire une fois par navigateur et par appareil, sur `https://toposhare.web.app`, puis recharger :
+- **Ordinateur :** F12, onglet Console, taper `localStorage.setItem('umami.disabled', '1')`.
+- **Android (Chrome) :** sur le site, taper dans la barre d'adresse `javascript:localStorage.setItem('umami.disabled','1');location.reload()` (Chrome retire `javascript:` au collage : le retaper).
+- **iPhone :** pas de console ; passer par l'inspecteur web de Safari sur un Mac.
+- **Vérifier :** dans l'onglet Réseau, plus aucun appel vers `gateway.umami.is`. Vider les données du site efface la marque. Pour la retirer : `localStorage.removeItem('umami.disabled')`.
 
 ## Modèle de données (collections)
 `gyms` et `secteurs` (commune dans `commune`, libellé dans `city` / `region`), `walls` (photo du mur d'une salle), `blocs`, `voies` (champ `methodCount`), `methodes` (publiques), `methodesPrivees` (auteur et admin seuls ; changer de visibilité déplace le document), `voies/{id}/contributeurs/{uid}` (marque + `foreignCount` : si d'autres grimpeurs ont contribué, seul l'admin supprime la voie), `vues` (les prises d'une méthode portent `viewId`, absent = vue d'ensemble, et la méthode liste `vueIds` ; photos supplémentaires d'une voie, par longueur ; la photo portée par la voie est la « vue d'ensemble » ; une voie sans `longueurs` vaut L1), `photos`, `votes/{kind__cible__uid}` (auteur et admin seuls ; `ratingCount` et `ratingSum` sur la cible ne bougent qu'avec le vote, dans le même lot), `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).

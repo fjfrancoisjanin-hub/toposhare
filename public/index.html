@@ -448,6 +448,7 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="/config.js"></script>
+<script src="/mesure.js"></script>
 <script src="/firebase-shim.js"></script>
 <script>
 const GRADES = ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8a+","8b","8b+","8c","8c+","9a","9a+","9b","9b+","9c"];
@@ -765,6 +766,7 @@ $("form").addEventListener("submit", async e => {
     else {
       const ref = await state.db.collection("blocs").add({ ...p, gymId: state.gymId, wallId: w.id, authorId: state.me || null, createdAt: Date.now() });
       id = ref.id;
+      TS_MESURE.event("bloc_cree", { salle: state.gymId, type: "bloc" });
       if (ed.kind === "draft") { try { await draftsCol().doc(ed.id).delete(); } catch {} }
     }
     clearEditor(); restoreLocal();
@@ -881,7 +883,7 @@ function renderDetail() {
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
 $("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
-$("dReplay").addEventListener("click", () => openFs("breplay"));
+$("dReplay").addEventListener("click", () => { TS_MESURE.event("replay_lance", { salle: salleMesure(), type: "bloc" }); openFs("breplay"); });
 
 /* ---------- bloc replay: départ → mains dans l'ordre → top ---------- */
 function blocSteps(holds) {
@@ -1153,7 +1155,7 @@ async function routeFromHash() {
   } catch { gone(); }
 }
 window.addEventListener("hashchange", () => { if (state.booted) routeFromHash(); });
-function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); routeFromHash(); }
+function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); const routed = /^#\/(salle|secteur|voie|bloc)\//.test(location.hash); routeFromHash(); if (!routed) trackScreen(); }
 
 /* ---------- navigation ---------- */
 const VIEWS = { home: "vHome", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
@@ -1174,6 +1176,23 @@ function go(v) {
   if (v === "create") { renderEditor(); editView.layout(true); }
   if (v === "detail") renderDetail();
   window.scrollTo(0, 0);
+  trackScreen();
+}
+// Mesure d'audience : un lien direct enchaîne plusieurs écrans d'un coup, seul le dernier compte.
+const salleMesure = () => state.mode === "out" ? state.secteurId : state.gymId;
+const typeMesure = () => state.mode === "out" ? "voie" : "bloc";
+let lastScreen = null, screenTimer = 0;
+function trackScreen() {
+  if (!state.booted) return;
+  clearTimeout(screenTimer);
+  screenTimer = setTimeout(() => {
+    const v = state.view, id = v === "detail" ? state.current : v === "ovoie" ? state.voieId : salleMesure();
+    const screen = { home: "/", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
+    if (!screen || screen === lastScreen) return;
+    lastScreen = screen;
+    TS_MESURE.page(screen);
+    if (v === "detail" || v === "ovoie") TS_MESURE.event("bloc_ouvert", { salle: salleMesure(), type: typeMesure() });
+  }, 0);
 }
 $("tabHome").onclick = () => go("home");
 $("tabPlace").onclick = () => { const p = currentPlace(); if (p) openPlace(p.type, p.id); };
@@ -1415,7 +1434,7 @@ $("ovWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key ==
 $("ovActions").addEventListener("click", async e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
-  if (a === "replay") { state.rpVue = null; openFs("replay"); }
+  if (a === "replay") { TS_MESURE.event("replay_lance", { salle: salleMesure(), type: "voie" }); state.rpVue = null; openFs("replay"); }
   if (a === "newm" || a === "editm") startMethod();
   if (a === "editr") startRoute(state.voieId);
   if (a === "addvue") startVue();
@@ -1838,6 +1857,7 @@ $("oForm").addEventListener("submit", async e => {
         $("oErr").textContent = "Envoi de la photo…";
         const a = await state.assets.upload(oe.photo.blob);
         const ref = await state.db.collection("voies").add({ secteurId: state.secteurId, name, grade: oe.grade, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, addedBy, methodCount: 0, createdAt: Date.now() });
+        TS_MESURE.event("bloc_cree", { salle: state.secteurId, type: "voie" });
         state.oe = null; $("oErr").textContent = ""; toast("Voie publiée. Ajoutez maintenant votre méthode."); openVoie(ref.id);
       }
     } else {
@@ -2024,6 +2044,7 @@ function renderAcctSheet() {
         <li><span><b>Votre travail est gardé.</b> Les prises déjà posées restent en place pendant la connexion.</span></li>
       </ul>
       <p class="note" style="margin:0">Google affiche ensuite sa page de connexion avec l'adresse « betatheque.firebaseapp.com » : c'est l'adresse technique de TopoShare.</p>
+      <p class="note" style="margin:0">Mesure d'audience anonyme, sans cookies (Umami)</p>
       <div class="err" id="sErr"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn gbtn" type="button" data-login-go><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>Continuer avec Google</button>
@@ -2047,6 +2068,7 @@ function renderAcctSheet() {
       ${u && u.email === window.BT_OWNER_EMAIL ? `<a class="btn ghost small" href="/admin" style="text-decoration:none">Suivi d'activité</a>` : ""}
       <button class="btn danger small" type="button" data-signout>Se déconnecter</button>
     </div>
+    <p class="note" style="margin:0">Mesure d'audience anonyme, sans cookies (Umami)</p>
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", async e => {

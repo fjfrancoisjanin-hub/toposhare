@@ -150,6 +150,7 @@ test('le QR code généré sur /admin mène à la bonne salle', async ({ page },
     return jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height)?.data;
   });
   expect(new URL(url).hash).toBe(`#/salle/g-${id}`);
+  expect(new URL(url).search).toBe('?src=qr');
   await page.goto(url);
   await expect(card(page, `Bloc ${id}`)).toBeVisible({ timeout: 15_000 });
 });

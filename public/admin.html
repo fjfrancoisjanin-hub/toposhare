@@ -227,7 +227,7 @@ function renderQrPlaces() {
 $("qrMake").onclick = () => {
   const [type, id] = $("qrPlace").value.split(/:(.*)/s); if (!id) return;
   const x = D.all[type === "salle" ? 0 : 3].find(p => p.id === id);
-  const qr = qrcode(0, "M"); qr.addData(`${location.origin}/#/${type}/${id}`); qr.make();
+  const qr = qrcode(0, "M"); qr.addData(`${location.origin}/?src=qr#/${type}/${id}`); qr.make();
   const poster = $("poster");
   poster.innerHTML = `<img src="/logo.svg" alt="TopoShare" style="height:64px"><h1 style="font-size:32px">${esc(x.name)}</h1><img id="qrImg" alt="QR code" style="width:280px;height:280px;image-rendering:pixelated" src="${qr.createDataURL(10, 4)}"><p style="font-size:18px;margin:0">Sans compte, sans appli à installer</p>`;
   poster.hidden = false; $("qrPrint").hidden = false;

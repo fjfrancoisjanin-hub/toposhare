@@ -266,6 +266,7 @@
     ["Connecté en tant que", "Signed in as", "Sesión iniciada como"],
     ["Suivi d'activité", "Activity", "Actividad"],
     ["Se déconnecter", "Sign out", "Cerrar sesión"],
+    ["Mesure d'audience anonyme, sans cookies (Umami)", "Anonymous audience measurement, no cookies (Umami)", "Medición de audiencia anónima, sin cookies (Umami)"],
     ["Déconnecté", "Signed out", "Sesión cerrada"],
     ["Écrivez votre message avant d'envoyer.", "Write your message before sending.", "Escribe tu mensaje antes de enviarlo."],
     ["Merci, votre avis est bien arrivé", "Thanks, your feedback was received", "Gracias, hemos recibido tu opinión"],
