@@ -23,14 +23,17 @@
   auth.languageCode = "fr";
 
   const listeners = [], photoListeners = [];
-  let initial = true;
+  let initial = true, counted = null;
+  // Une connexion compte une fois, qu'elle passe par une fenêtre ou par une redirection. Aucune donnée sur le compte n'est envoyée.
+  const countLogin = u => { if (u && u.uid !== counted) { counted = u.uid; window.TS_MESURE?.event("connexion"); } };
   const ready = new Promise(res => {
     auth.onAuthStateChanged(u => {
-      if (initial) { initial = false; res(u); return; }
+      if (initial) { initial = false; counted = u ? u.uid : null; res(u); return; }
+      if (u) countLogin(u); else counted = null;
       listeners.forEach(fn => { try { fn(u); } catch (e) { console.error(e); } });
     });
   });
-  auth.getRedirectResult().catch(() => {});
+  auth.getRedirectResult().then(r => { if (r?.user) { counted = null; countLogin(r.user); } }).catch(() => {});
 
   function signIn() {
     const p = new firebase.auth.GoogleAuthProvider();
