@@ -151,6 +151,8 @@
     ["Photographier le nouveau mur", "Photograph the new wall", "Fotografiar el muro nuevo"],
     ["Donnez un nom à la salle.", "Give the gym a name.", "Ponle un nombre al rocódromo."],
     ["Envoi de la photo…", "Uploading photo…", "Enviando la foto…"],
+    ["Cette photo est trop lourde, même compressée. Essayez-en une autre.", "This photo is too heavy even after compression. Try another one.", "Esta foto pesa demasiado, incluso comprimida. Prueba con otra."],
+    ["La photo ne charge pas. Vérifiez votre connexion : elle se rechargera toute seule.", "The photo won't load. Check your connection: it will reload by itself.", "La foto no carga. Revisa tu conexión: se volverá a cargar sola."],
     ["La création a échoué. Vérifiez la photo et réessayez.", "Creation failed. Check the photo and try again.", "No se pudo crear. Revisa la foto e inténtalo de nuevo."],
     ["La création a échoué. Réessayez.", "Creation failed. Try again.", "No se pudo crear. Inténtalo de nuevo."],
     ["Le mur a été remonté", "The wall has been reset", "El muro se ha vuelto a montar"],

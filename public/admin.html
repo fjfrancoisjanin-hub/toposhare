@@ -127,6 +127,8 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
       <p class="note">Un grimpeur qui supprime son bloc ou sa voie ne peut pas effacer les votes des autres : ils restent invisibles, sans effet.</p>
       <button class="btn ghost" id="cleanVotes" type="button">Nettoyer les votes orphelins</button>
       <div class="log" id="cleanVotesLog"></div>
+      <button class="btn ghost" id="thumbBtn" type="button" style="margin-top:10px">Générer les miniatures manquantes</button>
+      <div class="log" id="thumbLog"></div>
     </section>
     <section class="panel" id="importBox">
       <h2>Reprise des données du prototype</h2>
@@ -280,7 +282,7 @@ const delDoc = async (col, id) => {
   if (col === "blocs" || col === "voies") for (const d of (await BT.fs.collection("votes").where("targetId", "==", id).where("kind", "==", col).get()).docs) await d.ref.delete();
   return BT.fs.collection(col).doc(id).delete();
 };
-const delPhoto = ref => String(ref || "").startsWith("photo:") ? delDoc("photos", ref.slice(6)).catch(() => {}) : null;
+const delPhoto = ref => String(ref || "").startsWith("photo:") ? Promise.all([delDoc("photos", ref.slice(6)), delDoc("miniatures", ref.slice(6))].map(p => p.catch(() => {}))) : null;
 async function cascade(col, id) {
   const [gyms, walls, blocs, secteurs, voies, methodes] = D.all;
   if (col === "gyms") { for (const o of D.owners.filter(o => o.gymId === id)) await delDoc("gymOwners", o.id); D.owners = D.owners.filter(o => o.gymId !== id); for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
@@ -333,6 +335,19 @@ $("recount").onclick = async () => {
   }
   $("recountLog").textContent = `${n} voie(s) corrigée(s).`;
   await load();
+};
+// Photos d'avant les miniatures : on crée la miniature depuis la photo existante, une seule fois.
+$("thumbBtn").onclick = async () => {
+  const btn = $("thumbBtn"), log = m => $("thumbLog").textContent += m + "\n";
+  btn.disabled = true; $("thumbLog").textContent = "";
+  try {
+    const vues = await all("vues");
+    const refs = [...new Set([...D.all[1], ...D.all[4], ...vues].map(x => x.image).filter(r => String(r || "").startsWith("photo:")))];
+    log(`${refs.length} photo(s) à vérifier.`);
+    for (const r of refs) log(`${r} : ${await BT.makeMissingThumb(r.slice(6))}`);
+    log("Terminé.");
+  } catch (e) { log("Erreur : " + (e.message || e.code || e)); }
+  finally { btn.disabled = false; }
 };
 $("importBtn").onclick = async () => {
   const btn = $("importBtn"), log = m => $("importLog").textContent += m + "\n";

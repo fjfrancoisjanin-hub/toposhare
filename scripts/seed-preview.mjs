@@ -6,7 +6,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { PUBLIC_COLLECTIONS, TEST_PROJECT, referenceDocs, requireTestKey } from './reference-lib.mjs';
 
 // La collection reference n'est pas dans cette liste : elle survit à la remise à zéro.
-const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'vues', 'photos', 'votes', 'feedback', 'data'];
+const COLLECTIONS = ['gymOwners', 'gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'methodesPrivees', 'vues', 'photos', 'miniatures', 'votes', 'feedback', 'data'];
 
 requireTestKey();
 initializeApp({ credential: applicationDefault(), projectId: TEST_PROJECT });

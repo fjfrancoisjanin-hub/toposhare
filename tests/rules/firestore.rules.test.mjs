@@ -597,15 +597,91 @@ describe('Brouillons', () => {
 });
 
 describe('Photos', () => {
-  test('une photo de moins de 1 Mo est acceptée', async () => {
-    await assertSucceeds(user('alice').doc('photos/p1').set({ authorId: 'alice', data: 'a'.repeat(1000) }));
+  const photo = (extra = {}) => ({ authorId: 'alice', data: 'a'.repeat(1000), w: 2000, h: 1500, mime: 'image/webp', createdAt: 1, ...extra });
+  test('une photo WebP de 2 000 px et de poids normal est acceptée', async () => {
+    await assertSucceeds(user('alice').doc('photos/p1').set(photo()));
+  });
+  test('une photo JPEG sans champ mime (envois d\'avant) est acceptée', async () => {
+    const { mime, ...old } = photo(); void mime;
+    await assertSucceeds(user('alice').doc('photos/p1').set(old));
+  });
+  test('une photo à la limite de poids est acceptée', async () => {
+    await assertSucceeds(user('alice').doc('photos/p1').set(photo({ data: 'a'.repeat(560_000) })));
   });
   test('une photo trop lourde est refusée', async () => {
-    await assertFails(user('alice').doc('photos/p1').set({ authorId: 'alice', data: 'a'.repeat(1_000_001) }));
+    await assertFails(user('alice').doc('photos/p1').set(photo({ data: 'a'.repeat(560_001) })));
+  });
+  test('une photo trop grande est refusée', async () => {
+    await assertFails(user('alice').doc('photos/p1').set(photo({ w: 2001 })));
+    await assertFails(user('alice').doc('photos/p1').set(photo({ h: 4000 })));
+  });
+  test('une photo sans dimensions, ou avec des dimensions nulles, est refusée', async () => {
+    const { w, ...sansLargeur } = photo(); void w;
+    await assertFails(user('alice').doc('photos/p1').set(sansLargeur));
+    await assertFails(user('alice').doc('photos/p1').set(photo({ h: 0 })));
+  });
+  test('un format autre que JPEG ou WebP est refusé', async () => {
+    await assertFails(user('alice').doc('photos/p1').set(photo({ mime: 'image/png' })));
+  });
+  test('un champ en trop est refusé', async () => {
+    await assertFails(user('alice').doc('photos/p1').set(photo({ extra: 'x' })));
+  });
+  test('un invité ne peut pas envoyer de photo', async () => {
+    await assertFails(anon().doc('photos/p1').set(photo()));
+  });
+  test("on ne peut pas envoyer une photo au nom d'un autre", async () => {
+    await assertFails(user('bob').doc('photos/p1').set(photo()));
   });
   test('une photo ne peut pas être modifiée après coup', async () => {
     await seed('photos/p1', { authorId: 'alice', data: 'abc' });
     await assertFails(user('alice').doc('photos/p1').update({ data: 'xyz' }));
+  });
+  test("tout le monde lit une photo, seuls son auteur et l'admin la suppriment", async () => {
+    await seed('photos/p1', photo());
+    await assertSucceeds(anon().doc('photos/p1').get());
+    await assertFails(user('bob').doc('photos/p1').delete());
+    await assertSucceeds(user('alice').doc('photos/p1').delete());
+    await seed('photos/p2', photo());
+    await assertSucceeds(owner().doc('photos/p2').delete());
+  });
+});
+
+describe('Miniatures', () => {
+  const mini = (extra = {}) => ({ authorId: 'alice', data: 'a'.repeat(1000), w: 320, h: 240, mime: 'image/webp', createdAt: 1, ...extra });
+  test('une miniature légère est acceptée', async () => {
+    await assertSucceeds(user('alice').doc('miniatures/p1').set(mini()));
+  });
+  test('une miniature à la limite de poids est acceptée', async () => {
+    await assertSucceeds(user('alice').doc('miniatures/p1').set(mini({ data: 'a'.repeat(40_000) })));
+  });
+  test('une miniature trop lourde est refusée', async () => {
+    await assertFails(user('alice').doc('miniatures/p1').set(mini({ data: 'a'.repeat(40_001) })));
+  });
+  test('une miniature de plus de 400 px est refusée', async () => {
+    await assertFails(user('alice').doc('miniatures/p1').set(mini({ w: 401 })));
+    await assertFails(user('alice').doc('miniatures/p1').set(mini({ h: 1500 })));
+  });
+  test('un format autre que JPEG ou WebP est refusé', async () => {
+    await assertFails(user('alice').doc('miniatures/p1').set(mini({ mime: 'image/gif' })));
+  });
+  test('un invité ne peut pas envoyer de miniature', async () => {
+    await assertFails(anon().doc('miniatures/p1').set(mini()));
+  });
+  test("un grimpeur ne crée pas de miniature au nom d'un autre, l'admin le peut", async () => {
+    await assertFails(user('bob').doc('miniatures/p1').set(mini()));
+    await assertSucceeds(owner().doc('miniatures/p1').set(mini()));
+  });
+  test('une miniature ne peut pas être modifiée', async () => {
+    await seed('miniatures/p1', mini());
+    await assertFails(user('alice').doc('miniatures/p1').update({ data: 'xyz' }));
+  });
+  test("tout le monde lit une miniature, seuls son auteur et l'admin la suppriment", async () => {
+    await seed('miniatures/p1', mini());
+    await assertSucceeds(anon().doc('miniatures/p1').get());
+    await assertFails(user('bob').doc('miniatures/p1').delete());
+    await assertSucceeds(user('alice').doc('miniatures/p1').delete());
+    await seed('miniatures/p2', mini());
+    await assertSucceeds(owner().doc('miniatures/p2').delete());
   });
 });
 

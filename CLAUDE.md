@@ -6,7 +6,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 
 ## Stack
 - HTML/CSS/JS vanilla, **sans build** : `public/` est servi tel quel.
-- Firebase compat SDK 10.12.2 chargé depuis gstatic. Auth Google, Firestore. **Pas de Cloud Storage** (offre Spark) : photos compressées en base64 dans la collection `photos` (< 1 Mo par document).
+- Firebase compat SDK 10.12.2 chargé depuis gstatic. Auth Google, Firestore. **Pas de Cloud Storage** (offre Spark) : photos compressées en base64 dans la collection `photos` (≤ 400 Ko binaires, 2 000 px au plus, WebP si le navigateur sait l'encoder, sinon JPEG), avec une miniature (~20 Ko) dans `miniatures` sous le même identifiant. Cache Firestore activé sur le téléphone.
 - `public/firebase-shim.js` expose `window.claude.use("db" | "user" | "assets")`, la même interface que le prototype artifact : l'appli n'appelle pas Firebase directement. En local (localhost), le shim se branche sur les émulateurs.
 - `public/i18n.js` : textes FR/EN. Toute chaîne visible passe par i18n, dans les deux langues.
 
@@ -22,8 +22,15 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - `npm run dev` : émulateurs (Auth, Firestore sur :8085, Hosting sur http://localhost:5000, UI sur :4000). Jamais de données de prod en local.
 - `npm test` : règles Firestore puis E2E Playwright (Pixel 7 + iPhone 14). Nécessite Java 21.
 - `npm run test:rules` / `npm run test:e2e` séparément.
+- Mesure de lancement : `npx firebase emulators:exec --only auth,firestore --project betatheque "node scripts/mesure-lancement.mjs [--miniatures] [--repo <dossier>]"` copie les données publiques de la prod (lecture seule, sans clé) dans l'émulateur et compte les documents et Ko lus au lancement, à l'ouverture d'un mur et d'un secteur, puis au 2e lancement. `--miniatures` simule le bouton admin ; `--repo` compare avec un autre état du dépôt (git worktree).
 - Déploiement : **ne pas lancer `firebase deploy` à la main**. Merge sur `main` → GitHub Actions teste puis déploie (site + règles). Une PR → déployée sur l'environnement de test https://toposhare-test.web.app (projet `toposhare-test`, remis à zéro à chaque déploiement, une seule URL : la dernière PR déployée s'affiche, voir le bandeau). Le job `preview` n'a aucun accès à la prod.
 - Données du site de test : la référence figée (données publiques de la prod, collection `reference` du projet de test, jamais dans Git) plus le jeu fictif. Pour la rafraîchir : action « Figer la référence » dans l'onglet Actions, lecture de la prod sans clé. Votes, méthodes privées, avis, brouillons, propriétaires et contributeurs ne sont pas copiés.
+
+## Photos et lectures
+- **Une seule passe de compression**, dans `firebase-shim.js` (`preparePhoto`) : depuis l'image d'origine, 2 000 px au plus, qualité baissée puis taille réduite jusqu'à 400 Ko ; au-delà, refus avec un message clair. Le canvas ne recopie ni EXIF ni GPS. Photo et miniature partent dans le même lot.
+- **Lecture** (`BT.img`) : cache du téléphone d'abord (une photo ne change jamais), serveur ensuite. Écran d'accueil et carte « Reprendre » : miniature seulement. Petites cartes de liste : miniature, photo complète s'il n'y en a pas. Photo d'en-tête : chargée quand l'écran est visible, miniature en attendant.
+- **Lancement** : secteurs, salles, murs et voies (une seule écoute sur `voies`) ; les blocs d'une salle ne se lisent qu'à l'entrée dans la salle. Aucune photo.
+- Chaque envoi crée une photo distincte : le partage d'une photo entre voies ou vues n'existe pas encore (supprimer une vue supprime sa photo).
 
 ## Navigation
 Accueil, lieu en cours et bouton de création. Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
@@ -38,7 +45,7 @@ Tableau de bord : Umami Cloud. Le suivi automatique est coupé, chaque écran es
 - **Vérifier :** dans l'onglet Réseau, plus aucun appel vers `gateway.umami.is`. Vider les données du site efface la marque. Pour la retirer : `localStorage.removeItem('umami.disabled')`.
 
 ## Modèle de données (collections)
-`gyms` et `secteurs` (commune dans `commune`, libellé dans `city` / `region`), `walls` (photo du mur d'une salle), `blocs`, `voies` (champ `methodCount`), `methodes` (publiques), `methodesPrivees` (auteur et admin seuls ; changer de visibilité déplace le document), `voies/{id}/contributeurs/{uid}` (marque + `foreignCount` : si d'autres grimpeurs ont contribué, seul l'admin supprime la voie), `vues` (les prises d'une méthode portent `viewId`, absent = vue d'ensemble, et la méthode liste `vueIds` ; photos supplémentaires d'une voie, par longueur ; la photo portée par la voie est la « vue d'ensemble » ; une voie sans `longueurs` vaut L1), `photos`, `votes/{kind__cible__uid}` (auteur et admin seuls ; `ratingCount` et `ratingSum` sur la cible ne bougent qu'avec le vote, dans le même lot), `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).
+`gyms` et `secteurs` (commune dans `commune`, libellé dans `city` / `region`), `walls` (photo du mur d'une salle), `blocs`, `voies` (champ `methodCount`), `methodes` (publiques), `methodesPrivees` (auteur et admin seuls ; changer de visibilité déplace le document), `voies/{id}/contributeurs/{uid}` (marque + `foreignCount` : si d'autres grimpeurs ont contribué, seul l'admin supprime la voie), `vues` (les prises d'une méthode portent `viewId`, absent = vue d'ensemble, et la méthode liste `vueIds` ; photos supplémentaires d'une voie, par longueur ; la photo portée par la voie est la « vue d'ensemble » ; une voie sans `longueurs` vaut L1), `photos` (`data`, `w`, `h` ≤ 2 000, `mime` jpeg ou webp, `authorId` ; jamais modifiée), `miniatures/{même id que la photo}` (≤ 400 px, ≤ 40 000 caractères ; absente pour les photos d'avant, l'appli affiche alors la photo complète ; l'admin les crée depuis `/admin`), `votes/{kind__cible__uid}` (auteur et admin seuls ; `ratingCount` et `ratingSum` sur la cible ne bougent qu'avec le vote, dans le même lot), `feedback`, `data/users/{uid}/{docId}` (brouillons privés), `gymOwners/{gymId__email}` (propriétaires de salle, écrits par l'admin seul).
 Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les règles : e-mail vérifié) peut tout modérer.
 
 ## Décisions de référence
@@ -58,7 +65,7 @@ Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les
 - **Contrôle côté serveur** : toute règle d'accès est appliquée par les règles Firestore, jamais seulement en cachant un bouton.
 
 ## Sécurité : failles connues (tests `todo` dans tests/rules)
-1. Aucun schéma validé à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
+1. Aucun schéma validé (sauf `photos` et `miniatures`, dont taille, dimensions et format sont contrôlés) à la création (`blocs`, `voies`, `gyms`, `secteurs`) : champs et tailles libres.
 2. `feedback` ouvert sans compte : risque de spam (limité à 2000 caractères).
 Avant une diffusion large : App Check, alerte budget, mentions légales / politique de confidentialité (connexion Google, RGPD).
 

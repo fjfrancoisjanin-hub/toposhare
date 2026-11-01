@@ -825,7 +825,7 @@ $("filters").addEventListener("click", e => { const b = e.target.closest(".chip"
 function renderList() {
   renderHero();
   renderFilters();
-  if (!state.loaded) { $("list").innerHTML = `<div class="empty">Chargement des blocs…</div>`; return; }
+  if (!state.loaded || !state.blocsLoaded) { $("list").innerHTML = `<div class="empty">Chargement des blocs…</div>`; return; }
   if (!gym()) { $("list").innerHTML = `<div class="empty"><strong>Choisissez votre salle</strong><span>Sélectionnez une salle existante ou ajoutez la vôtre avec une photo de son mur.</span><button class="btn" type="button" data-open-sheet>Choisir une salle</button></div>`; return; }
   if (state.filter === "drafts") { renderDraftList(); return; }
   const f = FILTERS.find(x => x.id === state.filter) || FILTERS[0];
@@ -958,7 +958,7 @@ function renderSheet() {
         batch.set(state.db.collection("walls").doc(), { gymId: gref.id, name: wname, image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
         await batch.commit();
         openPlace("salle", gref.id); closeSheet(); toast(`${name} est prête : tracez le premier bloc`);
-      } catch (err) { $("sErr").textContent = "La création a échoué. Vérifiez la photo et réessayez."; }
+      } catch (err) { $("sErr").textContent = photoErrMsg(err, "La création a échoué. Vérifiez la photo et réessayez."); }
     });
     return;
   }
@@ -981,7 +981,7 @@ function renderSheet() {
         batch.set(state.db.collection("walls").doc(), { gymId: state.gymId, name: $("rwName").value.trim() || "Spray wall", image: ph.url, w: ph.w, h: ph.h, active: true, createdAt: Date.now() });
         await batch.commit();
         clearEditor(); closeSheet(); toast("Nouveau mur en place. Les anciens blocs sont archivés.");
-      } catch (err) { $("sErr").textContent = err?.code === "permission-denied" ? "Vous n'avez plus le droit de changer ce mur." : "Le changement de mur a échoué. Réessayez."; }
+      } catch (err) { $("sErr").textContent = err?.code === "permission-denied" ? "Vous n'avez plus le droit de changer ce mur." : photoErrMsg(err, "Le changement de mur a échoué. Réessayez."); }
     });
     return;
   }
@@ -999,21 +999,21 @@ $("sheet").addEventListener("click", e => {
   if (e.target.closest("[data-close-sheet]")) { closeSheet(); return; }
   const gb = e.target.closest("[data-gym]"); if (gb) { const after = state.afterPick; openPlace("salle", gb.dataset.gym); closeSheet(); if (after) $("tabCreate").click(); }
 });
-async function prepPhoto(file) {
-  const url = URL.createObjectURL(file), img = new Image(); img.src = url; await img.decode();
-  const sc = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.round(img.naturalWidth * sc), h = Math.round(img.naturalHeight * sc);
-  const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
-  URL.revokeObjectURL(url);
-  const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.84));
-  return { blob, w, h, preview: URL.createObjectURL(blob) };
-}
+// Une seule passe de compression (dans le shim) : photo principale + miniature. L'aperçu sert à l'éditeur.
+const prepPhoto = file => BT.preparePhoto(file);
 async function uploadPhoto(file) {
   if (!state.assets || !state.db) throw new Error("unavailable");
-  const p = await prepPhoto(file);
-  const a = await state.assets.upload(p.blob);
-  return { url: a.url, w: p.w, h: p.h };
+  const a = await state.assets.upload(await prepPhoto(file));
+  return { url: a.url, w: a.w, h: a.h };
 }
+// Message clair quand la photo reste trop lourde après compression.
+const photoErrMsg = (err, fallback) => err?.code === "photo-too-large" ? "Cette photo est trop lourde, même compressée. Essayez-en une autre." : fallback;
+// Supprime la photo et sa miniature.
+const dropPhoto = ref => {
+  if (!String(ref || "").startsWith("photo:")) return Promise.resolve();
+  const id = ref.slice(6);
+  return Promise.all([state.db.collection("photos").doc(id).delete(), state.db.collection("miniatures").doc(id).delete()].map(p => p.catch(() => {})));
+};
 
 /* ---------- accueil : lieu en cours, favoris, récents (gardés sur le téléphone) ---------- */
 const lsJson = k => { try { return JSON.parse(lsGet(k) || "[]"); } catch { return []; } };
@@ -1024,7 +1024,7 @@ function touchRecent(type, id) { lsSet("ts-recents", JSON.stringify([{ type, id,
 const isFav = (type, id) => lsJson("ts-favs").some(f => f.type === type && f.id === id);
 function toggleFav(type, id) { const favs = lsJson("ts-favs"); lsSet("ts-favs", JSON.stringify(isFav(type, id) ? favs.filter(f => !(f.type === type && f.id === id)) : [...favs, { type, id }])); }
 const placeCommune = (type, x) => type === "salle" ? x.city : type === "secteur" ? x.region : state.secteurs.find(s => s.id === x.secteurId)?.name;
-const placePhoto = (type, id) => { const ref = type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image; return ref ? BT.img(ref) : ""; };
+const placePhoto = (type, id, opt) => { const ref = type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image; return ref ? BT.img(ref, opt) : ""; };
 const placeUrl = (type, id) => `${location.origin}/#/${type}/${id}`;
 function openPlace(type, id) {
   touchRecent(type, id);
@@ -1040,6 +1040,7 @@ function renderTabs() {
 }
 function renderHero() {
   for (const el of document.querySelectorAll("[data-hero]")) {
+    if (el.parentElement.closest("[hidden]")) continue; // écran caché : pas de photo à charger
     const type = el.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId, x = placeOf(type, id);
     if (!x) { el.innerHTML = ""; el.hidden = true; continue; }
     const photo = placePhoto(type, id), fav = isFav(type, id);
@@ -1078,7 +1079,7 @@ function renderHome() {
   const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id)), others = recents.filter(r => !(p && r.type === p.type && r.id === p.id)).slice(0, 5);
   let html = "";
   if (p) {
-    const x = placeOf(p.type, p.id), photo = placePhoto(p.type, p.id);
+    const x = placeOf(p.type, p.id), photo = placePhoto(p.type, p.id, { thumbOnly: true });
     html += `<button class="resume" id="hResume" data-go="${p.type}:${esc(p.id)}">${photo ? `<img src="${esc(photo)}" alt="">` : ""}<span class="txt"><b>Reprendre : ${esc(x.name)}</b><small>${[TYPE_LABEL[p.type], placeCommune(p.type, x), ago(p.t)].filter(Boolean).map(esc).join(" · ")}</small></span></button>`;
   }
   if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
@@ -1150,7 +1151,7 @@ async function routeFromHash() {
     const d = await state.db.collection(type === "voie" ? "voies" : "blocs").doc(id).get();
     if (!d.exists) return gone();
     const x = d.data();
-    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x }); openPlace("secteur", x.secteurId); openVoie(id); }
+    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x, _lien: true }); openPlace("secteur", x.secteurId); openVoie(id); }
     else { if (!placeOf("salle", x.gymId)) return gone(); openPlace("salle", x.gymId); openDetail(id); }
   } catch { gone(); }
 }
@@ -1167,6 +1168,8 @@ function go(v) {
   $("tabHome").setAttribute("aria-current", v === "home" ? "page" : "false");
   $("tabPlace").setAttribute("aria-current", ["list", "olist", "detail", "ovoie"].includes(v) ? "page" : "false");
   $("tabCreate").setAttribute("aria-current", v === "create" || v === "oedit" ? "page" : "false");
+  if (["list", "create", "detail"].includes(v)) ensureBlocs();
+  BT.retryPhotos();
   renderHeader();
   if (v === "home") renderHome();
   if (v === "olist") renderOList();
@@ -1217,7 +1220,7 @@ function renderHeader() {
   }
   const g = gym(), w = activeWall();
   $("gymName").textContent = g ? `${g.name}${g.city ? " " + g.city : ""}` : (state.loaded ? "Choisir une salle" : "Chargement…");
-  $("gymSub").textContent = g ? (w ? `${w.name} · ${state.blocs.filter(b => !isArchived(b)).length} blocs` : "Pas de photo du mur") : "";
+  $("gymSub").textContent = g ? (w ? `${w.name}${state.blocsLoaded ? ` · ${state.blocs.filter(b => !isArchived(b)).length} blocs` : ""}` : "Pas de photo du mur") : "";
 }
 function rerender() {
   renderHeader();
@@ -1233,14 +1236,21 @@ function rerender() {
   if (state.fsMode === "oview" || state.fsMode === "replay") renderOFs();
 }
 function switchGym(id) {
-  state.gymId = id; lsSet("pan-gym", id); state.blocs = []; state.filter = "all";
+  state.gymId = id; lsSet("pan-gym", id); state.blocs = []; state.blocsLoaded = false; state.filter = "all";
   if (state.unsubBlocs) state.unsubBlocs();
-  state.unsubBlocs = null;
-  if (state.db) state.unsubBlocs = state.db.collection("blocs").where("gymId", "==", id).onSnapshot(snap => {
+  state.unsubBlocs = null; state.blocsFor = null;
+  state.edit = { kind: "new" }; state.holds = []; loadDraft(); renderGrades(); renderEditorChrome(); if (state.mode === "in") go(state.view === "detail" ? "list" : state.view); rerender();
+}
+// Les blocs d'une salle ne se lisent qu'à l'entrée dans la salle, pas au lancement de l'appli.
+function ensureBlocs() {
+  const id = state.gymId;
+  if (!state.db || !id || state.blocsFor === id) return;
+  state.unsubBlocs?.(); state.blocsFor = id; state.blocsLoaded = false;
+  state.unsubBlocs = state.db.collection("blocs").where("gymId", "==", id).onSnapshot(snap => {
     state.blocs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    state.blocsLoaded = true;
     rerender();
   }, () => toast("Impossible de charger les blocs pour l'instant."));
-  state.edit = { kind: "new" }; state.holds = []; loadDraft(); renderGrades(); renderEditorChrome(); if (state.mode === "in") go(state.view === "detail" ? "list" : state.view); rerender();
 }
 
 /* ================= OUTDOOR: secteurs, voies, méthodes ================= */
@@ -1255,14 +1265,10 @@ const myMethod = () => state.methodes.find(m => state.me && m.authorId === state
 const oView = new WallView($("oeWall"), { onTap: (x, y) => oTap(x, y) });
 oView.max = 8;
 
+const sortVoies = l => l.sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
 function switchSecteur(id) {
-  state.secteurId = id; lsSet("pan-sect", id); state.voies = [];
-  if (state.unsubVoies) state.unsubVoies(); state.unsubVoies = null;
-  if (state.db && id) state.unsubVoies = state.db.collection("voies").where("secteurId", "==", id).onSnapshot(sn => {
-    state.voies = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
-    state.allVoies = [...state.allVoies.filter(v => v.secteurId !== id), ...state.voies];
-    rerender();
-  }, () => toast("Impossible de charger les voies pour l'instant."));
+  state.secteurId = id; lsSet("pan-sect", id);
+  state.voies = sortVoies(state.allVoies.filter(v => v.secteurId === id));
   if (state.mode === "out" && state.view !== "olist") go("olist"); else rerender();
 }
 // Méthodes publiques de la voie, plus les méthodes privées de l'utilisateur : les règles refusent toute autre lecture.
@@ -1289,7 +1295,7 @@ function openVoie(id, sel) {
 /* ---------- drawing a route ---------- */
 function stepPoint(st, anchors) { if (st.t === "clip") { const a = anchors[st.a]; return a ? { x: a.x, y: a.y } : { x: st.x, y: st.y }; } return st; }
 function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, preview = null, markA = -1, markS = -1 } = {}) {
-  const W = v.w, H = v.h, k = Math.min(W, H) / 1400, img = preview || BT.img(v.image);
+  const W = v.w, H = v.h, k = Math.min(W, H) / 1400, img = preview || BT.img(v.image, mini ? { thumbFirst: true } : undefined);
   const P = p => [p.x * W, p.y * H];
   let line = "", anc = "", flow = "", rings = "", top = "";
   // route line through the anchors
@@ -1555,7 +1561,7 @@ async function saveVue(oe, label, longueurId) {
   const now = Date.now();
   if (oe.id) { await state.db.collection("vues").doc(oe.id).update({ label, longueurId, anchors: oe.anchors, updatedAt: now, updatedBy: state.me }); return oe.id; }
   $("oErr").textContent = "Envoi de la photo…";
-  const a = await state.assets.upload(oe.photo.blob), v = state.voies.find(x => x.id === oe.voieId), batch = state.db.batch(), ref = state.db.collection("vues").doc();
+  const a = await state.assets.upload(oe.photo), v = state.voies.find(x => x.id === oe.voieId), batch = state.db.batch(), ref = state.db.collection("vues").doc();
   batch.set(ref, { voieId: oe.voieId, longueurId, label, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, order: now, createdAt: now });
   if (v.authorId !== state.me) {
     const mark = contribRef(oe.voieId, state.me);
@@ -1565,7 +1571,7 @@ async function saveVue(oe, label, longueurId) {
   return ref.id;
 }
 async function deleteVue(v, V) {
-  if (V.isBase) { await voieRef(v.id).update({ baseDeleted: true, anchors: [], image: "", updatedAt: Date.now(), updatedBy: state.me }); if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {}); return; }
+  if (V.isBase) { await voieRef(v.id).update({ baseDeleted: true, anchors: [], image: "", updatedAt: Date.now(), updatedBy: state.me }); await dropPhoto(v.image); return; }
   const batch = state.db.batch();
   batch.delete(state.db.collection("vues").doc(V.id));
   if (isAdmin()) (await state.db.collection("vues").doc(V.id).collection("utilisateurs").get()).forEach(d => batch.delete(d.ref));
@@ -1574,7 +1580,7 @@ async function deleteVue(v, V) {
     if ((await mark.get()).exists) { batch.delete(mark); batch.update(voieRef(v.id), { foreignCount: state.db.increment(-1) }); }
   }
   await batch.commit();
-  if (String(V.image || "").startsWith("photo:")) await state.db.collection("photos").doc(V.image.slice(6)).delete().catch(() => {});
+  await dropPhoto(V.image);
 }
 async function moveVue(d) {
   const v = voie(), list = vuesOf(v, currentLen(v).id), i = list.findIndex(x => x.id === currentVue(v)?.id), j = i + d;
@@ -1660,10 +1666,10 @@ async function deleteVoie(v) {
     (await voieRef(v.id).collection("contributeurs").get()).forEach(d => batch.delete(d.ref));
     await deleteVotes("voies", v.id);
   }
-  for (const x of state.vues) { batch.delete(state.db.collection("vues").doc(x.id)); if (String(x.image || "").startsWith("photo:")) state.db.collection("photos").doc(x.image.slice(6)).delete().catch(() => {}); }
+  for (const x of state.vues) { batch.delete(state.db.collection("vues").doc(x.id)); dropPhoto(x.image); }
   batch.delete(voieRef(v.id));
   await batch.commit();
-  if (String(v.image || "").startsWith("photo:")) await state.db.collection("photos").doc(v.image.slice(6)).delete().catch(() => {});
+  await dropPhoto(v.image);
 }
 
 /* ---------- fullscreen view & mental replay ---------- */
@@ -1825,7 +1831,7 @@ function renderOE() {
 $("oeFile").addEventListener("change", async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f || !state.oe) return;
   if (!state.assets) { $("oePickErr").textContent = "L'envoi de photos n'est pas disponible avec votre accès à cette page."; return; }
-  try { state.oe.photo = await prepPhoto(f); renderOE(); oView.layout(true); } catch { $("oePickErr").textContent = "Cette photo n'a pas pu être lue. Essayez-en une autre."; }
+  try { state.oe.photo = await prepPhoto(f); renderOE(); oView.layout(true); } catch (err) { $("oePickErr").textContent = photoErrMsg(err, "Cette photo n'a pas pu être lue. Essayez-en une autre."); }
 });
 $("oeFull").addEventListener("click", () => openFs("oedit"));
 $("oeVues").addEventListener("click", e => {
@@ -1855,7 +1861,7 @@ $("oForm").addEventListener("submit", async e => {
         await state.db.collection("voies").doc(oe.id).update({ name, addedBy, anchors: oe.anchors, updatedAt: Date.now(), updatedBy: state.me, ...(multi ? {} : { grade: oe.grade }), ...(lens?.length === 1 ? { longueurs: [{ ...lens[0], grade: oe.grade }] } : {}) }); state.oe = null; toast("Points enregistrés"); openVoie(oe.id); }
       else {
         $("oErr").textContent = "Envoi de la photo…";
-        const a = await state.assets.upload(oe.photo.blob);
+        const a = await state.assets.upload(oe.photo);
         const ref = await state.db.collection("voies").add({ secteurId: state.secteurId, name, grade: oe.grade, image: a.url, w: oe.photo.w, h: oe.photo.h, anchors: oe.anchors, authorId: state.me, addedBy, methodCount: 0, createdAt: Date.now() });
         TS_MESURE.event("bloc_cree", { salle: state.secteurId, type: "voie" });
         state.oe = null; $("oErr").textContent = ""; toast("Voie publiée. Ajoutez maintenant votre méthode."); openVoie(ref.id);
@@ -2103,7 +2109,10 @@ function subscribeDrafts() {
     renderEditorChrome(); if (state.view === "list") renderList();
   }, () => {});
 }
-BT.onPhoto(() => { rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
+let lastPhotoErr = 0;
+BT.onPhoto((id, err) => {
+  if (err && Date.now() - lastPhotoErr > 8000) { lastPhotoErr = Date.now(); toast("La photo ne charge pas. Vérifiez votre connexion : elle se rechargera toute seule."); }
+  rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
 BT.onUser(u => {
   state.me = u ? u.uid : null;
   renderAcct(); subscribeDrafts(); subscribeRoles(); subscribeMethods(state.voieId); renderEditorChrome();
@@ -2157,7 +2166,13 @@ renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
     } else rerender();
   };
   const fail = () => { $("offline").hidden = false; };
-  db.collection("voies").get().then(s => { const known = new Set(state.allVoies.map(v => v.id)); state.allVoies.push(...s.docs.filter(d => !known.has(d.id)).map(d => ({ id: d.id, ...d.data() }))); rerender(); }).catch(() => {});
+  // Les voies sont lues une seule fois, dans une seule écoute : la recherche et la liste du secteur s'en servent toutes les deux.
+  db.collection("voies").onSnapshot(sn => {
+    const extra = state.allVoies.filter(v => v._lien && !sn.docs.some(d => d.id === v.id));
+    state.allVoies = [...sn.docs.map(d => ({ id: d.id, ...d.data() })), ...extra];
+    state.voies = sortVoies(state.allVoies.filter(v => v.secteurId === state.secteurId));
+    rerender();
+  }, () => toast("Impossible de charger les voies pour l'instant."));
   db.collection("gyms").onSnapshot(s => { state.gyms = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); gotG = true; ready(); }, fail);
   db.collection("walls").onSnapshot(s => { state.walls = s.docs.map(d => ({ id: d.id, ...d.data() })); gotW = true; ready(); }, fail);
 })();
