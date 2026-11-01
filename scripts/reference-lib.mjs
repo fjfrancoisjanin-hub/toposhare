@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 export const TEST_PROJECT = 'toposhare-test';
 // Liste fermée : uniquement ce que la prod montre à tout le monde. Votes, méthodes privées, avis, brouillons, propriétaires et contributeurs n'y entrent pas.
-export const PUBLIC_COLLECTIONS = ['gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'vues', 'photos'];
+export const PUBLIC_COLLECTIONS = ['gyms', 'walls', 'blocs', 'secteurs', 'voies', 'methodes', 'vues', 'photos', 'miniatures'];
 const PROD_DOCUMENTS = 'https://firestore.googleapis.com/v1/projects/betatheque/databases/(default)/documents';
 
 // Ces scripts effacent des données : ils refusent de tourner avec une autre clé que celle du projet de test.

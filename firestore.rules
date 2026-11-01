@@ -206,10 +206,27 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == uid;
     }
 
-    // Photos des murs et des voies, compressées (moins de 1 Mo) : lisibles par tous, ajoutées par un grimpeur connecté.
+    // Photos des murs et des voies : une seule passe de compression côté appli, 2 000 px et 400 Ko au plus (base64 : 560 000 caractères
+    // de marge). Lisibles par tous, ajoutées par un grimpeur connecté, jamais modifiées.
+    function imageOk(maxChars, maxPx) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['data', 'w', 'h', 'mime', 'authorId', 'createdAt'])
+        && d.data is string && d.data.size() > 0 && d.data.size() <= maxChars
+        && d.w is int && d.w > 0 && d.w <= maxPx
+        && d.h is int && d.h > 0 && d.h <= maxPx
+        && d.get('mime', 'image/jpeg') in ['image/jpeg', 'image/webp'];
+    }
     match /photos/{id} {
       allow read: if true;
-      allow create: if claimsMe() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+      allow create: if claimsMe() && imageOk(560000, 2000);
+      allow delete: if mine() || isAdmin();
+    }
+
+    // Miniatures (~20 Ko), sous le même identifiant que la photo : affichées en attendant la photo complète.
+    // L'admin peut en créer pour les photos d'avant, en gardant l'auteur de la photo pour que celui-ci puisse la supprimer.
+    match /miniatures/{id} {
+      allow read: if true;
+      allow create: if (claimsMe() || isAdmin()) && imageOk(40000, 400);
       allow delete: if mine() || isAdmin();
     }
 
