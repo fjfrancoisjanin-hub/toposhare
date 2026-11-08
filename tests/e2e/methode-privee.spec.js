@@ -64,7 +64,7 @@ test('une méthode privée ne compte pas dans le nombre de méthodes', async ({ 
   await login(page, ALICE);
   await page.locator('.name', { hasText: `Voie ${id}` }).click();
   await addMethod(page);
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabFalaises').click();
   await expect(page.locator('.name', { hasText: `Voie ${id}` })).toBeVisible();
   await expect(page.locator('.by', { hasText: 'méthode' })).toHaveCount(0);
 });
@@ -110,7 +110,7 @@ test("l'auteur supprime sa voie sans contributeur, mais plus dès qu'un autre y 
   await expect(page.locator('#ovName')).toBeVisible();
   await expect(page.locator('[data-act="delv"]')).toHaveCount(0);
 
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabFalaises').click();
   await page.locator('.name', { hasText: `Seconde ${id}` }).click();
   await page.locator('[data-act="delv"]').click();
   await page.locator('[data-act="delv"]').click();

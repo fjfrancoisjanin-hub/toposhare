@@ -33,7 +33,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - Chaque envoi crée une photo distincte : le partage d'une photo entre voies ou vues n'existe pas encore (supprimer une vue supprime sa photo).
 
 ## Navigation
-Accueil, lieu en cours et bouton de création. Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
+Barre du bas : **Accueil · Salles · Falaises · +** (création). Accueil : carte « Reprendre » (dernier lieu), deux entrées Salles / Falaises (listes `vPlaces`, dernières visites puis par commune, étoile de favori), puis Favoris. Plus de bloc « Récents » à l'écran (`ts-recents` sert encore à « Reprendre » et aux dernières visites). Onglet Salles/Falaises : au fond d'une fiche il remonte au lieu, dans le lieu il ouvre la liste, ailleurs il rouvre le dernier lieu de ce type. L'en-tête d'un lieu propose « Passer aux falaises / salles ». Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
 
 ## Mesure d'audience
 Tableau de bord : Umami Cloud. Le suivi automatique est coupé, chaque écran est envoyé depuis `go()`, avec des adresses `/salle/id`, `/bloc/id`, etc. QR code d'une salle : `/?src=qr#/salle/id` (`docs/qr/`, régénéré par `node scripts/make-qr.mjs <slug>`).

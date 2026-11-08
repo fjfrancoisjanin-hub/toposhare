@@ -92,7 +92,7 @@ test('chaque changement d\'écran compte comme une page vue, sans doublon sur un
   // Un lien direct passe par la salle puis le bloc : une seule page vue, la dernière.
   await page.evaluate(i => { location.hash = `#/bloc/b-${i}`; }, id);
   await expect.poll(() => pages(page)).toEqual(['/', `/bloc/b-${id}`]);
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabSalles').click();
   await expect.poll(() => pages(page)).toEqual(['/', `/bloc/b-${id}`, `/salle/${id}`]);
   await page.locator('#tabHome').click();
   await expect.poll(() => pages(page)).toEqual(['/', `/bloc/b-${id}`, `/salle/${id}`, '/']);

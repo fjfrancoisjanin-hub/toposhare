@@ -32,7 +32,7 @@ test('trois comptes votent 3, 2 et 2 : la fiche affiche « ★★☆ 2,3 · 3 av
   await vote(page, 2);
   await expect(page.locator('#dRate .rating')).toHaveText('★★☆ 2,3 · 3 avis');
 
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabSalles').click();
   await page.locator('[data-f="best"]').click();
   const names = page.locator('#list .card .name');
   await expect(names).toHaveText([`Noté ${id}`, `Moyen ${id}`, `Rare ${id}`]);
@@ -93,7 +93,7 @@ test('une voie se note aussi, et le tri « Mieux notés » classe les voies', as
   await page.locator('.card .name', { hasText: `Aaa ${id}` }).click();
   await page.locator('#ovRate [data-vote="3"]').click();
   await expect(page.locator('#ovRate')).toContainText('1 avis, note affichée à partir de 3');
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabFalaises').click();
   await page.locator('#oBest').click();
   await expect(page.locator('#oListEl .card .name')).toHaveText([`Zzz ${id}`, `Aaa ${id}`]);
 });
