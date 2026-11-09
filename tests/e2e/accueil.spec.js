@@ -213,7 +213,9 @@ test('à 390 px, la barre du bas tient sur une ligne et le nom très long du sec
   await expect(page.locator('#tabFalaises')).toBeVisible();
   const box = await page.locator('nav.tabs .in').evaluate(n => ({ s: n.scrollWidth, c: n.clientWidth }));
   expect(box.s).toBeLessThanOrEqual(box.c);
-  const tabs = await page.locator('nav.tabs .tab').evaluateAll(els => els.map(e => ({ w: e.clientWidth, s: e.scrollWidth })));
-  for (const t of tabs) expect(t.s).toBeLessThanOrEqual(t.w + 1);
+  // Largeur réelle du contenu de chaque onglet (et non scrollWidth, qui ne dépasse pas tant que le texte tient juste) :
+  // 12 px de marge pour que des polices un peu plus larges (CI, autres téléphones) ne fassent pas déborder.
+  const tabs = await page.locator('nav.tabs .tab').evaluateAll(els => els.map(e => { const r = document.createRange(); r.selectNodeContents(e); return { id: e.id, w: e.clientWidth, content: Math.ceil(Math.max(...[...r.getClientRects()].map(x => x.width), 0)), sum: Math.ceil([...e.children].reduce((a, c) => a + c.getBoundingClientRect().width, 0)) }; }));
+  for (const t of tabs) expect(Math.max(t.content, t.id === 'tabCreate' ? t.sum : 0)).toBeLessThanOrEqual(t.w - 12);
   await expect(page.locator('[data-hero="secteur"] b')).toHaveText(`Un nom de secteur vraiment très long ${id}`);
 });
