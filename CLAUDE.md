@@ -61,7 +61,7 @@ Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les
 - **Notes** : de 0 à 3 étoiles, connexion obligatoire, un vote par personne, moyenne affichée à partir de 3 votes, pas de note sur son propre contenu.
 - **Géographie** : deux niveaux en falaise, commune puis secteur. La commune vient de la liste officielle française (geo.api.gouv.fr), elle est obligatoire pour un nouveau secteur, et affichée « Saint-Antonin-Noble-Val (82) ». France uniquement pour l'instant.
 - **Voies** : une ou plusieurs longueurs, chacune avec sa cotation ; une ou plusieurs vues (photos) par longueur ; points d'ancrage propres à chaque vue.
-- **Navigation** : écran d'accueil avec recherche ; barre du bas « Accueil · lieu en cours · Nouveau bloc / Nouvelle voie ».
+- **Navigation** : écran d'accueil avec recherche ; barre du bas « Accueil · Salles · Falaises · Nouveau / Nouveau bloc / Nouvelle voie ». Pas de bloc « Récents » sur l'accueil.
 - **Contrôle côté serveur** : toute règle d'accès est appliquée par les règles Firestore, jamais seulement en cachant un bouton.
 
 ## Sécurité : failles connues (tests `todo` dans tests/rules)
