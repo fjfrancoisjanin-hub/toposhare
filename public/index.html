@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>TopoShare</title>
-<meta name="description" content="Partage tes voies, prise par prise. Share your routes, hold by hold.">
+<meta name="description" content="Par les grimpeurs, pour les grimpeurs. By climbers, for climbers.">
 <meta name="theme-color" content="#1B2024">
 <link rel="manifest" href="/manifest.webmanifest?v=2">
 <link rel="icon" href="/ts-icon-64.png">
@@ -246,6 +246,21 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
 .splash p { margin: 0; font-size: 16px; color: #ECEEF0; }
 .splash p.en { font-size: 14px; color: #9AA3AC; margin-top: -8px; }
 .splash.out { opacity: 0; pointer-events: none; }
+.spl-route { width: 220px; height: 56px; margin-top: 10px; }
+.spl-route circle { fill: transparent; stroke: #5A636B; stroke-width: 4; }
+.spl-route circle.on { fill: #FF6630; stroke: #FF6630; }
+.splash p.spl-msg { font-size: 13px; color: #9AA3AC; min-height: 1.3em; margin-top: -4px; }
+.spl-slow { display: grid; gap: 10px; justify-items: center; }
+.spl-slow > div { display: flex; gap: 10px; }
+.splash button { appearance: none; border: 1px solid #5A636B; background: transparent; color: #ECEEF0; border-radius: 12px; padding: 10px 16px; font: 700 14px var(--f-body); cursor: pointer; }
+.splash button#splGo { background: #FF6630; border-color: #FF6630; color: #1B2024; }
+.skel { height: 64px; border-radius: 12px; background: var(--line); }
+@media (prefers-reduced-motion: no-preference) {
+  .spl-route circle { transition: fill .3s ease, stroke .3s ease; }
+  .spl-route circle:nth-of-type(2) { transition-delay: .12s; } .spl-route circle:nth-of-type(3) { transition-delay: .24s; } .spl-route circle:nth-of-type(4) { transition-delay: .36s; }
+  .skel { background: linear-gradient(90deg, var(--line), var(--surface), var(--line)); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: no-preference) { .splash { transition: opacity .45s ease; } .splash img { animation: pop .6s cubic-bezier(.2,1.3,.4,1) both; } }
 @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .login-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -256,7 +271,10 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
 </style>
 </head>
 <body>
-<div class="splash" id="splash" aria-hidden="true"><img src="/ts-icon-512.png" alt=""><h1>Topo<span>Share</span></h1><p>Partage tes voies, prise par prise.</p><p class="en" lang="en">Share your routes, hold by hold.</p></div>
+<div class="splash" id="splash" role="status" aria-live="polite"><img src="/ts-icon-512.png" alt=""><h1>Topo<span>Share</span></h1><p>Par les grimpeurs, pour les grimpeurs.</p><p class="en" lang="en">By climbers, for climbers.</p>
+  <svg class="spl-route" viewBox="0 0 220 56" aria-hidden="true"><polyline points="20,40 80,16 140,40 200,16" fill="none" stroke="#5A636B" stroke-width="3" stroke-dasharray="2 7" stroke-linecap="round"/><circle id="spl1" cx="20" cy="40" r="9"/><circle id="spl2" cx="80" cy="16" r="9"/><circle id="spl3" cx="140" cy="40" r="9"/><circle id="spl4" cx="200" cy="16" r="9"/></svg>
+  <p class="spl-msg" id="splMsg"></p>
+  <div class="spl-slow" id="splSlow" hidden><p>Connexion lente : les données arrivent encore.</p><div><button type="button" id="splGo">Continuer</button><button type="button" id="splRetry">Réessayer</button></div></div></div>
 <script src="/i18n.js"></script>
 
 <div class="app">
@@ -498,7 +516,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
+  tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, vLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
 
@@ -1049,7 +1067,8 @@ function touchRecent(type, id) { lsSet("ts-recents", JSON.stringify([{ type, id,
 const isFav = (type, id) => lsJson("ts-favs").some(f => f.type === type && f.id === id);
 function toggleFav(type, id) { const favs = lsJson("ts-favs"); lsSet("ts-favs", JSON.stringify(isFav(type, id) ? favs.filter(f => !(f.type === type && f.id === id)) : [...favs, { type, id }])); }
 const placeCommune = (type, x) => type === "salle" ? x.city : type === "secteur" ? x.region : state.secteurs.find(s => s.id === x.secteurId)?.name;
-const placePhoto = (type, id, opt) => { const ref = type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image; return ref ? BT.img(ref, opt) : ""; };
+const placeRef = (type, id) => type === "salle" ? activeWall(id)?.image : type === "voie" ? placeOf("voie", id)?.image : state.allVoies.find(v => v.secteurId === id && v.image)?.image;
+const placePhoto = (type, id, opt) => { const ref = placeRef(type, id); return ref ? BT.img(ref, opt) : ""; };
 const placeUrl = (type, id) => `${location.origin}/#/${type}/${id}`;
 function openPlace(type, id) {
   touchRecent(type, id);
@@ -1095,7 +1114,7 @@ function renderHome() {
   const recents = liveRecents(), p = recents.find(r => r.type !== "voie"), firstRun = !lsJson("ts-recents").length;
   $("hTitle").hidden = !firstRun;
   $("hBody").hidden = !!$("hSearch").value.trim();
-  if (!state.loaded || !state.oLoaded) { $("hBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  if (!state.loaded || !state.oLoaded) { $("hBody").innerHTML = `<div class="skel" aria-hidden="true"></div><div class="skel" aria-hidden="true"></div><div class="skel" aria-hidden="true"></div>`; return; }
   const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id));
   let html = "";
   if (p) {
@@ -1113,7 +1132,7 @@ function openPlaces(kind) { state.placesKind = kind; go("places"); }
 function renderPlaces() {
   const kind = state.placesKind || "salle", salle = kind === "salle";
   $("plTitle").textContent = salle ? "Salles" : "Falaises";
-  if (!state.loaded || !state.oLoaded) { $("plBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  if (!state.loaded || !state.oLoaded) { $("plBody").innerHTML = `<div class="skel" aria-hidden="true"></div><div class="skel" aria-hidden="true"></div><div class="skel" aria-hidden="true"></div>`; return; }
   const items = salle ? state.gyms : state.secteurs, label = x => (salle ? x.city : x.region) || "";
   const row = x => `<div class="prow">${placeRow({ type: kind, id: x.id })}<button class="favbtn" type="button" data-fav="${kind}:${esc(x.id)}" aria-pressed="${isFav(kind, x.id)}" aria-label="${isFav(kind, x.id) ? "Retirer des favoris" : "Ajouter aux favoris"}">${isFav(kind, x.id) ? "★" : "☆"}</button></div>`;
   const recent = liveRecents().filter(r => r.type === kind).slice(0, 3).map(r => items.find(x => x.id === r.id)).filter(Boolean);
@@ -2193,13 +2212,30 @@ $("langBtn").addEventListener("click", () => openSheet("lang"));
 $("sheet").addEventListener("click", e => { const b = e.target.closest("[data-lang]"); if (b) { TS_I18N.set(b.dataset.lang); closeSheet(); } });
 document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.lang.toUpperCase(); rerender(); renderFilters(); renderTools(); renderEditorChrome(); if (state.oe) renderOE(); });
 
-/* ---------- splash ---------- */
+/* ---------- écran de chargement : on entre dans l'appli quand les données sont là ---------- */
+// Secteurs, salles et murs, voies, puis la miniature de la carte « Reprendre » (4 s au plus : pas de miniature = pas d'attente).
+// Après 12 s, un message propose de continuer ou de réessayer. Jamais de photo complète : le lancement reste léger.
 (() => {
-  const t0 = Date.now(), sp = $("splash");
+  const t0 = Date.now(), sp = $("splash"), dots = [1, 2, 3, 4].map(n => $("spl" + n)), msg = $("splMsg");
+  const MSG = ["Chargement des secteurs…", "Chargement des salles…", "Chargement des voies…", "Dernières photos…"];
+  let dataAt = 0, shut = false;
+  const homePhotoReady = () => {
+    const p = currentPlace(), ref = p && placeRef(p.type, p.id);
+    if (!ref || !String(ref).startsWith("photo:")) return true;
+    return !!BT.img(ref, { thumbOnly: true }) || BT.photoFailed(ref) || BT.thumbMissing(ref);
+  };
+  const close = () => { if (shut) return; shut = true; clearInterval(tick); sp.classList.add("out"); setTimeout(() => sp.remove(), 500); };
   const tick = setInterval(() => {
-    const dt = Date.now() - t0;
-    if (dt > 900 && (state.loaded || dt > 2600)) { clearInterval(tick); sp.classList.add("out"); setTimeout(() => sp.remove(), 500); }
-  }, 120);
+    const dt = Date.now() - t0, data = [state.oLoaded, state.loaded, state.vLoaded], dataOk = data.every(Boolean);
+    if (dataOk && !dataAt) dataAt = Date.now();
+    const flags = [...data, dataOk && (homePhotoReady() || Date.now() - dataAt > 4000)];
+    dots.forEach((d, i) => d.classList.toggle("on", flags[i]));
+    const next = flags.indexOf(false); msg.textContent = next < 0 ? "" : MSG[next];
+    if (next < 0 && dt > 900) close();
+    else if (dt > 12000) $("splSlow").hidden = false;
+  }, 100);
+  $("splGo").addEventListener("click", close);
+  $("splRetry").addEventListener("click", () => location.reload());
 })();
 
 /* ---------- boot ---------- */
@@ -2209,7 +2245,7 @@ renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
 (async () => {
   const [db, user, assets] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("assets")]);
   Object.assign(state, { db, user, assets });
-  if (!db) { state.loaded = state.oLoaded = true; $("offline").hidden = false; renderHeader(); renderList(); if (state.mode === "out") renderOList(); return; }
+  if (!db) { state.loaded = state.oLoaded = state.vLoaded = true; $("offline").hidden = false; renderHeader(); renderList(); if (state.mode === "out") renderOList(); return; }
   db.collection("secteurs").onSnapshot(sn => {
     state.secteurs = sn.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
     if (!state.oLoaded) { state.oLoaded = true; if (!state.secteurs.some(x => x.id === state.secteurId)) state.secteurId = state.secteurs[0]?.id || null; if (state.secteurId) switchSecteur(state.secteurId); bootRoute(); }
@@ -2236,8 +2272,9 @@ renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
     const extra = state.allVoies.filter(v => v._lien && !sn.docs.some(d => d.id === v.id));
     state.allVoies = [...sn.docs.map(d => ({ id: d.id, ...d.data() })), ...extra];
     state.voies = sortVoies(state.allVoies.filter(v => v.secteurId === state.secteurId));
+    state.vLoaded = true;
     rerender();
-  }, () => toast("Impossible de charger les voies pour l'instant."));
+  }, () => { state.vLoaded = true; toast("Impossible de charger les voies pour l'instant."); });
   db.collection("gyms").onSnapshot(s => { state.gyms = s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); gotG = true; ready(); }, fail);
   db.collection("walls").onSnapshot(s => { state.walls = s.docs.map(d => ({ id: d.id, ...d.data() })); gotW = true; ready(); }, fail);
 })();

@@ -155,6 +155,7 @@
     else { if (!opt.thumbOnly) loadFull(id); loadThumb(id); }
     return thumbCache[id] || "";
   }
+  const thumbMissing = ref => typeof ref === "string" && ref.startsWith("photo:") && noThumb.has(ref.slice(6));
   const photoFailed = ref => typeof ref === "string" && ref.startsWith("photo:") && failed.has(ref.slice(6));
   // Relance les photos qui n'ont pas pu charger (retour du réseau, changement d'écran).
   function retryPhotos() { const ids = [...failed]; failed.clear(); ids.forEach(id => notify(id)); }
@@ -165,7 +166,7 @@
     signOut: () => auth.signOut(),
     onUser: fn => listeners.push(fn),
     onPhoto: fn => photoListeners.push(fn),
-    img, uploadPhoto, preparePhoto, makeMissingThumb, photoFailed, retryPhotos, stats,
+    img, uploadPhoto, preparePhoto, makeMissingThumb, photoFailed, thumbMissing, retryPhotos, stats,
     user: () => auth.currentUser,
     ready,
   };
