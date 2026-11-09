@@ -338,6 +338,10 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
         </div>
         <div class="field"><span class="label" id="gLbl">Cotation</span><div class="grades" id="grades" role="group" aria-labelledby="gLbl"></div></div>
         <div class="field"><label class="label" for="fDesc">Consignes (optionnel)</label><textarea id="fDesc" maxlength="240" placeholder="ex. Assis départ, pieds marqués uniquement"></textarea></div>
+        <div class="field"><span class="label">Visibilité</span><div style="display:grid;gap:6px">
+          <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fVis" id="fVisPublic" value="public" checked>Visible par tous</label>
+          <label style="display:flex;gap:8px;align-items:center"><input type="radio" name="fVis" id="fVisPrivate" value="private">Privé (moi seul)</label>
+          <div class="note" id="fVisNote" hidden></div></div></div>
         <div class="err" id="fErr"></div>
         <div style="display:flex; gap:10px; flex-wrap:wrap">
           <button class="btn" type="submit" id="fSave">Publier le bloc</button>
@@ -728,12 +732,22 @@ function renderGrades() {
   $("grades").innerHTML = GRADES.map(g => `<button type="button" class="chip" data-g="${g}" aria-pressed="${state.grade === g}">${g}</button>`).join("");
 }
 $("grades").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.grade = b.dataset.g; renderGrades(); saveDraft(); });
+// Visibilité d'un bloc : public par défaut, le dernier choix est gardé sur le téléphone. Un bloc public déjà noté ne peut plus devenir privé.
+function setVisField(isPrivate, rated = false) {
+  $("fVisPrivate").checked = isPrivate; $("fVisPublic").checked = !isPrivate;
+  $("fVisPrivate").disabled = rated;
+  $("fVisNote").hidden = !rated; $("fVisNote").textContent = rated ? "Ce bloc a déjà des notes : il ne peut plus devenir privé." : "";
+}
+const lastVis = () => lsGet("ts-bloc-vis") === "private";
+$("form").addEventListener("change", e => { if (e.target.name === "fVis" && state.edit.kind !== "bloc") lsSet("ts-bloc-vis", $("fVisPrivate").checked ? "private" : "public"); });
 function clearEditor(wipe = true) {
   state.edit = { kind: "new" }; state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null;
+  setVisField(lastVis());
   $("fName").value = ""; $("fDesc").value = ""; $("fSetter").value = accountFirstName(); $("fErr").textContent = "";
   if (wipe) lsSet("pan-draft", ""); renderEditorChrome(); renderEditor();
 }
 function fillEditor(src) {
+  if (state.edit.kind === "bloc") setVisField(!!src.isPrivate, !src.isPrivate && (src.ratingCount || 0) > 0); else setVisField(lastVis());
   state.holds = (src.holds || []).map(h => ({ ...h }));
   $("fName").value = src.name || ""; $("fDesc").value = src.desc || "";
   $("fSetter").value = src.setter || accountFirstName();
@@ -803,15 +817,26 @@ $("form").addEventListener("submit", async e => {
   const ed = state.edit;
   try {
     let id;
-    if (ed.kind === "bloc") { await state.db.collection("blocs").doc(ed.id).update({ ...p, updatedAt: Date.now(), updatedBy: state.me }); id = ed.id; }
-    else {
-      const ref = await state.db.collection("blocs").add({ ...p, gymId: state.gymId, wallId: w.id, authorId: state.me || null, createdAt: Date.now() });
+    const wantPrivate = $("fVisPrivate").checked, col = priv => state.db.collection(priv ? "blocsPrivees" : "blocs");
+    if (ed.kind === "bloc") {
+      const cur = state.blocs.find(b => b.id === ed.id); id = ed.id;
+      if (cur && !!cur.isPrivate === wantPrivate) await col(wantPrivate).doc(id).update({ ...p, updatedAt: Date.now(), updatedBy: state.me });
+      else if (cur) {
+        // Changer de visibilité déplace le bloc, sous le même identifiant (lien direct conservé).
+        if (wantPrivate && (cur.ratingCount || 0) > 0) { $("fErr").textContent = "Ce bloc a déjà des notes : il ne peut plus devenir privé."; return; }
+        const { id: _, isPrivate: __, ...kept } = cur, batch = state.db.batch();
+        batch.delete(col(!wantPrivate).doc(id));
+        batch.set(col(wantPrivate).doc(id), { ...kept, ...p, updatedAt: Date.now(), updatedBy: state.me });
+        await batch.commit();
+      } else throw new Error("introuvable");
+    } else {
+      const ref = await col(wantPrivate).add({ ...p, gymId: state.gymId, wallId: w.id, authorId: state.me || null, createdAt: Date.now() });
       id = ref.id;
       TS_MESURE.event("bloc_cree", { salle: state.gymId, type: "bloc" });
       if (ed.kind === "draft") { try { await draftsCol().doc(ed.id).delete(); } catch {} }
     }
     clearEditor(); restoreLocal();
-    toast(ed.kind === "bloc" ? "Modifications enregistrées" : "Bloc publié"); openDetail(id);
+    toast(ed.kind === "bloc" ? "Modifications enregistrées" : $("fVisPrivate").checked ? "Bloc enregistré, vous seul le voyez" : "Bloc publié"); openDetail(id);
   } catch (err) {
     $("fErr").textContent = err && (err.code === "permission_denied" || err.code === "permission-denied") ? "Enregistrement refusé : vous n'avez pas les droits d'écriture sur ce pan." : "Enregistrement impossible pour l'instant. Réessayez dans un instant.";
   } finally { $("fSave").disabled = false; }
@@ -881,7 +906,7 @@ function renderList() {
     return `<button class="card${old ? " old" : ""}" data-id="${esc(b.id)}">
       <div class="thumb">${w ? wallSVG(w, b.holds || [], { mini: true, uid: "t" + b.id.replace(/\W/g, "") }) : ""}</div>
       <div class="meta"><div class="name">${esc(b.name)}</div>
-        <div class="by">${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div>${ratingLine(b)}</div>
+        <div class="by">${b.isPrivate ? `<span class="tag">🔒 Privé</span>` : ""}${old ? `<span class="tag">Archivé</span>` : ""}${esc(b.setter || "Ouvreur inconnu")} · ${ago(b.createdAt)} · ${(b.holds || []).filter(h => h.t === "hand").length} moves</div>${ratingLine(b)}</div>
       <div class="grade">${esc(b.grade)}</div>
     </button>`; }).join("");
 }
@@ -909,18 +934,18 @@ function openDetail(id) { state.current = id; state.delArmed = null; go("detail"
 function renderDetail() {
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
   $("dAdminEdit").hidden = !(b && w && isAdmin());
-  renderRating($("dRate"), "blocs", b && w ? b : null, b && w && !isArchived(b));
+  renderRating($("dRate"), "blocs", b && w && !b.isPrivate ? b : null, b && w && !isArchived(b));
   const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
   if (!b || !w) { $("dName").textContent = "Bloc introuvable"; $("dBy").textContent = "Il a peut-être été supprimé."; $("dGrade").textContent = ""; $("dSeq").textContent = ""; $("dDesc").hidden = true; wallEl.hidden = true; $("dDel").hidden = $("dDelOk").hidden = $("dEdit").hidden = $("dReplay").hidden = true; $("dOld").hidden = true; return; }
   wallEl.hidden = false;
   $("dName").textContent = b.name; $("dGrade").textContent = b.grade;
-  $("dBy").textContent = `Ouvert par ${b.setter || "un grimpeur"} · ${day(b.createdAt)}${b.updatedAt ? ` · modifié le ${day(b.updatedAt)}` : ""}`;
+  $("dBy").textContent = `Ouvert par ${b.setter || "un grimpeur"} · ${day(b.createdAt)}${b.updatedAt ? ` · modifié le ${day(b.updatedAt)}` : ""}${b.isPrivate ? " · 🔒 Privé, vous seul le voyez" : ""}`;
   $("dOld").hidden = !isArchived(b);
   wallEl.innerHTML = wallSVG(w, b.holds || [], { uid: "d" }); wallEl.appendChild(btn);
   $("dSeq").textContent = seqText(b.holds || []);
   $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
   const own = state.me && b.authorId === state.me;
-  $("dDel").hidden = !(own || canManageGym(b.gymId)) || state.delArmed === b.id; $("dDelOk").hidden = state.delArmed !== b.id; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
+  $("dDel").hidden = !(own || (canManageGym(b.gymId) && !b.isPrivate)) || state.delArmed === b.id; $("dDelOk").hidden = state.delArmed !== b.id; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
 }
 $("dEdit").addEventListener("click", () => startEdit("bloc", state.current));
 $("dAdminEdit").addEventListener("click", () => openEdit("blocs", state.current));
@@ -953,7 +978,7 @@ function focusB() {
 $("dWall").addEventListener("click", () => openFs("view"));
 $("dWall").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFs("view"); } });
 $("dDel").addEventListener("click", () => { state.delArmed = state.current; $("dDel").hidden = true; $("dDelOk").hidden = false; });
-$("dDelOk").addEventListener("click", async () => { try { if (isAdmin()) await deleteVotes("blocs", state.current); await state.db.collection("blocs").doc(state.current).delete(); toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
+$("dDelOk").addEventListener("click", async () => { try { const cur = state.blocs.find(x => x.id === state.current); if (cur?.isPrivate) await state.db.collection("blocsPrivees").doc(state.current).delete(); else { if (isAdmin()) await deleteVotes("blocs", state.current); await state.db.collection("blocs").doc(state.current).delete(); } toast("Bloc supprimé"); go("list"); } catch { toast("Suppression refusée"); } });
 
 /* ---------- gyms & walls sheet ---------- */
 function openSheet(panel = "main") { state.sheet = panel; $("sheet").innerHTML = ""; renderSheet(); $("sheetBg").hidden = false; document.body.classList.add("locked"); }
@@ -1217,7 +1242,9 @@ async function routeFromHash() {
   const gone = () => { toast("Ce contenu n'existe plus"); go("home"); };
   if (type === "salle" || type === "secteur") { placeOf(type, id) ? openPlace(type, id) : gone(); return; }
   try {
-    const d = await state.db.collection(type === "voie" ? "voies" : "blocs").doc(id).get();
+    let d = await state.db.collection(type === "voie" ? "voies" : "blocs").doc(id).get();
+    // Un bloc privé ne s'ouvre que pour son auteur : pour les autres, la lecture est refusée et le lien « n'existe plus ».
+    if (!d.exists && type === "bloc" && state.me) { try { d = await state.db.collection("blocsPrivees").doc(id).get(); } catch { return gone(); } }
     if (!d.exists) return gone();
     const x = d.data();
     if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x, _lien: true }); openPlace("secteur", x.secteurId); openVoie(id); }
@@ -1319,8 +1346,9 @@ function rerender() {
   if (state.fsMode === "oview" || state.fsMode === "replay") renderOFs();
 }
 function switchGym(id) {
-  state.gymId = id; lsSet("pan-gym", id); state.blocs = []; state.blocsLoaded = false; state.filter = "all";
+  state.gymId = id; lsSet("pan-gym", id); state.blocs = state.pubBlocs = state.privBlocs = []; state.blocsLoaded = false; state.filter = "all";
   if (state.unsubBlocs) state.unsubBlocs();
+  state.unsubPriv?.(); state.unsubPriv = null;
   state.unsubBlocs = null; state.blocsFor = null;
   state.edit = { kind: "new" }; state.holds = []; loadDraft(); renderGrades(); renderEditorChrome(); if (state.mode === "in") go(state.view === "detail" ? "list" : state.view); rerender();
 }
@@ -1330,10 +1358,28 @@ function ensureBlocs() {
   if (!state.db || !id || state.blocsFor === id) return;
   state.unsubBlocs?.(); state.blocsFor = id; state.blocsLoaded = false;
   state.unsubBlocs = state.db.collection("blocs").where("gymId", "==", id).onSnapshot(snap => {
-    state.blocs = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    state.pubBlocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    mergeBlocs();
     state.blocsLoaded = true;
     rerender();
   }, () => toast("Impossible de charger les blocs pour l'instant."));
+  subscribePrivBlocs();
+}
+// Blocs de la salle : les publics, plus les blocs privés de la personne connectée (lus à part, les règles refusent toute autre lecture).
+function mergeBlocs() {
+  const seen = new Set();
+  state.blocs = [...(state.pubBlocs || []), ...(state.privBlocs || [])].filter(b => !seen.has(b.id) && seen.add(b.id)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+function subscribePrivBlocs() {
+  state.unsubPriv?.(); state.unsubPriv = null; state.privBlocs = [];
+  const id = state.blocsFor;
+  if (state.me && state.db && id) {
+    state.unsubPriv = state.db.collection("blocsPrivees").where("gymId", "==", id).where("authorId", "==", state.me).onSnapshot(snap => {
+      state.privBlocs = snap.docs.map(d => ({ id: d.id, ...d.data(), isPrivate: true }));
+      mergeBlocs(); rerender();
+    }, () => {});
+  }
+  mergeBlocs();
 }
 
 /* ================= OUTDOOR: secteurs, voies, méthodes ================= */
@@ -2050,7 +2096,7 @@ const EDITS = {
   gyms: { title: "Modifier la salle", items: () => state.gyms, fields: [["name", "Nom de la salle", 40, true], ["city", "Ville", 60, false]], commune: "city" },
   secteurs: { title: "Modifier le secteur", items: () => state.secteurs, fields: [["name", "Nom du secteur", 50, true], ["region", "Commune", 60, false]], commune: "region" },
   voies: { title: "Modifier la voie", items: () => state.voies, fields: [["name", "Nom de la voie", 50, true], ["addedBy", "Ajoutée par", 30, true]], grade: true },
-  blocs: { title: "Modifier l'ouvreur", items: () => state.blocs, fields: [["setter", "Ouvert par", 30, true]] },
+  blocs: { title: "Modifier l'ouvreur", items: () => state.blocs.filter(b => !b.isPrivate), fields: [["setter", "Ouvert par", 30, true]] },
   methodes: { title: "Modifier le prénom", items: () => state.methodes, fields: [["climber", "Grimpeur", 30, true]] },
 };
 const withEdit = (col, x, row) => isAdmin() ? `<div style="display:flex;gap:8px"><div style="flex:1;min-width:0;display:grid">${row}</div><button class="btn ghost small" type="button" data-edit="${col}:${esc(x.id)}" aria-label="Modifier « ${esc(x.name)} »">Modifier</button></div>` : row;
@@ -2199,7 +2245,7 @@ BT.onPhoto((id, err) => {
   rerender(); if (state.view === "oedit") renderOE(); if (state.fsMode === "edit") renderEditor(); });
 BT.onUser(u => {
   state.me = u ? u.uid : null;
-  renderAcct(); subscribeDrafts(); subscribeRoles(); subscribeMethods(state.voieId); renderEditorChrome();
+  renderAcct(); subscribeDrafts(); subscribeRoles(); subscribeMethods(state.voieId); subscribePrivBlocs(); renderEditorChrome();
   syncNames();
   if (u) { toast(`Connecté : ${u.displayName || u.email}`); if (state.sheet === "login") closeSheet(); }
   rerender();
@@ -2240,7 +2286,7 @@ document.addEventListener("ts-lang", () => { $("langBtn").textContent = TS_I18N.
 
 /* ---------- boot ---------- */
 try { localStorage.removeItem("pan-setter"); } catch {}
-renderGrades(); renderTools(); renderEditorChrome(); go("home"); renderHeader();
+renderGrades(); renderTools(); renderEditorChrome(); setVisField(lastVis()); go("home"); renderHeader();
 
 (async () => {
   const [db, user, assets] = await Promise.all([claude.use("db"), claude.use("user"), claude.use("assets")]);

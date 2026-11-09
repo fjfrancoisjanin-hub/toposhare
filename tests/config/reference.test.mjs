@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { PUBLIC_COLLECTIONS, decodeFields, readPublicCollection } from '../../scripts/reference-lib.mjs';
 
 test('aucune collection privée dans la référence', () => {
-  for (const col of ['votes', 'methodesPrivees', 'feedback', 'data', 'gymOwners', 'contributeurs', 'utilisateurs']) assert.ok(!PUBLIC_COLLECTIONS.includes(col), col);
+  for (const col of ['votes', 'methodesPrivees', 'blocsPrivees', 'feedback', 'data', 'gymOwners', 'contributeurs', 'utilisateurs']) assert.ok(!PUBLIC_COLLECTIONS.includes(col), col);
 });
 
 test('les valeurs Firestore sont décodées avec leur type', () => {

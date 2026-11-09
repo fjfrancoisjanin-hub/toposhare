@@ -88,6 +88,16 @@ service cloud.firestore {
       allow delete: if mine() || isAdmin() || isGymOwner(resource.data.gymId);
     }
 
+    // Blocs privés : à part des blocs publics, lisibles par leur auteur et l'admin seulement (pas de note, pas de propriétaire de salle).
+    // Un bloc public déjà noté ne peut pas devenir privé : ses notes seraient perdues. Le passage se fait dans un lot, le bloc public existe encore au moment du contrôle.
+    match /blocsPrivees/{id} {
+      function wasRated() { let pub = /databases/$(database)/documents/blocs/$(id); return exists(pub) && get(pub).data.get('ratingCount', 0) > 0; }
+      allow read: if mine() || isAdmin();
+      allow create: if (claimsMe() || isAdmin()) && noRating() && !wasRated();
+      allow update: if (mine() || isAdmin()) && editOk() && nameOk('name', 40) && nameOk('grade', 10) && nameOk('setter', 30) && noRating();
+      allow delete: if mine() || isAdmin();
+    }
+
     // Falaise : secteurs, voies (points d'ancrage communs), méthodes par grimpeur.
     match /secteurs/{id} {
       allow read: if true;
