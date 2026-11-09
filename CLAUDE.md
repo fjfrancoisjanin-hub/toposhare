@@ -29,7 +29,8 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 ## Photos et lectures
 - **Une seule passe de compression**, dans `firebase-shim.js` (`preparePhoto`) : depuis l'image d'origine, 2 000 px au plus, qualité baissée puis taille réduite jusqu'à 400 Ko ; au-delà, refus avec un message clair. Le canvas ne recopie ni EXIF ni GPS. Photo et miniature partent dans le même lot.
 - **Lecture** (`BT.img`) : cache du téléphone d'abord (une photo ne change jamais), serveur ensuite. Écran d'accueil et carte « Reprendre » : miniature seulement. Petites cartes de liste : miniature, photo complète s'il n'y en a pas. Photo d'en-tête : chargée quand l'écran est visible, miniature en attendant.
-- **Lancement** : secteurs, salles, murs et voies (une seule écoute sur `voies`) ; les blocs d'une salle ne se lisent qu'à l'entrée dans la salle. Aucune photo.
+- **Lancement** : secteurs, salles, murs et voies (une seule écoute sur `voies`) ; les blocs d'une salle ne se lisent qu'à l'entrée dans la salle. Aucune photo complète.
+- **Écran de chargement** (`#splash`) : reste affiché jusqu'à l'arrivée des secteurs, salles et murs, voies (`state.oLoaded`, `loaded`, `vLoaded`) puis de la miniature de la carte « Reprendre » (4 s au plus ; pas de miniature = pas d'attente). Après 12 s : message « Connexion lente » avec Continuer / Réessayer. On n'attend volontairement pas toutes les photos : lecture Firestore lourde et quota gratuit de 50 000 lectures par jour. Slogan : « Par les grimpeurs, pour les grimpeurs. » (i18n FR/EN/ES, `manifest`, meta description).
 - Chaque envoi crée une photo distincte : le partage d'une photo entre voies ou vues n'existe pas encore (supprimer une vue supprime sa photo).
 
 ## Navigation
