@@ -15,16 +15,25 @@ async function seedPlaces(id) {
 }
 const card = (page, text) => page.locator('.card .name', { hasText: text });
 
-test('premier lancement : titre, recherche, lieux existants, et « Nouveau » sur le bouton de création', async ({ page }, testInfo) => {
+test('premier lancement : titre, recherche, deux entrées Salles / Falaises, et « Nouveau » sur le bouton de création', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedPlaces(id);
   await page.goto('/');
   await expect(page.locator('#hTitle')).toHaveText("Où grimpes-tu aujourd'hui ?");
-  await expect(page.locator('#hBody')).toContainText(`Salle ${id}`);
-  await expect(page.locator('#hBody')).toContainText(`Anglars ${id}`);
+  await expect(page.locator('#hEntrySalles')).toBeVisible();
+  await expect(page.locator('#hEntryFalaises')).toBeVisible();
+  await expect(page.locator('#hResume')).toHaveCount(0);
+  await expect(page.locator('#hBody')).not.toContainText('Récents');
   await expect(page.locator('[data-add-place]')).toBeVisible();
-  await expect(page.locator('#tabPlace')).toBeHidden();
   await expect(page.locator('#tabCreateLbl')).toHaveText('Nouveau');
+  await page.locator('#hEntrySalles').click();
+  await expect(page.locator('#plTitle')).toHaveText('Salles');
+  await expect(page.locator('#plBody')).toContainText(`Salle ${id}`);
+  await expect(page.locator('#plBody')).not.toContainText(`Anglars ${id}`);
+  await page.locator('#tabFalaises').click();
+  await expect(page.locator('#plTitle')).toHaveText('Falaises');
+  await expect(page.locator('#plBody')).toContainText(`Anglars ${id}`);
+  await expect(page.locator('#plBody')).toContainText('Saint-Antonin-Noble-Val (82)');
 });
 
 test("ouvrir le lien d'une salle, d'un secteur, d'une voie ou d'un bloc mène à la page, sans aucun tap", async ({ page }, testInfo) => {
@@ -65,13 +74,12 @@ test("le dernier lieu s'ouvre en 1 tap depuis l'accueil, une de ses voies en 2, 
   await expect(page.locator('#hResume')).toContainText(`Reprendre : Anglars ${id}`);
   await expect(page.locator('#hResume')).toContainText('Saint-Antonin-Noble-Val (82)');
   await expect(page.locator('#tabCreateLbl')).toHaveText('Nouvelle voie');
-  await expect(page.locator('#tabPlace')).toContainText(`Anglars ${id}`);
   await page.locator('#hResume').click();
   await card(page, `Le marché ${id}`).click();
   await expect(page.locator('#ovName')).toHaveText(`Le marché ${id}`);
   await page.reload();
   await expect(page.locator('#hResume')).toBeVisible();
-  await expect(page.locator('#hBody')).toContainText('Récents');
+  await expect(page.locator('#hBody')).not.toContainText('Récents');
 });
 
 test('un invité utilise la recherche : préfixes, accents, tirets et st / saint', async ({ page }, testInfo) => {
@@ -116,6 +124,48 @@ test('les favoris se gardent, sans compte, et un lieu supprimé disparaît sans 
   await expect(page.locator('#hResume')).toContainText(`Anglars ${id}`);
 });
 
+test('passer de la salle à la falaise se fait en 1 tap, et chaque onglet suit son monde', async ({ page }, testInfo) => {
+  const id = uid(testInfo);
+  await seedPlaces(id);
+  await page.goto(`/#/salle/g-${id}`);
+  await expect(card(page, `Bloc ${id}`)).toBeVisible();
+  await expect(page.locator('#tabSalles')).toHaveAttribute('aria-current', 'page');
+  await page.locator('#tabFalaises').click();
+  await expect(page.locator('#tabFalaises')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('#plTitle')).toHaveText('Falaises');
+  await page.locator(`#plBody [data-go="secteur:s-${id}"]`).first().click();
+  await expect(card(page, `Le marché ${id}`)).toBeVisible();
+  await expect(page.locator('#tabCreateLbl')).toHaveText('Nouvelle voie');
+  await expect(page.locator('[data-hero="secteur"] [data-home]')).toHaveText('← Falaises');
+  // Retour à la salle : le dernier lieu de ce type s'ouvre directement.
+  await page.locator('#tabSalles').click();
+  await expect(card(page, `Bloc ${id}`)).toBeVisible();
+  // Dans le lieu, l'onglet ouvre la liste ; au fond d'une fiche, il remonte au lieu.
+  await page.locator('#tabSalles').click();
+  await expect(page.locator('#plTitle')).toHaveText('Salles');
+  await page.locator(`#plBody [data-go="salle:g-${id}"]`).first().click();
+  await card(page, `Bloc ${id}`).click();
+  await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`);
+  await page.locator('#tabSalles').click();
+  await expect(card(page, `Bloc ${id}`)).toBeVisible();
+  // Depuis l'en-tête d'un lieu, on bascule vers l'autre monde sans repasser par l'accueil.
+  await page.locator('#gymBtn').click();
+  await page.locator('[data-switch-kind="secteur"]').click();
+  await expect(page.locator('#plTitle')).toHaveText('Falaises');
+});
+
+test('depuis la liste, une étoile met en favori, et le favori apparaît sur l\'accueil', async ({ page }, testInfo) => {
+  const id = uid(testInfo);
+  await seedPlaces(id);
+  await page.goto('/');
+  await page.locator('#hEntrySalles').click();
+  await page.locator(`[data-fav="salle:g-${id}"]`).click();
+  await expect(page.locator(`[data-fav="salle:g-${id}"]`)).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('[data-places-home]').click();
+  await expect(page.locator('#hBody')).toContainText('Favoris');
+  await expect(page.locator('#hBody')).toContainText(`Salle ${id}`);
+});
+
 test('« Nouveau » fait choisir entre bloc et voie, puis le lieu', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedPlaces(id);
@@ -155,13 +205,15 @@ test('le QR code généré sur /admin mène à la bonne salle', async ({ page },
   await expect(card(page, `Bloc ${id}`)).toBeVisible({ timeout: 15_000 });
 });
 
-test('à 390 px, la barre du bas tronque un nom très long sans déborder', async ({ page }, testInfo) => {
+test('à 390 px, la barre du bas tient sur une ligne et le nom très long du secteur ne déborde pas', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seed('secteurs', id, { name: `Un nom de secteur vraiment très long ${id}`, region: '', createdAt: 1 });
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(`/#/secteur/${id}`);
-  await expect(page.locator('#tabPlace')).toBeVisible();
+  await expect(page.locator('#tabFalaises')).toBeVisible();
   const box = await page.locator('nav.tabs .in').evaluate(n => ({ s: n.scrollWidth, c: n.clientWidth }));
   expect(box.s).toBeLessThanOrEqual(box.c);
+  const tabs = await page.locator('nav.tabs .tab').evaluateAll(els => els.map(e => ({ w: e.clientWidth, s: e.scrollWidth })));
+  for (const t of tabs) expect(t.s).toBeLessThanOrEqual(t.w + 1);
   await expect(page.locator('[data-hero="secteur"] b')).toHaveText(`Un nom de secteur vraiment très long ${id}`);
 });

@@ -60,7 +60,7 @@ test("l'auteur crée L2 en 6c+, un autre ajoute une vue « L2 depuis le relais �
   await page.locator('#ovLens [data-len]').nth(1).click();
   await expect(page.locator('#ovWall')).toBeVisible();
   await expect(page.locator('[data-act="delv"]')).toHaveCount(0);
-  await page.locator('#tabPlace').click();
+  await page.locator('#tabFalaises').click();
   await expect(page.locator('#oListEl .card .grade')).toHaveText('6c+');
 
   // Le contributeur retire sa vue : la voie redevient supprimable par son auteur.

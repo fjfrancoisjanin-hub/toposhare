@@ -33,7 +33,7 @@ Public visé : ~50 grimpeurs de la communauté, puis multi-salles. Mobile d'abor
 - Chaque envoi crée une photo distincte : le partage d'une photo entre voies ou vues n'existe pas encore (supprimer une vue supprime sa photo).
 
 ## Navigation
-Accueil, lieu en cours et bouton de création. Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
+Barre du bas : **Accueil · Salles · Falaises · +** (création). Accueil : carte « Reprendre » (dernier lieu), deux entrées Salles / Falaises (listes `vPlaces`, dernières visites puis par commune, étoile de favori), puis Favoris. Plus de bloc « Récents » à l'écran (`ts-recents` sert encore à « Reprendre » et aux dernières visites). Onglet Salles/Falaises : au fond d'une fiche il remonte au lieu, dans le lieu il ouvre la liste, ailleurs il rouvre le dernier lieu de ce type. L'en-tête d'un lieu propose « Passer aux falaises / salles ». Liens directs en `/#/salle/id`, `/#/secteur/id`, `/#/voie/id`, `/#/bloc/id`. Favoris (`ts-favs`) et récents (`ts-recents`) restent dans `localStorage`.
 
 ## Mesure d'audience
 Tableau de bord : Umami Cloud. Le suivi automatique est coupé, chaque écran est envoyé depuis `go()`, avec des adresses `/salle/id`, `/bloc/id`, etc. QR code d'une salle : `/?src=qr#/salle/id` (`docs/qr/`, régénéré par `node scripts/make-qr.mjs <slug>`).
@@ -61,7 +61,7 @@ Chaque contenu porte `authorId` = uid de l'auteur. L'admin (`isAdmin()` dans les
 - **Notes** : de 0 à 3 étoiles, connexion obligatoire, un vote par personne, moyenne affichée à partir de 3 votes, pas de note sur son propre contenu.
 - **Géographie** : deux niveaux en falaise, commune puis secteur. La commune vient de la liste officielle française (geo.api.gouv.fr), elle est obligatoire pour un nouveau secteur, et affichée « Saint-Antonin-Noble-Val (82) ». France uniquement pour l'instant.
 - **Voies** : une ou plusieurs longueurs, chacune avec sa cotation ; une ou plusieurs vues (photos) par longueur ; points d'ancrage propres à chaque vue.
-- **Navigation** : écran d'accueil avec recherche ; barre du bas « Accueil · lieu en cours · Nouveau bloc / Nouvelle voie ».
+- **Navigation** : écran d'accueil avec recherche ; barre du bas « Accueil · Salles · Falaises · Nouveau / Nouveau bloc / Nouvelle voie ». Pas de bloc « Récents » sur l'accueil.
 - **Contrôle côté serveur** : toute règle d'accès est appliquée par les règles Firestore, jamais seulement en cachant un bouton.
 
 ## Sécurité : failles connues (tests `todo` dans tests/rules)

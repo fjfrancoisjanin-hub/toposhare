@@ -161,7 +161,19 @@ nav.tabs .tab.plus { flex-grow: 1.3; }
 .placehero .bar button { appearance: none; border: 0; border-radius: 10px; padding: 8px 10px; font: 700 13px var(--f-body); background: rgba(0,0,0,.55); color: #fff; cursor: pointer; }
 .placehero .bar div { display: flex; gap: 8px; }
 mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
-.tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 700 15px var(--f-body); padding: 10px; border-radius: 12px; cursor: pointer; }
+.tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 700 13px var(--f-body); padding: 10px 4px; border-radius: 12px; cursor: pointer; }
+nav.tabs .in { gap: 6px; }
+nav.tabs .tab.plus { flex-grow: 1.7; padding-inline: 6px; gap: 6px; }
+.entries { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.entry { appearance: none; display: grid; gap: 2px; justify-items: start; text-align: left; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 16px; padding: 16px 14px; cursor: pointer; font-family: var(--f-body); }
+.entry .em { font-size: 28px; line-height: 1; margin-bottom: 6px; }
+.entry b { font: 800 19px var(--f-display); }
+.entry small { color: var(--muted); }
+.plhead { display: flex; align-items: center; gap: 12px; }
+.plhead h1 { margin: 0; }
+.prow { display: flex; gap: 8px; align-items: stretch; }
+.prow .gymrow { flex: 1 1 auto; min-width: 0; }
+.prow .favbtn { appearance: none; flex: none; width: 48px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 12px; font-size: 20px; cursor: pointer; }
 .tab[aria-current="page"] { color: var(--fg); background: var(--bg); }
 .tab.plus { background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
 .tab.plus .pl { width: 22px; height: 22px; flex: none; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font-size: 18px; line-height: 1; font-weight: 800; }
@@ -262,6 +274,14 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
       <div id="hResults" style="display:grid;gap:14px" aria-live="polite"></div>
       <div id="hBody" style="display:grid;gap:16px"></div>
       <button class="fb-link" type="button" data-feedback>Une idée, un bug ? Donnez votre avis</button>
+    </div>
+  </section>
+
+  <!-- LIEUX : liste des salles ou des falaises -->
+  <section id="vPlaces" hidden>
+    <div class="gut home">
+      <div class="plhead"><button class="btn ghost small" type="button" data-places-home>← Accueil</button><h1 id="plTitle"></h1></div>
+      <div id="plBody" style="display:grid;gap:16px"></div>
     </div>
   </section>
 
@@ -415,7 +435,8 @@ mark { background: #FFD84D; color: #1A1A1A; border-radius: 2px; }
 
 <nav class="tabs"><div class="in">
   <button class="tab" id="tabHome" aria-current="page">Accueil</button>
-  <button class="tab" id="tabPlace" hidden></button>
+  <button class="tab" id="tabSalles">🧗 Salles</button>
+  <button class="tab" id="tabFalaises">⛰️ Falaises</button>
   <button class="tab plus" id="tabCreate"><span class="pl" aria-hidden="true">+</span><span id="tabCreateLbl">Nouveau</span></button>
 </div></nav>
 
@@ -987,6 +1008,7 @@ function renderSheet() {
   }
   const walls = g ? wallsOf(g.id) : [];
   s.innerHTML = `<h2 id="sheetTitle">Salles</h2>
+    <button class="btn ghost small" type="button" data-switch-kind="secteur">⛰️ Passer aux falaises</button>
     <section><div class="gymlist">${state.gyms.length ? state.gyms.map(x => withEdit("gyms", x, `<button class="gymrow" type="button" data-gym="${esc(x.id)}" aria-current="${x.id === state.gymId}"><span><b>${esc(x.name)}</b> <small>${esc(x.city || "")}${unverified(x)}</small></span><small>${x.id === state.gymId ? "Sélectionnée" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucune salle pour l'instant.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newgym">+ Ajouter une salle</button></section>
     ${g ? `<section><div class="label">Murs de ${esc(g.name)}</div>
@@ -995,6 +1017,7 @@ function renderSheet() {
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
 }
 $("sheet").addEventListener("click", e => {
+  const sw = e.target.closest("[data-switch-kind]"); if (sw) { closeSheet(); openPlaces(sw.dataset.switchKind); return; }
   const p = e.target.closest("[data-sheet]"); if (p) { state.sheet = p.dataset.sheet; renderSheet(); return; }
   if (e.target.closest("[data-close-sheet]")) { closeSheet(); return; }
   const gb = e.target.closest("[data-gym]"); if (gb) { const after = state.afterPick; openPlace("salle", gb.dataset.gym); closeSheet(); if (after) $("tabCreate").click(); }
@@ -1032,9 +1055,7 @@ function openPlace(type, id) {
   else { if (state.secteurId !== id) switchSecteur(id); go("olist"); }
 }
 function renderTabs() {
-  const p = currentPlace(), x = p && placeOf(p.type, p.id), tab = $("tabPlace");
-  tab.hidden = !x;
-  if (x) { tab.textContent = `${p.type === "salle" ? "🧗" : "⛰️"} ${x.name}`; tab.setAttribute("aria-label", x.name); }
+  const p = currentPlace();
   const editing = p?.type === "salle" && (state.edit.kind !== "new" || state.holds.length);
   $("tabCreateLbl").textContent = !p ? "Nouveau" : p.type === "secteur" ? "Nouvelle voie" : editing ? "Bloc en cours" : "Nouveau bloc";
 }
@@ -1046,7 +1067,7 @@ function renderHero() {
     const photo = placePhoto(type, id), fav = isFav(type, id);
     el.hidden = false;
     el.innerHTML = `${photo ? `<img src="${esc(photo)}" alt="">` : ""}
-      <div class="bar"><button type="button" data-home>← Accueil</button><div>
+      <div class="bar"><button type="button" data-home>${state.origin === "places" ? (type === "salle" ? "← Salles" : "← Falaises") : "← Accueil"}</button><div>
         <button type="button" data-share>Partager le lien</button>
         <button type="button" data-star aria-pressed="${fav}" aria-label="${fav ? "Retirer des favoris" : "Ajouter aux favoris"}">${fav ? "★" : "☆"}</button></div></div>
       <div class="txt"><b>${esc(x.name)}</b><small>${esc(placeCommune(type, x) || "")}</small></div>`;
@@ -1055,7 +1076,7 @@ function renderHero() {
 document.addEventListener("click", async e => {
   const h = e.target.closest("[data-hero]"); if (!h) return;
   const type = h.dataset.hero, id = type === "salle" ? state.gymId : state.secteurId;
-  if (e.target.closest("[data-home]")) go("home");
+  if (e.target.closest("[data-home]")) { if (state.origin === "places") openPlaces(type); else go("home"); }
   if (e.target.closest("[data-star]")) { toggleFav(type, id); renderHero(); }
   if (e.target.closest("[data-share]")) {
     const url = placeUrl(type, id);
@@ -1065,27 +1086,51 @@ document.addEventListener("click", async e => {
 });
 const placeRow = (r, sub) => { const x = placeOf(r.type, r.id); return `<button class="gymrow" type="button" data-go="${r.type}:${esc(r.id)}"><span><b>${esc(x.name)}</b> <small>${esc(sub ?? placeCommune(r.type, x) ?? "")}</small></span><small>${TYPE_LABEL[r.type]}</small></button>`; };
 const TYPE_LABEL = { salle: "Salle", secteur: "Secteur", voie: "Voie" };
+const lastOf = kind => liveRecents().find(r => r.type === kind) || null;
+const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
 function renderHome() {
   renderSearch();
   const recents = liveRecents(), p = recents.find(r => r.type !== "voie"), firstRun = !lsJson("ts-recents").length;
   $("hTitle").hidden = !firstRun;
   $("hBody").hidden = !!$("hSearch").value.trim();
   if (!state.loaded || !state.oLoaded) { $("hBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
-  if (!p && !recents.length) {
-    $("hBody").innerHTML = `<section>${[...state.gyms.map(g => placeRow({ type: "salle", id: g.id })), ...state.secteurs.map(x => placeRow({ type: "secteur", id: x.id }))].join("")}</section>
-      <button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
-    return;
-  }
-  const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id)), others = recents.filter(r => !(p && r.type === p.type && r.id === p.id)).slice(0, 5);
+  const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id));
   let html = "";
   if (p) {
     const x = placeOf(p.type, p.id), photo = placePhoto(p.type, p.id, { thumbOnly: true });
     html += `<button class="resume" id="hResume" data-go="${p.type}:${esc(p.id)}">${photo ? `<img src="${esc(photo)}" alt="">` : ""}<span class="txt"><b>Reprendre : ${esc(x.name)}</b><small>${[TYPE_LABEL[p.type], placeCommune(p.type, x), ago(p.t)].filter(Boolean).map(esc).join(" · ")}</small></span></button>`;
   }
+  html += `<div class="entries"><button class="entry" type="button" id="hEntrySalles" data-list="salle"><span class="em" aria-hidden="true">🧗</span><b>Salles</b><small>${plural(state.gyms.length, "salle", "salles")}</small></button>
+    <button class="entry" type="button" id="hEntryFalaises" data-list="secteur"><span class="em" aria-hidden="true">⛰️</span><b>Falaises</b><small>${plural(state.secteurs.length, "secteur", "secteurs")}</small></button></div>`;
   if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
-  if (others.length) html += `<section><div class="label">Récents</div>${others.map(r => placeRow(r)).join("")}</section>`;
+  if (firstRun) html += `<button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
   $("hBody").innerHTML = html;
 }
+// Liste des salles ou des falaises : derniers lieux visités d'abord, puis tout, par commune.
+function openPlaces(kind) { state.placesKind = kind; go("places"); }
+function renderPlaces() {
+  const kind = state.placesKind || "salle", salle = kind === "salle";
+  $("plTitle").textContent = salle ? "Salles" : "Falaises";
+  if (!state.loaded || !state.oLoaded) { $("plBody").innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  const items = salle ? state.gyms : state.secteurs, label = x => (salle ? x.city : x.region) || "";
+  const row = x => `<div class="prow">${placeRow({ type: kind, id: x.id })}<button class="favbtn" type="button" data-fav="${kind}:${esc(x.id)}" aria-pressed="${isFav(kind, x.id)}" aria-label="${isFav(kind, x.id) ? "Retirer des favoris" : "Ajouter aux favoris"}">${isFav(kind, x.id) ? "★" : "☆"}</button></div>`;
+  const recent = liveRecents().filter(r => r.type === kind).slice(0, 3).map(r => items.find(x => x.id === r.id)).filter(Boolean);
+  const groups = new Map();
+  for (const x of [...items].sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"))) { const k = label(x) || "—"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+  let html = recent.length ? `<section><div class="label">Dernières visites</div>${recent.map(row).join("")}</section>` : "";
+  html += [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "fr")).map(([k, xs]) => `<section><div class="label">${esc(k)}</div>${xs.map(row).join("")}</section>`).join("");
+  if (!items.length) html += `<div class="note">${salle ? "Aucune salle pour l'instant." : "Aucun secteur pour l'instant."}</div>`;
+  html += `<button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
+  $("plBody").innerHTML = html;
+}
+$("vPlaces").addEventListener("click", e => {
+  if (e.target.closest("[data-places-home]")) { go("home"); return; }
+  const f = e.target.closest("[data-fav]");
+  if (f) { const [type, id] = f.dataset.fav.split(/:(.*)/s); toggleFav(type, id); renderPlaces(); return; }
+  const g = e.target.closest("[data-go]");
+  if (g) { const [type, id] = g.dataset.go.split(/:(.*)/s); state.origin = "places"; openPlace(type, id); return; }
+  if (e.target.closest("[data-add-place]")) state.me ? openSheet("newchoice") : promptLogin("ajouter du contenu");
+});
 // Recherche sur le contenu public seulement : aucune méthode ni aucun brouillon.
 const foldChars = s => [...(s || "")].map(c => { const f = c.normalize("NFD")[0].toLowerCase(); return /[a-z0-9]/.test(f) ? f : " "; }).join("");
 function highlight(text, q) {
@@ -1121,8 +1166,10 @@ function openVoieById(id) {
   return true;
 }
 $("vHome").addEventListener("click", e => {
+  const l = e.target.closest("[data-list]");
+  if (l) { openPlaces(l.dataset.list); return; }
   const g = e.target.closest("[data-go]");
-  if (g) { const [type, id] = g.dataset.go.split(/:(.*)/s); type === "voie" ? openVoieById(id) : openPlace(type, id); return; }
+  if (g) { const [type, id] = g.dataset.go.split(/:(.*)/s); state.origin = "home"; type === "voie" ? openVoieById(id) : openPlace(type, id); return; }
   const c = e.target.closest("[data-q]");
   if (c) { $("hSearch").value = c.dataset.q; renderSearch(); return; }
   if (e.target.closest("[data-add-place]")) { state.me ? openSheet("newchoice") : promptLogin("ajouter du contenu"); return; }
@@ -1141,6 +1188,7 @@ function renderChoiceSheet() {
 $("sheet").addEventListener("click", e => { const b = e.target.closest("[data-pick-after]"); if (!b) return; state.afterPick = true; state.sheet = b.dataset.pickAfter; renderSheet(); });
 // Liens directs : /#/salle/id, /#/secteur/id, /#/voie/id, /#/bloc/id. Un lien n'ouvre que la consultation.
 async function routeFromHash() {
+  state.origin = "home";
   const m = location.hash.match(/^#\/(salle|secteur|voie|bloc)\/(.+)$/);
   if (!m) return;
   const [, type, id] = m;
@@ -1159,19 +1207,22 @@ window.addEventListener("hashchange", () => { if (state.booted) routeFromHash();
 function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); const routed = /^#\/(salle|secteur|voie|bloc)\//.test(location.hash); routeFromHash(); if (!routed) trackScreen(); }
 
 /* ---------- navigation ---------- */
-const VIEWS = { home: "vHome", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+const VIEWS = { home: "vHome", places: "vPlaces", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
-  state.view = v; state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode);
+  state.view = v; if (v !== "places") { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
-  $("gymBtn").hidden = v === "home";
+  $("gymBtn").hidden = v === "home" || v === "places";
   $("tabHome").setAttribute("aria-current", v === "home" ? "page" : "false");
-  $("tabPlace").setAttribute("aria-current", ["list", "olist", "detail", "ovoie"].includes(v) ? "page" : "false");
+  const inSalles = ["list", "detail", "create"].includes(v) || (v === "places" && state.placesKind === "salle"), inFalaises = ["olist", "ovoie", "oedit"].includes(v) || (v === "places" && state.placesKind === "secteur");
+  $("tabSalles").setAttribute("aria-current", inSalles ? "page" : "false");
+  $("tabFalaises").setAttribute("aria-current", inFalaises ? "page" : "false");
   $("tabCreate").setAttribute("aria-current", v === "create" || v === "oedit" ? "page" : "false");
   if (["list", "create", "detail"].includes(v)) ensureBlocs();
   BT.retryPhotos();
   renderHeader();
   if (v === "home") renderHome();
+  if (v === "places") renderPlaces();
   if (v === "olist") renderOList();
   if (v === "ovoie") renderVoie();
   if (v === "oedit") { renderOE(); oView.layout(true); }
@@ -1190,7 +1241,7 @@ function trackScreen() {
   clearTimeout(screenTimer);
   screenTimer = setTimeout(() => {
     const v = state.view, id = v === "detail" ? state.current : v === "ovoie" ? state.voieId : salleMesure();
-    const screen = { home: "/", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
+    const screen = { home: "/", places: state.placesKind === "secteur" ? "/falaises" : "/salles", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
     if (!screen || screen === lastScreen) return;
     lastScreen = screen;
     TS_MESURE.page(screen);
@@ -1198,7 +1249,18 @@ function trackScreen() {
   }, 0);
 }
 $("tabHome").onclick = () => go("home");
-$("tabPlace").onclick = () => { const p = currentPlace(); if (p) openPlace(p.type, p.id); };
+// Onglet Salles / Falaises : au fond d'un lieu, remonte à ce lieu ; dans un lieu, ouvre la liste ; ailleurs, rouvre le dernier lieu de ce type.
+function openKind(kind) {
+  const here = state.mode === (kind === "salle" ? "in" : "out"), id = kind === "salle" ? state.gymId : state.secteurId;
+  state.origin = "home";
+  if (here && ["detail", "create", "ovoie", "oedit"].includes(state.view) && placeOf(kind, id)) { openPlace(kind, id); return; }
+  if (here && ["list", "olist"].includes(state.view)) { state.origin = "places"; openPlaces(kind); return; }
+  if (state.view === "places" && state.placesKind === kind) return;
+  const last = lastOf(kind);
+  if (last) openPlace(kind, last.id); else openPlaces(kind);
+}
+$("tabSalles").onclick = () => openKind("salle");
+$("tabFalaises").onclick = () => openKind("secteur");
 $("tabCreate").onclick = () => {
   const p = currentPlace();
   if (!p && !state.me) { promptLogin("ajouter du contenu"); return; }
@@ -1943,6 +2005,7 @@ function renderSectorSheet() {
     return;
   }
   s.innerHTML = `<h2 id="sheetTitle">Secteurs de falaise</h2>
+    <button class="btn ghost small" type="button" data-switch-kind="salle">🧗 Passer aux salles</button>
     <section><div class="gymlist">${state.secteurs.length ? state.secteurs.map(x => withEdit("secteurs", x, `<button class="gymrow" type="button" data-sect="${esc(x.id)}" aria-current="${x.id === state.secteurId}"><span><b>${esc(x.name)}</b> <small>${esc(x.region || "")}${unverified(x)}</small></span><small>${x.id === state.secteurId ? "Sélectionné" : "Choisir"}</small></button>`)).join("") : `<div class="note">Aucun secteur pour l'instant. Créez le premier.</div>`}</div>
     <button class="btn ghost small" type="button" data-sheet="newsector">+ Ajouter un secteur</button></section>
     <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
