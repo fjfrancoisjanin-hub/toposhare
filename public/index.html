@@ -112,6 +112,26 @@ h2 { font-size: 18px; }
 .undo:disabled { opacity: .4; cursor: default; }
 .counts { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .counts b { color: var(--fg); }
+.helpbtn { appearance: none; flex: none; width: 26px; height: 26px; margin-left: auto; padding: 0; border-radius: 50%; border: 1.5px solid currentColor; background: transparent; color: var(--muted); font: 800 14px var(--f-body); cursor: pointer; }
+.helpbtn.new { color: var(--accent); }
+.fs .helpbtn { color: #9AA3AC; } .fs .helpbtn.new { color: var(--accent); }
+.helpcard { position: fixed; left: 12px; right: 12px; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 80; max-width: 460px; margin-inline: auto; display: grid; gap: 8px; padding: 14px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.45); font-size: 14px; }
+.helpcard[hidden] { display: none; }
+.helpcard ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.helpcard .hc-a { display: flex; gap: 8px; flex-wrap: wrap; }
+.holdmenu { position: fixed; z-index: 80; min-width: 230px; max-width: calc(100vw - 24px); display: grid; gap: 6px; padding: 10px; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.45); }
+.holdmenu[hidden], .hm-scrim[hidden] { display: none; }
+.hm-scrim { position: fixed; inset: 0; z-index: 79; }
+.holdmenu .hm-h { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.holdmenu .hm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+.holdmenu .hm-lbl { font: 700 14px var(--f-body); }
+.holdmenu button { appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 10px; min-height: 40px; padding: 0 12px; font: 700 14px var(--f-body); cursor: pointer; text-align: left; }
+.holdmenu .hm-occ { min-height: 30px; padding: 0 10px; text-transform: none; letter-spacing: 0; }
+.holdmenu .hm-occ[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.holdmenu button.danger { color: #E5484D; }
+@media (prefers-reduced-motion: no-preference) { .holdmenu { animation: hmpop .16s cubic-bezier(.2,1.2,.4,1) both; } .helpbtn.new { animation: helpring 1.8s ease-out infinite; } }
+@keyframes hmpop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+@keyframes helpring { 0% { box-shadow: 0 0 0 0 rgba(255,102,48,.55); } 70%, 100% { box-shadow: 0 0 0 9px rgba(255,102,48,0); } }
 .ins { flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--fg); color: var(--fg); font-weight: 600; }
 .ins button { appearance: none; border: 0; background: var(--fg); color: var(--bg); border-radius: 8px; padding: 6px 10px; font: 700 13px var(--f-body); cursor: pointer; }
 .fs .ins { border-color: #F2F3F5; color: #F2F3F5; } .fs .ins button { background: #F2F3F5; color: #0D0F11; }
@@ -487,6 +507,9 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
 <div class="sheet-bg" id="sheetBg" hidden>
   <div class="sheet gut" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" id="sheet"></div>
 </div>
+<div class="hm-scrim" id="hmScrim" hidden></div>
+<div class="holdmenu" id="holdMenu" role="menu" hidden></div>
+<div class="helpcard" id="helpCard" role="dialog" aria-label="Aide" hidden><b id="hcTitle"></b><ul id="hcList"></ul><div class="hc-a"><button class="btn ghost small" type="button" data-help-close>Fermer</button><button class="btn ghost small" type="button" data-help-hide>Ne plus afficher l'aide</button></div></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -553,9 +576,9 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
              + `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${3.5 * k}" stroke-dasharray="${14 * k} ${9 * k}" stroke-linecap="round" marker-end="url(#${uid}a)"/>`;
     }
   }
-  let n = 0;
+  let n = 0; const occ = {};
   for (const h of holds) {
-    const t = TYPES[h.t] || TYPES.hand, [cx, cy] = P(h), r = R(h);
+    const t = TYPES[h.t] || TYPES.hand, [cx, cy] = P(h), r = R(h), oc = occ[h.x + "," + h.y] = (occ[h.x + "," + h.y] ?? -1) + 1;
     holes += `<circle cx="${cx}" cy="${cy}" r="${r + 8 * k}" fill="#000"/>`;
     rings += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${sw + 5 * k}"/>`
           +  `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${sw}"/>`;
@@ -563,7 +586,7 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
     if (holds.indexOf(h) === mark) rings += markRing(cx, cy, r + 18 * k, k);
     if (hi.includes(h)) badges += `<circle cx="${cx}" cy="${cy}" r="${r + 15 * k}" fill="none" stroke="#fff" stroke-width="${5 * k}"/>`;
     if (mini) continue;
-    const bx = cx + r * 0.78, by = cy - r * 0.78, br = 17 * k;
+    const br = 17 * k, bx = cx + r * 0.78 - oc * 1.9 * br, by = cy - r * 0.78;
     const badge = (txt, col, ink) => `<circle cx="${bx}" cy="${by}" r="${br}" fill="${col}" stroke="rgba(0,0,0,.6)" stroke-width="${3 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 17 : 21) * k}" fill="${ink}">${txt}</text>`;
     if (h.t === "hand") badges += badge(String(++n), "var(--h-hand)", "#fff");
     else if (h.t === "start") badges += badge("D", "var(--h-start)", "#0D0F11");
@@ -580,13 +603,15 @@ function seqText(holds) {
 
 /* ---------- pinch / pan / tap surface ---------- */
 class WallView {
-  constructor(el, { onTap = null, dblZoom = false } = {}) {
-    Object.assign(this, { el, onTap, dblZoom, max: 6, s: 1, ox: 0, oy: 0, bw: 0, bh: 0, aspect: 1.5, pts: new Map(), lastTap: null });
+  constructor(el, { onTap = null, dblZoom = false, onLongPress = null } = {}) {
+    Object.assign(this, { el, onTap, dblZoom, onLongPress, max: 6, s: 1, ox: 0, oy: 0, bw: 0, bh: 0, aspect: 1.5, pts: new Map(), lastTap: null });
     this.layer = document.createElement("div"); this.layer.className = "wv-layer"; el.prepend(this.layer);
     el.addEventListener("pointerdown", e => this.down(e));
     el.addEventListener("pointermove", e => this.move(e));
     el.addEventListener("pointerup", e => this.up(e));
     el.addEventListener("pointercancel", e => this.up(e, true));
+    el.addEventListener("contextmenu", e => { if (this.onLongPress) e.preventDefault(); });
+    el.style.webkitTouchCallout = "none"; el.style.userSelect = "none";
     el.addEventListener("wheel", e => { e.preventDefault(); const p = this.loc(e); this.zoomAt(p.x, p.y, this.s * Math.exp(-e.deltaY * 0.0018)); }, { passive: false });
     new ResizeObserver(() => this.layout()).observe(el);
   }
@@ -621,12 +646,23 @@ class WallView {
     if (e.target.closest("button")) return;
     this.el.setPointerCapture?.(e.pointerId);
     this.pts.set(e.pointerId, this.loc(e));
-    if (this.pts.size === 1) { const p = this.loc(e); this.g = { x: p.x, y: p.y, t: Date.now(), ox: this.ox, oy: this.oy, moved: false, multi: false }; }
+    clearTimeout(this._lp);
+    if (this.pts.size === 1) {
+      const p = this.loc(e); this.g = { x: p.x, y: p.y, t: Date.now(), ox: this.ox, oy: this.oy, moved: false, multi: false, cx: e.clientX, cy: e.clientY };
+      if (this.onLongPress) this._lp = setTimeout(() => this.fireLong(), 500);
+    }
     if (this.pts.size === 2) {
       const [a, b] = [...this.pts.values()];
       this.g.multi = true;
       this.pin = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s: this.s, ox: this.ox, oy: this.oy };
     }
+  }
+  // Appui long : rien ne bouge depuis 0,5 s. Si le menu s'ouvre, le relâchement ne compte pas comme un tap.
+  fireLong() {
+    const g = this.g; if (!g || g.moved || g.multi || !this.onLongPress) return;
+    const nx = (g.x - this.ox) / (this.s * this.bw), ny = (g.y - this.oy) / (this.s * this.bh);
+    if (nx < 0 || nx > 1 || ny < 0 || ny > 1) return;
+    if (this.onLongPress(nx, ny, g.cx, g.cy) === true) { g.long = true; try { navigator.vibrate?.(12); } catch {} }
   }
   move(e) {
     if (!this.pts.has(e.pointerId)) return;
@@ -638,12 +674,13 @@ class WallView {
       this.s = ns; this.ox = mx - u * ns; this.oy = my - v * ns; this.clamp(); this.apply();
     } else if (this.g) {
       const p = this.loc(e), dx = p.x - this.g.x, dy = p.y - this.g.y;
-      if (!this.g.moved && Math.hypot(dx, dy) > 8) this.g.moved = true;
+      if (!this.g.moved && Math.hypot(dx, dy) > 8) { this.g.moved = true; clearTimeout(this._lp); }
       if (this.g.moved) { this.ox = this.g.ox + dx; this.oy = this.g.oy + dy; this.clamp(); this.apply(); }
     }
   }
   up(e, cancel) {
     if (!this.pts.has(e.pointerId)) return;
+    clearTimeout(this._lp);
     this.pts.delete(e.pointerId);
     if (this.pts.size === 1) { // finished a pinch, keep panning with the remaining finger
       const p = [...this.pts.values()][0]; this.pin = null;
@@ -651,7 +688,7 @@ class WallView {
     }
     if (this.pts.size || !this.g) return;
     const g = this.g; this.g = null;
-    if (cancel || g.moved || g.multi || Date.now() - g.t > 600) return;
+    if (cancel || g.moved || g.multi || g.long || Date.now() - g.t > 600) return;
     const p = this.loc(e);
     if (this.dblZoom) {
       const now = Date.now();
@@ -685,20 +722,114 @@ function insBanner(ed, what) {
 }
 const markRing = (cx, cy, r, k) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#fff" stroke-width="${4 * k}" stroke-dasharray="${9 * k} ${6 * k}"/>`;
 
+/* ---------- appui long sur une prise : ajouter avant / après, déplacer, changer, repos, supprimer ---------- */
+const HM = { ctx: null };
+const hmEd = c => c.src === "bloc" ? state : state.oe;
+const hmList = c => c.src === "bloc" ? state.holds : c.src === "steps" ? state.oe.steps : state.oe.anchors;
+const hmRender = c => { if (c.src === "bloc") { renderEditor(); saveDraft(); } else renderOE(); };
+function hmName(c, i) {
+  const list = hmList(c), h = list[i];
+  if (c.src === "anchors") return h.t === "relais" ? "Relais" : `Point ${list.slice(0, i + 1).filter(a => a.t !== "relais").length}`;
+  if (c.src === "bloc") return h.t === "hand" ? `Move ${list.slice(0, i + 1).filter(x => x.t === "hand").length}` : TYPES[h.t].label;
+  return `Move ${list.slice(0, i + 1).filter(x => x.t !== "clip").length}`;
+}
+function hmDraw() {
+  const c = HM.ctx, list = hmList(c), h = list[c.i]; if (!h) { hmClose(); return; }
+  const head = c.cands.length > 1
+    ? `<div class="hm-h">${c.cands.map(j => `<button type="button" class="hm-occ" data-hm-occ="${j}" aria-pressed="${j === c.i}">${esc(hmName(c, j))}</button>`).join("")}</div>`
+    : `<div class="hm-h">${esc(hmName(c, c.i))}</div>`;
+  let rows = "";
+  if (c.src !== "anchors" && (h.t === "hand" || h.t === "foot")) {
+    const pair = (act, label) => `<div class="hm-row"><span class="hm-lbl">${label}</span><button type="button" data-hm="${act}:hand">Main</button><button type="button" data-hm="${act}:foot">Pied</button></div>`;
+    rows += pair("before", "Ajouter avant") + pair("after", "Ajouter après");
+    rows += `<button type="button" data-hm="swap">${h.t === "hand" ? "Changer en pied" : "Changer en main"}</button>`;
+    if (c.src === "steps") rows += `<button type="button" data-hm="rest">${h.rest ? "Retirer le repos" : "Repos ici"}</button>`;
+  }
+  if (c.src === "anchors" && h.t !== "relais") rows += `<button type="button" data-hm="work">${h.work ? "Remettre en point d'ancrage" : "Marquer comme point de travail"}</button>`;
+  rows += `<button type="button" data-hm="move">Déplacer</button><button type="button" class="danger" data-hm="del">Supprimer</button>`;
+  $("holdMenu").innerHTML = head + rows;
+}
+function hmOpen(c, cx, cy) {
+  HM.ctx = c; hmDraw();
+  const m = $("holdMenu"); m.hidden = false; $("hmScrim").hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight, vw = innerWidth, vh = innerHeight;
+  m.style.left = Math.max(12, Math.min(vw - w - 12, cx - w / 2)) + "px";
+  m.style.top = Math.max(12, cy + 30 + h > vh - 12 ? cy - h - 30 : cy + 30) + "px";
+}
+function hmClose() { HM.ctx = null; $("holdMenu").hidden = true; $("hmScrim").hidden = true; }
+function applyMove(ed, list, x, y) { const m = ed.moving; ed.moving = null; const h = m && list[m.i]; if (h) { h.x = +x.toFixed(4); h.y = +y.toFixed(4); } }
+function hmAct(act) {
+  const c = HM.ctx; if (!c) return;
+  const ed = hmEd(c), list = hmList(c), i = c.i, h = list[i], [a, arg] = act.split(":"); if (!h) { hmClose(); return; }
+  if (a === "before" || a === "after") {
+    ed.tool = arg; ed.insertAt = a === "before" ? i : i + 1; ed.lastIdx = null; if (ed.insertAt >= list.length) ed.insertAt = null;
+    hmClose(); hmRender(c); toast("Touchez l'emplacement du nouveau move"); return;
+  }
+  if (a === "swap") h.t = h.t === "hand" ? "foot" : "hand";
+  else if (a === "rest") { if (h.rest) delete h.rest; else h.rest = true; }
+  else if (a === "work") { if (h.work) delete h.work; else h.work = true; }
+  else if (a === "del") insRemove(ed, list, i);
+  else if (a === "move") { ed.moving = { i }; toast("Touchez le nouvel emplacement"); }
+  hmClose(); hmRender(c);
+}
+$("holdMenu").addEventListener("click", e => {
+  const o = e.target.closest("[data-hm-occ]"); if (o) { HM.ctx.i = +o.dataset.hmOcc; hmDraw(); return; }
+  const b = e.target.closest("[data-hm]"); if (b) hmAct(b.dataset.hm);
+});
+$("hmScrim").addEventListener("click", hmClose);
+// Bloc : prises sous le doigt (la dernière posée d'abord, les autres au choix dans le menu si la même prise revient).
+function longHold(nx, ny, cx, cy) {
+  const w = activeWall(); if (!w) return false;
+  const k = w.w / 1800, px = nx * w.w, py = ny * w.h, cands = [];
+  state.holds.forEach((h, i) => { if (Math.hypot(h.x * w.w - px, h.y * w.h - py) <= (TYPES[h.t].r + 8) * k) cands.push(i); });
+  if (!cands.length) return false;
+  hmOpen({ src: "bloc", i: cands[cands.length - 1], cands }, cx, cy); return true;
+}
+function oLong(nx, ny, cx, cy) {
+  const oe = state.oe, v = oeTarget(); if (!oe || !v) return false;
+  const k = Math.min(v.w, v.h) / 1400, px = nx * v.w, py = ny * v.h, cands = [], isRoute = oe.kind === "route";
+  (isRoute ? oe.anchors : oe.steps).forEach((q, i) => {
+    if (isRoute ? Math.hypot(q.x * v.w - px, q.y * v.h - py) <= 32 * k : q.t !== "clip" && vueIdOf(q) === oe.viewId && Math.hypot(q.x * v.w - px, q.y * v.h - py) <= ((OT[q.t] || OT.hand).r + 8) * k) cands.push(i);
+  });
+  if (!cands.length) return false;
+  hmOpen({ src: isRoute ? "anchors" : "steps", i: cands[cands.length - 1], cands }, cx, cy); return true;
+}
+
+/* ---------- bouton d'aide « ? » : une carte courte par écran, fermable, masquable, retrouvable dans « Mon compte » ---------- */
+const HELP = {
+  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
+  route: ["Points d'ancrage", ["Touchez chaque point d'ancrage du bas vers le haut, puis le relais.", "Appui long sur un point : le marquer « point de travail » (dégaine sautée à l'enchaînement), le déplacer ou le supprimer."]],
+  method: ["Ma méthode", ["Touchez mains et pieds dans l'ordre où vous les prenez.", "Touchez une prise déjà posée pour la reprendre.", "Appui long sur une prise : ajouter un move avant ou après, marquer un repos, la déplacer, la supprimer."]],
+};
+const helpState = () => { try { return JSON.parse(lsGet("ts-help") || "{}"); } catch { return {}; } };
+const helpSave = h => lsSet("ts-help", JSON.stringify(h));
+const helpBtn = key => helpState().hidden?.[key] ? "" : `<button type="button" class="helpbtn${helpState().seen?.[key] ? "" : " new"}" data-help="${key}" aria-label="Aide">?</button>`;
+function helpOpen(key) {
+  const h = helpState(); h.seen = { ...h.seen, [key]: 1 }; helpSave(h);
+  const [title, lines] = HELP[key]; $("hcTitle").textContent = title; $("hcList").innerHTML = lines.map(l => `<li>${l}</li>`).join("");
+  $("helpCard").dataset.key = key; $("helpCard").hidden = false; renderTools(); if (state.oe) renderOETools();
+}
+function helpClose() { $("helpCard").hidden = true; }
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-help]"); if (b) { if (!$("helpCard").hidden && $("helpCard").dataset.key === b.dataset.help) helpClose(); else helpOpen(b.dataset.help); return; }
+  if (e.target.closest("[data-help-close]")) { helpClose(); return; }
+  if (e.target.closest("[data-help-hide]")) { const h = helpState(); h.hidden = { ...h.hidden, [$("helpCard").dataset.key]: 1 }; helpSave(h); helpClose(); renderTools(); if (state.oe) renderOETools(); toast("Aide masquée. Retrouvez-la dans Mon compte."); return; }
+  if (e.target.closest("[data-help-reset]")) { const h = helpState(); delete h.hidden; helpSave(h); renderTools(); if (state.oe) renderOETools(); toast("Aides réaffichées"); }
+});
+
 /* ---------- editor ---------- */
-const editView = new WallView($("editWall"), { onTap: (x, y) => tapHold(x, y) });
+const editView = new WallView($("editWall"), { onTap: (x, y) => tapHold(x, y), onLongPress: (x, y, cx, cy) => longHold(x, y, cx, cy) });
 const fsView = new WallView($("fsWall"), { dblZoom: true });
 function tapHold(x, y) {
   const w = activeWall(); if (!w) return;
   const k = w.w / 1800, px = x * w.w, py = y * w.h;
+  if (state.moving) { applyMove(state, state.holds, x, y); $("fErr").textContent = ""; renderEditor(); saveDraft(); return; }
   const hit = state.holds.findIndex(h => Math.hypot(h.x * w.w - px, h.y * w.h - py) <= (TYPES[h.t].r + 8) * k);
-  if (hit >= 0) insRemove(state, state.holds, hit);
-  else {
-    const t = TYPES[state.tool];
-    if (t.max && state.holds.filter(h => h.t === state.tool).length >= t.max) { toast(`${t.max} prises « ${t.label} » maximum`); return; }
-    insAdd(state, state.holds, { x: +x.toFixed(4), y: +y.toFixed(4), t: state.tool });
-    if (state.tool === "start") { state.tool = "hand"; toast("Départ posé. Touchez maintenant les mains dans l'ordre."); }
-  }
+  // Un tap sur une prise déjà posée la reprend : la même prise peut revenir plusieurs fois dans le bloc. Pour la retirer : appui long.
+  const t = TYPES[state.tool], spot = hit >= 0 ? state.holds[hit] : null;
+  if (t.max && state.holds.filter(h => h.t === state.tool).length >= t.max) { toast(`${t.max} prises « ${t.label} » maximum`); return; }
+  insAdd(state, state.holds, { x: spot ? spot.x : +x.toFixed(4), y: spot ? spot.y : +y.toFixed(4), t: state.tool });
+  if (state.tool === "start") { state.tool = "hand"; toast("Départ posé. Touchez maintenant les mains dans l'ordre."); }
   $("fErr").textContent = "";
   renderEditor(); saveDraft();
 }
@@ -711,12 +842,12 @@ function renderTools() {
   const c = k => state.holds.filter(h => h.t === k).length;
   const nb = state.insertAt == null ? 0 : state.holds.slice(0, state.insertAt).filter(h => h.t === "hand").length;
   const counts = `<span>Départ <b>${c("start")}</b></span><span>Moves <b>${c("hand")}</b></span><span>Pieds <b>${c("foot")}</b></span><span>Top <b>${c("top")}</b></span>`
-    + insBanner(state, nb ? `Prochaine prise insérée après le move ${nb}` : "Prochaine prise insérée au début du bloc");
+    + insBanner(state, nb ? `Prochaine prise insérée après le move ${nb}` : "Prochaine prise insérée au début du bloc") + helpBtn("bloc");
   document.querySelectorAll("[data-counts]").forEach(el => el.innerHTML = counts);
 }
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-tools] .tool"); if (t) { state.tool = t.dataset.t; renderTools(); return; }
-  const u = e.target.closest("[data-undo]"); if (u) { insUndo(state, state.holds); renderEditor(); saveDraft(); return; }
+  const u = e.target.closest("[data-undo]"); if (u) { if (state.moving) { state.moving = null; toast("Déplacement annulé"); return; } insUndo(state, state.holds); renderEditor(); saveDraft(); return; }
   if (e.target.closest("[data-endins]")) { if (state.view === "oedit" || state.fsMode === "oedit") { if (state.oe) { state.oe.insertAt = null; renderOE(); } } else { state.insertAt = null; renderEditor(); } }
 });
 function renderEditor() {
@@ -741,7 +872,7 @@ function setVisField(isPrivate, rated = false) {
 const lastVis = () => lsGet("ts-bloc-vis") === "private";
 $("form").addEventListener("change", e => { if (e.target.name === "fVis" && state.edit.kind !== "bloc") lsSet("ts-bloc-vis", $("fVisPrivate").checked ? "private" : "public"); });
 function clearEditor(wipe = true) {
-  state.edit = { kind: "new" }; state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null;
+  state.edit = { kind: "new" }; state.holds = []; state.tool = "start"; state.insertAt = state.lastIdx = null; state.moving = null;
   setVisField(lastVis());
   $("fName").value = ""; $("fDesc").value = ""; $("fSetter").value = accountFirstName(); $("fErr").textContent = "";
   if (wipe) lsSet("pan-draft", ""); renderEditorChrome(); renderEditor();
@@ -753,7 +884,7 @@ function fillEditor(src) {
   $("fSetter").value = src.setter || accountFirstName();
   state.grade = src.grade || state.grade;
   state.tool = state.holds.some(h => h.t === "start") ? "hand" : "start";
-  state.insertAt = state.lastIdx = null; $("fErr").textContent = ""; renderGrades();
+  state.insertAt = state.lastIdx = state.moving = null; $("fErr").textContent = ""; renderGrades();
 }
 function startEdit(kind, id) {
   const src = kind === "draft" ? state.drafts.find(d => d.id === id) : state.blocs.find(b => b.id === id);
@@ -857,6 +988,7 @@ function openFs(mode) {
   $("fsFoot").hidden = !["edit", "oedit", "replay", "breplay"].includes(mode); $("fsDim").hidden = mode !== "view";
   $("fsIn").hidden = mode !== "edit"; $("fsOut").hidden = mode !== "oedit"; $("fsReplay").hidden = mode !== "replay" && mode !== "breplay";
   fsView.onTap = mode === "edit" ? (x, y) => tapHold(x, y) : mode === "oedit" ? (x, y) => oTap(x, y) : null;
+  fsView.onLongPress = mode === "edit" ? longHold : mode === "oedit" ? oLong : null;
   const isRp = mode === "replay" || mode === "breplay";
   fsView.dblZoom = !isRp && mode !== "edit" && mode !== "oedit";
   fsView.onAnyTap = isRp ? fx => { if (fx > 0.4) { if (!$("rpNext").disabled) rpStep(1); } else if (!$("rpPrev").disabled) rpStep(-1); } : null;
@@ -879,7 +1011,7 @@ function renderFsView() {
 $("fsDim").addEventListener("click", () => { state.fsDim = !state.fsDim; renderFsView(); });
 function closeFs() { const m = state.fsMode; $("fs").hidden = true; state.fsMode = null; document.body.classList.remove("locked"); if (state.view === "create") renderEditor(); if (m === "oedit") renderOE(); }
 $("fsClose").addEventListener("click", closeFs);
-document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("fs").hidden) closeFs(); else if (!$("sheetBg").hidden) closeSheet(); } });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("holdMenu").hidden) hmClose(); else if (!$("helpCard").hidden) helpClose(); else if (!$("fs").hidden) closeFs(); else if (!$("sheetBg").hidden) closeSheet(); } });
 
 /* ---------- list ---------- */
 function renderFilters() {
@@ -1391,7 +1523,7 @@ const OT = {
 const secteur = () => state.secteurs.find(x => x.id === state.secteurId);
 const voie = () => state.voies.find(v => v.id === state.voieId);
 const myMethod = () => state.methodes.find(m => state.me && m.authorId === state.me);
-const oView = new WallView($("oeWall"), { onTap: (x, y) => oTap(x, y) });
+const oView = new WallView($("oeWall"), { onTap: (x, y) => oTap(x, y), onLongPress: (x, y, cx, cy) => oLong(x, y, cx, cy) });
 oView.max = 8;
 
 const sortVoies = l => l.sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
@@ -1434,11 +1566,11 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
     const [x, y] = P(a), s = (mini ? 26 : 18) * k;
     if (ai === markA) top += markRing(x, y, s + 20 * k, k);
     if (a.t === "relais") anc += `<circle cx="${x}" cy="${y}" r="${s + 6 * k}" fill="#fff" stroke="#111" stroke-width="${3 * k}"/><circle cx="${x}" cy="${y}" r="${s - 3 * k}" fill="none" stroke="#111" stroke-width="${3 * k}"/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${17 * k}" fill="#111">R</text>`}`;
-    else { bolt++; anc += `<rect x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="${5 * k}" fill="#fff" stroke="#111" stroke-width="${3 * k}"/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${18 * k}" fill="#111">${bolt}</text>`}`; }
+    else { bolt++; anc += `<rect x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="${5 * k}" fill="${a.work ? "#FFB020" : "#fff"}" stroke="#111" stroke-width="${3 * k}"${a.work ? ` stroke-dasharray="${6 * k} ${4 * k}"` : ""}/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${18 * k}" fill="#111">${bolt}</text>`}`; }
   });
   if (!mini) {
     const vis = replay === null ? steps : steps.slice(0, replay + 1);
-    let move = 0, lastHand = null, prevHand = null;
+    let move = 0, lastHand = null, prevHand = null; const occR = {};
     vis.forEach((st, i) => {
       const cur = replay !== null && i === replay, past = replay !== null && i < replay;
       const op = past ? .5 : 1;
@@ -1453,7 +1585,9 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
       const t = OT[st.t] || OT.hand, [cx, cy] = P(st), r = t.r * k; move++;
       if (st.t === "hand") { if (prevHand) { const [px, py] = P(prevHand); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`; } prevHand = st; lastHand = st; }
       rings += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${10 * k}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${(cur ? 8 : 5.5) * k}"/>`;
-      const bx = cx + r * 0.8, by = cy - r * 0.8, br = 14 * k, txt = String(st.n ?? move);
+      const oc = occR[st.x + "," + st.y] = (occR[st.x + "," + st.y] ?? -1) + 1;
+      const br = 14 * k, bx = cx + r * 0.8 - oc * 1.9 * br, by = cy - r * 0.8, txt = String(st.n ?? move);
+      if (st.rest) rings += `<g opacity="${op}"><rect x="${cx - 24 * k}" y="${cy + r + 6 * k}" width="${48 * k}" height="${22 * k}" rx="${11 * k}" fill="#1B2024" stroke="#fff" stroke-width="${2 * k}"/><text x="${cx}" y="${cy + r + 17 * k}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${14 * k}" fill="#fff">zZ</text></g>`;
       rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
       if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 12 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
       if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
@@ -1817,7 +1951,7 @@ function renderOFs() {
     let move = 0; for (let i = 0; i <= state.rp; i++) if (steps[i].t !== "clip") move++;
     const total = steps.filter(s => s.t !== "clip").length;
     let boltNo = 0; if (st && st.t === "clip") { const a = (v.anchors || [])[st.a]; boltNo = a && a.t === "relais" ? "R" : (v.anchors || []).slice(0, st.a + 1).filter(x => x.t !== "relais").length; }
-    $("rpCap").innerHTML = st ? (st.t === "clip" ? `Clip ${boltNo === "R" ? "au relais" : "du point " + boltNo}<small>étape ${state.rp + 1} / ${steps.length}</small>` : `${st.t === "hand" ? "Main" : "Pied"} · move ${move} / ${total}<small>étape ${state.rp + 1} / ${steps.length}</small>`) : "";
+    $("rpCap").innerHTML = st ? (st.t === "clip" ? `Clip ${boltNo === "R" ? "au relais" : "du point " + boltNo}<small>étape ${state.rp + 1} / ${steps.length}</small>` : `${st.t === "hand" ? "Main" : "Pied"} · move ${move} / ${total}${st.rest ? " · Repos" : ""}<small>étape ${state.rp + 1} / ${steps.length}</small>`) : "";
     rpChrome(state.rp, steps.length);
   } else {
     $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
@@ -1880,11 +2014,12 @@ function oeTarget() {
 }
 function oTap(x, y) {
   const oe = state.oe, v = oeTarget(); if (!oe || !v) return;
+  if (oe.moving) { applyMove(oe, oe.kind === "route" ? oe.anchors : oe.steps, x, y); $("oErr").textContent = ""; renderOE(); return; }
   const k = Math.min(v.w, v.h) / 1400, px = x * v.w, py = y * v.h;
   const near = (list, rad) => list.findIndex(p => Math.hypot(p.x * v.w - px, p.y * v.h - py) <= rad * k);
   if (oe.kind === "route") {
     const hit = near(oe.anchors, 32);
-    if (hit >= 0) insRemove(oe, oe.anchors, hit);
+    if (hit >= 0) { toast("Appui long sur un point pour le modifier ou le supprimer."); return; }
     else if (oe.tool === "relais") { oe.anchors = oe.anchors.filter(a => a.t !== "relais"); oe.anchors.push({ x: +x.toFixed(4), y: +y.toFixed(4), t: "relais" }); }
     else {
       const a = { x: +x.toFixed(4), y: +y.toFixed(4), t: "bolt" }, ri = oe.anchors.findIndex(q => q.t === "relais");
@@ -1901,7 +2036,9 @@ function oTap(x, y) {
       if (ex >= 0) insRemove(oe, oe.steps, ex); else insAdd(oe, oe.steps, { t: "clip", a: ai, x: anchors[ai].x, y: anchors[ai].y });
     } else {
       const hit = oe.steps.findIndex(s => s.t !== "clip" && vueIdOf(s) === oe.viewId && Math.hypot(s.x * v.w - px, s.y * v.h - py) <= ((OT[s.t] || OT.hand).r + 8) * k);
-      if (hit >= 0) insRemove(oe, oe.steps, hit); else insAdd(oe, oe.steps, { x: +x.toFixed(4), y: +y.toFixed(4), t: oe.tool, ...(oe.viewId === BASE_VUE ? {} : { viewId: oe.viewId }) });
+      // Un tap sur une prise déjà posée la reprend (même prise plusieurs fois). Pour la retirer : appui long.
+      const spot = hit >= 0 ? oe.steps[hit] : null;
+      insAdd(oe, oe.steps, { x: spot ? spot.x : +x.toFixed(4), y: spot ? spot.y : +y.toFixed(4), t: oe.tool, ...(oe.viewId === BASE_VUE ? {} : { viewId: oe.viewId }) });
     }
   }
   $("oErr").textContent = ""; renderOE();
@@ -1919,16 +2056,17 @@ function renderOETools() {
     ? `<span>Points <b>${oe.anchors.filter(a => a.t !== "relais").length}</b></span><span>Relais <b>${oe.anchors.some(a => a.t === "relais") ? "oui" : "non"}</b></span>`
     : `<span>Mains <b>${oe.steps.filter(s => s.t === "hand").length}</b></span><span>Pieds <b>${oe.steps.filter(s => s.t === "foot").length}</b></span>`;
   let ib = "";
+  const hb = helpBtn(oe.kind === "route" ? "route" : "method");
   if (oe.insertAt != null) {
     const before = (oe.kind === "route" ? oe.anchors : oe.steps).slice(0, oe.insertAt);
     const n = oe.kind === "route" ? before.filter(a => a.t !== "relais").length : before.filter(st => st.t !== "clip").length;
     ib = insBanner(oe, oe.kind === "route" ? (n ? `Prochain point inséré après le point ${n}` : "Prochain point inséré en bas de la voie") : (n ? `Prochain repère inséré après le move ${n}` : "Prochain repère inséré au début"));
   }
-  document.querySelectorAll("[data-ocounts]").forEach(el => el.innerHTML = counts + ib);
+  document.querySelectorAll("[data-ocounts]").forEach(el => el.innerHTML = counts + ib + hb);
 }
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-otools] .tool"); if (t && state.oe) { state.oe.tool = t.dataset.ot; renderOETools(); return; }
-  if (e.target.closest("[data-oundo]") && state.oe) { insUndo(state.oe, state.oe.kind === "route" ? state.oe.anchors : state.oe.steps); renderOE(); }
+  if (e.target.closest("[data-oundo]") && state.oe) { if (state.oe.moving) { state.oe.moving = null; toast("Déplacement annulé"); return; } insUndo(state.oe, state.oe.kind === "route" ? state.oe.anchors : state.oe.steps); renderOE(); }
 });
 function renderOGrades() { $("oGrades").innerHTML = SPORT.map(g => `<button type="button" class="chip" data-og="${g}" aria-pressed="${state.oe?.grade === g}">${g}</button>`).join(""); }
 $("oGrades").addEventListener("click", e => { const b = e.target.closest("[data-og]"); if (!b || !state.oe) return; state.oe.grade = b.dataset.og; renderOGrades(); });
@@ -2201,6 +2339,7 @@ function renderAcctSheet() {
     <p style="margin:0">Connecté en tant que <b>${esc(u?.displayName || "")}</b><br><span class="note">${esc(u?.email || "")}</span></p>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button class="btn ghost small" type="button" data-sheet="feedback">Donner mon avis</button>
+      <button class="btn ghost small" type="button" data-help-reset>Réafficher les aides</button>
       ${u && u.email === window.BT_OWNER_EMAIL ? `<a class="btn ghost small" href="/admin" style="text-decoration:none">Suivi d'activité</a>` : ""}
       <button class="btn danger small" type="button" data-signout>Se déconnecter</button>
     </div>

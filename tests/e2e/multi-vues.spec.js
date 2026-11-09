@@ -16,6 +16,14 @@ async function tap(page, fx = 0.5, fy = 0.2) {
   await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
   await page.waitForTimeout(400); // Deux touches rapprochées compteraient pour un double tap.
 }
+// Appui long sur une prise, puis « Supprimer » : retire la prise et place l'insertion à cet endroit.
+async function removeAt(page, fx, fy) {
+  const box = await page.locator('#oeWall').boundingBox();
+  await page.mouse.move(box.x + box.width * fx, box.y + box.height * fy);
+  await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up();
+  await page.locator('[data-hm="del"]').click();
+  await page.waitForTimeout(400);
+}
 const caption = page => page.locator('#rpCap');
 
 test('une méthode avec des prises sur L1 puis sur L2 se répète dans le bon ordre et change de photo au bon moment', async ({ page }, testInfo) => {
@@ -62,8 +70,8 @@ test("l'insertion au milieu reste possible après un changement de vue, dans l'o
   await page.locator(`#oeVues [data-oev="x-${id}"]`).click();
   await tap(page, 0.7, 0.2);
   await page.locator('#oeVues [data-oev="base"]').click();
-  // Retirer la seconde prise de L1 place l'insertion à cet endroit ; la suivante se pose avant la prise de L2.
-  await tap(page, 0.3, 0.1);
+  // Retirer la seconde prise de L1 (appui long, Supprimer) place l'insertion à cet endroit ; la suivante se pose avant la prise de L2.
+  await removeAt(page, 0.3, 0.1);
   await tap(page, 0.5, 0.2);
   await page.locator('#oSave').click();
   await expect(page.locator('[data-act="replay"]')).toBeVisible();
