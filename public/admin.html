@@ -118,7 +118,7 @@ h2 { font-family: var(--f-display); font-weight: 800; font-size: 18px; margin: 0
     </section>
     <section class="panel">
       <h2>Gérer le contenu</h2>
-      <p class="note" style="margin-top:0">Supprimer efface aussi ce qui en dépend : une salle emporte ses murs et ses blocs, un secteur ses voies et leurs méthodes, une voie ses méthodes. Deux touches pour confirmer.</p>
+      <p class="note" style="margin-top:0">Supprimer efface aussi ce qui en dépend : une salle emporte ses murs et ses blocs (privés compris), un secteur ses voies et leurs méthodes, une voie ses méthodes. Deux touches pour confirmer.</p>
       <div class="chips" id="mgTabs" role="group" aria-label="Type de contenu"></div>
       <div class="rows" id="mgList"></div>
       <p class="note">Une voie où d'autres grimpeurs ont une méthode ne peut être supprimée que par l'admin. À lancer une fois après la mise en ligne, pour les méthodes antérieures :</p>
@@ -169,7 +169,7 @@ async function start(u) {
 async function all(col) { const s = await BT.fs.collection(col).get(); return s.docs.map(d => ({ id: d.id, ...d.data() })); }
 
 async function load() {
-  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all = await Promise.all(["gyms", "walls", "blocs", "secteurs", "voies", "methodes", "feedback", "methodesPrivees"].map(c => all(c).catch(() => [])));
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback] = D.all = await Promise.all(["gyms", "walls", "blocs", "secteurs", "voies", "methodes", "feedback", "methodesPrivees", "blocsPrivees"].map(c => all(c).catch(() => [])));
   const now = Date.now(), recent = arr => arr.filter(x => (x.createdAt || 0) > now - WEEK).length;
   const authors = new Set([...blocs, ...voies, ...methodes].map(x => x.authorId).filter(Boolean));
   const setters = new Set(blocs.map(b => (b.setter || "").trim().toLowerCase()).filter(Boolean));
@@ -220,7 +220,7 @@ async function load() {
 }
 
 /* ---------- gestion du contenu ---------- */
-const D = { all: [[], [], [], [], [], [], []], tab: "blocs", owners: [] };
+const D = { all: [[], [], [], [], [], [], [], [], []], tab: "blocs", owners: [] };
 function renderQrPlaces() {
   const [gyms, , , secteurs] = D.all, sel = $("qrPlace"), cur = sel.value;
   sel.innerHTML = [...gyms.map(g => `<option value="salle:${esc(g.id)}">Salle · ${esc(g.name)}</option>`), ...secteurs.map(x => `<option value="secteur:${esc(x.id)}">Secteur · ${esc(x.name)}</option>`)].join("");
@@ -257,14 +257,15 @@ $("ownerList").addEventListener("click", async e => {
   try { await delDoc("gymOwners", b.dataset.owner); D.owners = D.owners.filter(o => o.id !== b.dataset.owner); $("ownerMsg").textContent = "Rôle retiré."; renderOwners(); }
   catch { $("ownerMsg").textContent = "Retrait impossible. Réessayez."; }
 });
-const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"], ["methodesPrivees", "Méthodes privées"]];
+const TABS = [["blocs", "Blocs"], ["voies", "Voies"], ["methodes", "Méthodes"], ["gyms", "Salles"], ["walls", "Murs"], ["secteurs", "Secteurs"], ["feedback", "Avis"], ["methodesPrivees", "Méthodes privées"], ["blocsPrivees", "Blocs privés"]];
 function renderManage() {
-  const [gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees] = D.all;
-  const by = { gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees };
+  const [gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees, blocsPrivees] = D.all;
+  const by = { gyms, walls, blocs, secteurs, voies, methodes, feedback, methodesPrivees, blocsPrivees };
   const gName = id => gyms.find(g => g.id === id)?.name || "?", sName = id => secteurs.find(x => x.id === id)?.name || "?", vName = id => voies.find(v => v.id === id)?.name || "?";
   $("mgTabs").innerHTML = TABS.map(([k, l]) => `<button class="chip" data-tab="${k}" aria-pressed="${D.tab === k}">${l} (${by[k].length})</button>`).join("");
   const label = {
     blocs: b => `<b>${esc(b.name)}</b> · ${esc(b.grade)} · ${esc(gName(b.gymId))} · ${esc(b.setter || "?")}`,
+    blocsPrivees: b => `<b>${esc(b.name)}</b> · ${esc(b.grade)} · ${esc(gName(b.gymId))} · ${esc(b.setter || "?")} · privé`,
     voies: v => `<b>${esc(v.name)}</b> · ${esc(v.grade)} · ${esc(sName(v.secteurId))} · ${methodes.filter(m => m.voieId === v.id).length} méthode(s)`,
     methodes: m => `<b>${esc(m.climber || "?")}</b> sur ${esc(vName(m.voieId))} · ${(m.steps || []).length} prises`,
     methodesPrivees: m => `<b>${esc(m.climber || "?")}</b> sur ${esc(vName(m.voieId))} · ${(m.steps || []).length} prises`,
@@ -285,8 +286,8 @@ const delDoc = async (col, id) => {
 const delPhoto = ref => String(ref || "").startsWith("photo:") ? Promise.all([delDoc("photos", ref.slice(6)), delDoc("miniatures", ref.slice(6))].map(p => p.catch(() => {}))) : null;
 async function cascade(col, id) {
   const [gyms, walls, blocs, secteurs, voies, methodes] = D.all;
-  if (col === "gyms") { for (const o of D.owners.filter(o => o.gymId === id)) await delDoc("gymOwners", o.id); D.owners = D.owners.filter(o => o.gymId !== id); for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); }
-  if (col === "walls") { const w = walls.find(x => x.id === id); for (const b of blocs.filter(b => b.wallId === id)) await delDoc("blocs", b.id); await delPhoto(w?.image); }
+  if (col === "gyms") { for (const o of D.owners.filter(o => o.gymId === id)) await delDoc("gymOwners", o.id); D.owners = D.owners.filter(o => o.gymId !== id); for (const w of walls.filter(w => w.gymId === id)) await cascade("walls", w.id); for (const b of blocs.filter(b => b.gymId === id)) await delDoc("blocs", b.id); for (const b of D.all[8].filter(b => b.gymId === id)) await delDoc("blocsPrivees", b.id); }
+  if (col === "walls") { const w = walls.find(x => x.id === id); for (const b of blocs.filter(b => b.wallId === id)) await delDoc("blocs", b.id); for (const b of D.all[8].filter(b => b.wallId === id)) await delDoc("blocsPrivees", b.id); await delPhoto(w?.image); }
   if (col === "secteurs") { for (const v of voies.filter(v => v.secteurId === id)) await cascade("voies", v.id); }
   if (col === "voies") {
     const v = voies.find(x => x.id === id);

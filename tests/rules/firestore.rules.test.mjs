@@ -198,6 +198,70 @@ describe('Propriétaires de salle', () => {
   });
 });
 
+describe('Blocs privés', () => {
+  const bloc = { authorId: 'alice', gymId: 'g1', wallId: 'w1', name: 'Bloc', grade: '6a', setter: 'Alice', holds: [], createdAt: 1 };
+  const ALICE = { email: 'alice@example.com', email_verified: true };
+  test('un autre connecté, un invité et un propriétaire de salle ne lisent pas un bloc privé', async () => {
+    await seed('blocsPrivees/b1', bloc);
+    await seed('gymOwners/g1__bob@example.com', { gymId: 'g1', email: 'bob@example.com' });
+    await assertFails(user('bob').doc('blocsPrivees/b1').get());
+    await assertFails(anon().doc('blocsPrivees/b1').get());
+    await assertFails(user('bob').collection('blocsPrivees').where('gymId', '==', 'g1').get());
+    const gymOwner = env.authenticatedContext('bob', { email: 'bob@example.com', email_verified: true }).firestore();
+    await assertFails(gymOwner.doc('blocsPrivees/b1').get());
+    await assertFails(gymOwner.doc('blocsPrivees/b1').delete());
+  });
+  test("l'auteur le lit, le liste, le modifie et le supprime ; il le crée à son nom seulement", async () => {
+    await seed('blocsPrivees/b1', bloc);
+    await assertSucceeds(user('alice').doc('blocsPrivees/b1').get());
+    await assertSucceeds(user('alice').collection('blocsPrivees').where('gymId', '==', 'g1').where('authorId', '==', 'alice').get());
+    await assertFails(user('alice').collection('blocsPrivees').where('gymId', '==', 'g1').get());
+    await assertSucceeds(user('alice').doc('blocsPrivees/b1').update(trace('alice', { name: 'Bloc v2' })));
+    await assertFails(user('alice').doc('blocsPrivees/b1').update(trace('alice', { authorId: 'bob' })));
+    await assertFails(user('bob').doc('blocsPrivees/b1').update(trace('bob', { name: 'Piraté' })));
+    await assertFails(user('bob').doc('blocsPrivees/b1').delete());
+    await assertSucceeds(user('alice').doc('blocsPrivees/b2').set(bloc));
+    await assertFails(user('bob').doc('blocsPrivees/b3').set(bloc));
+    await assertFails(anon().doc('blocsPrivees/b4').set(bloc));
+    await assertSucceeds(user('alice').doc('blocsPrivees/b1').delete());
+  });
+  test("un bloc privé ne peut pas porter de note", async () => {
+    await assertFails(user('alice').doc('blocsPrivees/b1').set({ ...bloc, ratingCount: 3, ratingSum: 9 }));
+    await seed('blocsPrivees/b1', bloc);
+    await assertFails(user('alice').doc('blocsPrivees/b1').update(trace('alice', { ratingCount: 3, ratingSum: 9 })));
+  });
+  test("l'admin le lit et le supprime pour la modération", async () => {
+    await seed('blocsPrivees/b1', bloc);
+    await assertSucceeds(owner().doc('blocsPrivees/b1').get());
+    await assertSucceeds(owner().collection('blocsPrivees').where('gymId', '==', 'g1').get());
+    await assertSucceeds(owner().doc('blocsPrivees/b1').delete());
+  });
+  test("rendre un bloc public ou privé est un déplacement dans un seul lot, sous le même identifiant", async () => {
+    await seed('blocs/b1', { ...bloc, ratingCount: 0, ratingSum: 0 });
+    const db = user('alice'), toPrivate = db.batch();
+    toPrivate.delete(db.doc('blocs/b1'));
+    toPrivate.set(db.doc('blocsPrivees/b1'), bloc);
+    await assertSucceeds(toPrivate.commit());
+    const toPublic = db.batch();
+    toPublic.delete(db.doc('blocsPrivees/b1'));
+    toPublic.set(db.doc('blocs/b1'), bloc);
+    await assertSucceeds(toPublic.commit());
+  });
+  test("un bloc public déjà noté ne peut pas devenir privé", async () => {
+    await seed('blocs/b1', { ...bloc, ratingCount: 3, ratingSum: 6 });
+    const db = user('alice'), batch = db.batch();
+    batch.delete(db.doc('blocs/b1'));
+    batch.set(db.doc('blocsPrivees/b1'), bloc);
+    await assertFails(batch.commit());
+  });
+  test("un bloc privé n'est pas lisible dans la collection publique", async () => {
+    await seed('blocsPrivees/b1', bloc);
+    await assertFails(user('bob').doc('blocsPrivees/b1').get());
+    await assertSucceeds(user('bob').collection('blocs').where('gymId', '==', 'g1').get());
+    await assertSucceeds(env.authenticatedContext('alice', ALICE).firestore().collection('blocs').where('gymId', '==', 'g1').get());
+  });
+});
+
 describe('Méthodes privées', () => {
   const meth = { authorId: 'alice', voieId: 'v1', climber: 'Alice', createdAt: 1 };
   test('un autre connecté et un invité ne lisent pas une méthode privée, même avec son identifiant', async () => {
