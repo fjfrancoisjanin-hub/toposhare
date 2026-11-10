@@ -335,6 +335,8 @@
     ["Falaises", "Crags", "Escuelas"],
     ["Pieds dans l'ordre", "Feet in order", "Pies en orden"],
     ["Pied interdit", "No foot", "Pie prohibido"],
+    ["Fenêtre de 5 prises", "5-hold window", "Ventana de 5 presas"],
+    ["Tout depuis le début", "Everything from the start", "Todo desde el principio"],
     ["Interdits", "No-foot", "Prohibidos"],
     ["Outil « Pied interdit » : marquez une prise où le pied est interdit (rond rouge barré). Il ne change ni les mouvements ni les tracés.", "“No foot” tool: mark a hold where feet are forbidden (red crossed circle). It changes neither the moves nor the traces.", "Herramienta «Pie prohibido»: marca una presa donde no se puede poner el pie (círculo rojo tachado). No cambia ni los movimientos ni los trazados."],
     [/^(\d+) pieds? interdits?$/, m => `${m[1]} no-foot hold${+m[1] > 1 ? "s" : ""}`, m => `${m[1]} pie${+m[1] > 1 ? "s" : ""} prohibido${+m[1] > 1 ? "s" : ""}`],

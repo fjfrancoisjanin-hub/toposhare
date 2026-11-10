@@ -242,6 +242,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
 .rp { display: grid; gap: 10px; }
 .rp-cap { text-align: center; font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; min-width: 0; }
 .rp-cap small { display: block; color: #9AA3AC; font-weight: 500; font-size: 13px; }
+.rp-win { justify-self: center; font-size: 13px; padding: 6px 14px; }
 .rp-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
 .rp-btns .fs-btn { font-size: 17px; padding: 16px 12px; border-radius: 14px; }
 .rp-btns .go { font-size: 19px; }
@@ -502,6 +503,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
     <div id="fsOut" style="display:grid;gap:8px" hidden><div class="toolrow" data-otools></div><div class="counts" data-ocounts></div></div>
     <div id="fsReplay" class="rp" hidden>
       <div class="rp-cap" id="rpCap" aria-live="polite"></div>
+      <button class="fs-btn rp-win" id="rpWin" type="button" aria-pressed="true">Fenêtre de 5 prises</button>
       <div class="rp-btns"><button class="fs-btn" id="rpPrev" type="button">◀ Précédent</button><button class="fs-btn go" id="rpNext" type="button">Suivant ▶</button></div>
     </div>
   </div>
@@ -561,7 +563,7 @@ const day = t => t ? new Date(t).toLocaleDateString(TS_I18N.locale(), { day: "nu
 const ago = t => { if (!t) return ""; const d = (Date.now() - t) / 864e5; if (d < 1) return "aujourd'hui"; if (d < 2) return "hier"; if (d < 30) return `il y a ${Math.floor(d)} j`; return new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }); };
 
 /* ---------- wall drawing ---------- */
-function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1, hi = [], ordered = false } = {}) {
+function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1, hi = [], ordered = false, fade = [], labels = null } = {}) {
   const W = wall.w, H = wall.h, k = W / 1800, sw = 7 * k;
   const R = h => (TYPES[h.t] || TYPES.hand).r * k;
   const P = h => [h.x * W, h.y * H];
@@ -588,6 +590,7 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
   }
   let n = 0, fn = 0; const occ = {};
   for (const h of holds) {
+    const r0 = rings.length, faded = fade.includes(h);
     const t = TYPES[h.t] || TYPES.hand, [cx, cy] = P(h), r = R(h), oc = occ[h.x + "," + h.y] = (occ[h.x + "," + h.y] ?? -1) + 1;
     holes += `<circle cx="${cx}" cy="${cy}" r="${r + 8 * k}" fill="#000"/>`;
     rings += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${sw + 5 * k}"/>`
@@ -596,14 +599,18 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
     // Pied interdit : rond rouge barré, ni numéro ni trait vers les autres prises.
     if (h.t === "nofoot") { const d = r * 0.72; rings += `<line x1="${cx - d}" y1="${cy + d}" x2="${cx + d}" y2="${cy - d}" stroke="rgba(0,0,0,.6)" stroke-width="${sw + 5 * k}" stroke-linecap="round"/><line x1="${cx - d}" y1="${cy + d}" x2="${cx + d}" y2="${cy - d}" stroke="var(--h-nofoot)" stroke-width="${sw}" stroke-linecap="round"/>`; }
     if (holds.indexOf(h) === mark) rings += markRing(cx, cy, r + 18 * k, k);
-    if (hi.includes(h)) badges += `<circle cx="${cx}" cy="${cy}" r="${r + 15 * k}" fill="none" stroke="#fff" stroke-width="${5 * k}"/>`;
+    // Prise en cours du replay (la prochaine à prendre) : double anneau orange, bien distinct des autres prises.
+    if (hi.includes(h)) badges += `<circle cx="${cx}" cy="${cy}" r="${r + 16 * k}" fill="none" stroke="rgba(0,0,0,.65)" stroke-width="${12 * k}"/><circle cx="${cx}" cy="${cy}" r="${r + 16 * k}" fill="none" stroke="#FF6630" stroke-width="${7 * k}"/>`;
+    if (faded) rings = rings.slice(0, r0) + `<g opacity=".4">` + rings.slice(r0) + `</g>`;
     if (mini) continue;
+    const b0 = badges.length;
     const br = 17 * k, bx = cx + r * 0.78 - oc * 1.9 * br, by = cy - r * 0.78;
     const badge = (txt, col, ink) => `<circle cx="${bx}" cy="${by}" r="${br}" fill="${col}" stroke="rgba(0,0,0,.6)" stroke-width="${3 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 17 : 21) * k}" fill="${ink}">${txt}</text>`;
-    if (h.t === "hand") badges += badge(String(++n), "var(--h-hand)", "#fff");
-    else if (h.t === "foot" && ordered) badges += badge("P" + (++fn), "var(--h-foot)", "#0D0F11");
+    if (h.t === "hand") badges += badge(String(labels?.get(h) ?? ++n), "var(--h-hand)", "#fff");
+    else if (h.t === "foot" && ordered) badges += badge("P" + (labels?.get(h) ?? ++fn), "var(--h-foot)", "#0D0F11");
     else if (h.t === "start") badges += badge("D", "var(--h-start)", "#0D0F11");
     else if (h.t === "top") badges += badge("T", "var(--h-top)", "#fff");
+    if (faded) badges = badges.slice(0, b0) + `<g opacity=".4">` + badges.slice(b0) + `</g>`;
   }
   const defs = `<defs><marker id="${uid}a" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#fff" stroke="rgba(0,0,0,.6)" stroke-width="1"/></marker><marker id="${uid}f" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4" markerHeight="4" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="var(--h-foot)" stroke="rgba(0,0,0,.6)" stroke-width="1"/></marker>${dim && holds.length ? `<mask id="${uid}m"><rect width="${W}" height="${H}" fill="#fff"/>${holes}</mask>` : ""}</defs>`;
   const shade = dim && holds.length ? `<rect width="${W}" height="${H}" fill="rgba(0,0,0,.55)" mask="url(#${uid}m)"/>` : "";
@@ -1001,7 +1008,7 @@ function openFs(mode) {
   const isRp = mode === "replay" || mode === "breplay";
   fsView.dblZoom = !isRp && mode !== "edit" && mode !== "oedit";
   fsView.onAnyTap = isRp ? fx => { if (fx > 0.4) { if (!$("rpNext").disabled) rpStep(1); } else if (!$("rpPrev").disabled) rpStep(-1); } : null;
-  $("rpProg").hidden = !isRp;
+  $("rpProg").hidden = !isRp; if (isRp) renderRpWin();
   clearTimeout(state.hintT); $("rpHint").hidden = !isRp; $("rpHint").style.opacity = "1";
   if (isRp) state.hintT = setTimeout(() => { $("rpHint").style.opacity = "0"; state.hintT = setTimeout(() => $("rpHint").hidden = true, 500); }, 2200);
   fsView.max = state.mode === "out" ? 8 : 6;
@@ -1103,10 +1110,16 @@ function renderBReplay() {
   const holds = b.holds || [], ordered = b.seq === "ordered", steps = blocSteps(holds, ordered);
   state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
   // Pieds imposés (anciens blocs) : tous visibles dès le départ. Pieds dans l'ordre : ils apparaissent à leur tour, comme les mains.
-  const st = steps[state.rp], shown = steps.slice(0, state.rp + 1).filter(x => x.kind === "hand" || x.kind === "foot").flatMap(x => x.pts);
-  const vis = holds.filter(h => h.t === "start" || h.t === "nofoot" || (h.t === "foot" && !ordered) || shown.includes(h) || (h.t === "top" && st.kind === "top"));
+  // Fenêtre de 5 prises centrée sur la prise en cours : 2 avant, 2 après (au début et à la fin, elle reste de 5 prises). La prise en cours est en orange,
+  // les précédentes estompées, les suivantes normales. « Tout depuis le début » n'estompe rien et révèle tout jusqu'à la prise en cours.
+  const st = steps[state.rp], n = steps.length, w5 = winOn();
+  const from = w5 ? Math.min(Math.max(0, state.rp - 2), Math.max(0, n - REPLAY_WIN)) : 0, to = w5 ? Math.min(n, from + REPLAY_WIN) : state.rp + 1;
+  const win = steps.slice(from, to), inWin = h => win.some(x => x.pts.includes(h));
+  const vis = holds.filter(h => h.t === "nofoot" || (h.t === "foot" && !ordered) || inWin(h));
+  const fade = w5 ? steps.slice(from, state.rp).flatMap(x => x.pts) : [];
+  const labels = new Map(); for (const x of steps) if (x.kind === "hand" || x.kind === "foot") labels.set(x.pts[0], x.n);
   $("fsTitle").innerHTML = `${esc(b.name)} <small>${esc(b.grade)}</small>`;
-  fsView.set(wallSVG(w, vis, { uid: "br", hi: st.pts, ordered }), w.w / w.h);
+  fsView.set(wallSVG(w, vis, { uid: "br", hi: st.pts, ordered, fade, labels }), w.w / w.h);
   const total = holds.filter(h => h.t === "hand").length, totalFeet = holds.filter(h => h.t === "foot").length;
   const label = st.kind === "start" ? `Départ${st.pts.length > 1 ? " · 2 mains" : ""}` : st.kind === "top" ? "Top" : st.kind === "foot" ? `Pied ${st.n} / ${totalFeet}` : `Move ${st.n} / ${total}`;
   $("rpCap").innerHTML = `${label}<small>étape ${state.rp + 1} / ${steps.length}${st.kind === "start" && !ordered && holds.some(h => h.t === "foot") ? " · pieds imposés en jaune" : ""}</small>`;
@@ -1566,7 +1579,7 @@ function openVoie(id, sel) {
 
 /* ---------- drawing a route ---------- */
 function stepPoint(st, anchors) { if (st.t === "clip") { const a = anchors[st.a]; return a ? { x: a.x, y: a.y } : { x: st.x, y: st.y }; } return st; }
-function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, preview = null, markA = -1, markS = -1 } = {}) {
+function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, preview = null, markA = -1, markS = -1, win = 0 } = {}) {
   const W = v.w, H = v.h, k = Math.min(W, H) / 1400, img = preview || BT.img(v.image, mini ? { thumbFirst: true } : undefined);
   const P = p => [p.x * W, p.y * H];
   let line = "", anc = "", flow = "", rings = "", top = "";
@@ -1580,16 +1593,23 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
     else { bolt++; anc += `<rect x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="${5 * k}" fill="${a.work ? "#FFB020" : "#fff"}" stroke="#111" stroke-width="${3 * k}"${a.work ? ` stroke-dasharray="${6 * k} ${4 * k}"` : ""}/>${mini ? "" : `<text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${18 * k}" fill="#111">${bolt}</text>`}`; }
   });
   if (!mini) {
-    const vis = replay === null ? steps : steps.slice(0, replay + 1);
+    let vis = replay === null ? steps : steps.slice(0, replay + 1), off = 0;
+    // Fenêtre du replay : `win` prises (mains ou pieds) centrées sur la prise en cours (2 avant, 2 après), clips compris entre elles.
+    if (replay !== null && win) {
+      const mv = steps.map((x, j) => x.t !== "clip" ? j : -1).filter(j => j >= 0);
+      const pos = Math.max(0, mv.filter(j => j <= replay).length - 1), a = Math.min(Math.max(0, pos - 2), Math.max(0, mv.length - win)), z = Math.min(mv.length, a + win) - 1;
+      off = Math.min(mv[a] ?? 0, replay); vis = steps.slice(off, Math.max(mv[z] ?? replay, replay) + 1);
+    }
     let move = 0, lastHand = null, prevStep = null, prevFoot = null; const occR = {};
     vis.forEach((st, i) => {
+      i += off;
       const cur = replay !== null && i === replay, past = replay !== null && i < replay;
       const op = past ? .5 : 1;
       if (st.t === "clip") {
         const p = stepPoint(st, anchors), [ax, ay] = P(p);
         if (lastHand) { const [hx, hy] = P(lastHand); flow += `<line x1="${hx}" y1="${hy}" x2="${ax}" y2="${ay}" stroke="var(--h-top)" stroke-width="${4 * k}" stroke-dasharray="${8 * k} ${7 * k}" opacity="${op}"/>`; }
         top += `<g opacity="${op}"><circle cx="${ax}" cy="${ay}" r="${30 * k}" fill="none" stroke="var(--h-top)" stroke-width="${(cur ? 9 : 6) * k}"/><text x="${ax + 34 * k}" y="${ay - 22 * k}" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${20 * k}" fill="var(--h-top)" stroke="rgba(0,0,0,.65)" stroke-width="${5 * k}" paint-order="stroke">CLIP</text></g>`;
-        if (cur) top += `<circle cx="${ax}" cy="${ay}" r="${42 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
+        if (cur) top += `<circle cx="${ax}" cy="${ay}" r="${42 * k}" fill="none" stroke="rgba(0,0,0,.65)" stroke-width="${11 * k}"/><circle cx="${ax}" cy="${ay}" r="${42 * k}" fill="none" stroke="#FF6630" stroke-width="${6 * k}"/>`;
         if (i === markS) top += markRing(ax, ay, 50 * k, k);
         return;
       }
@@ -1604,7 +1624,7 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
       const br = 14 * k, bx = cx + r * 0.8 - oc * 1.9 * br, by = cy - r * 0.8, txt = String(st.n ?? move);
       if (st.rest) rings += `<g opacity="${op}"><rect x="${cx - 24 * k}" y="${cy + r + 6 * k}" width="${48 * k}" height="${22 * k}" rx="${11 * k}" fill="#1B2024" stroke="#fff" stroke-width="${2 * k}"/><text x="${cx}" y="${cy + r + 17 * k}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${14 * k}" fill="#fff">zZ</text></g>`;
       rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
-      if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 12 * k}" fill="none" stroke="#fff" stroke-width="${4 * k}"/>`;
+      if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 14 * k}" fill="none" stroke="rgba(0,0,0,.65)" stroke-width="${11 * k}"/><circle cx="${cx}" cy="${cy}" r="${r + 14 * k}" fill="none" stroke="#FF6630" stroke-width="${6 * k}"/>`;
       if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
     });
   }
@@ -1902,7 +1922,7 @@ function renderOFs() {
     state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
     $("fsTitle").innerHTML = `${esc(v.name)} <small>méthode de ${esc(m?.climber || "?")}</small>`;
     const st = steps[state.rp], V = (st && findVue(v, vueIdOf(st))) || baseVue(v) || v, onVue = stepsOn(steps, V);
-    fsView.set(routeSVG(V, V.anchors || [], onVue, { uid: "rp", replay: st ? onVue.findIndex(s => s.x === st.x && s.y === st.y && s.t === st.t) : null }), V.w / V.h);
+    fsView.set(routeSVG(V, V.anchors || [], onVue, { uid: "rp", win: winOn() ? REPLAY_WIN : 0, replay: st ? onVue.findIndex(s => s.x === st.x && s.y === st.y && s.t === st.t) : null }), V.w / V.h);
     if (state.rpVue !== V.id) {
       state.rpVue = V.id;
       if (allVues(v).length > 1) { const b = $("rpVue"); b.textContent = vueTitle(v, V); b.hidden = false; clearTimeout(state.rpVueT); state.rpVueT = setTimeout(() => b.hidden = true, 1800); }
@@ -1930,6 +1950,10 @@ function rpChrome(i, n) {
   $("rpNext").disabled = false; $("rpNext").textContent = last ? "↺ Recommencer" : "Suivant ▶";
   $("rpPrev").disabled = i <= 0;
 }
+// Replay : 5 prises visibles autour de la prise en cours (ts-replay-win), pour garder les longs circuits lisibles.
+const REPLAY_WIN = 5, winOn = () => lsGet("ts-replay-win") !== "all";
+function renderRpWin() { const on = winOn(); $("rpWin").setAttribute("aria-pressed", String(on)); $("rpWin").textContent = on ? "Fenêtre de 5 prises" : "Tout depuis le début"; }
+$("rpWin").addEventListener("click", () => { lsSet("ts-replay-win", winOn() ? "all" : "5"); renderRpWin(); if (state.fsMode === "breplay") { renderBReplay(); focusB(); } else { renderOFs(); focusStep(); } });
 const rpStep = d => { if (d > 0 && $("rpNext").textContent.startsWith("↺")) { state.rp = 0; d = 0; } state.rp += d; if (state.fsMode === "breplay") { renderBReplay(); focusB(); } else { renderOFs(); focusStep(); } };
 $("rpPrev").addEventListener("click", () => rpStep(-1));
 $("rpNext").addEventListener("click", () => rpStep(1));
