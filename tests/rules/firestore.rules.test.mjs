@@ -225,11 +225,6 @@ describe('Blocs privés', () => {
     await assertFails(anon().doc('blocsPrivees/b4').set(bloc));
     await assertSucceeds(user('alice').doc('blocsPrivees/b1').delete());
   });
-  test("un bloc privé ne peut pas porter de note", async () => {
-    await assertFails(user('alice').doc('blocsPrivees/b1').set({ ...bloc, ratingCount: 3, ratingSum: 9 }));
-    await seed('blocsPrivees/b1', bloc);
-    await assertFails(user('alice').doc('blocsPrivees/b1').update(trace('alice', { ratingCount: 3, ratingSum: 9 })));
-  });
   test("l'admin le lit et le supprime pour la modération", async () => {
     await seed('blocsPrivees/b1', bloc);
     await assertSucceeds(owner().doc('blocsPrivees/b1').get());
@@ -237,7 +232,7 @@ describe('Blocs privés', () => {
     await assertSucceeds(owner().doc('blocsPrivees/b1').delete());
   });
   test("rendre un bloc public ou privé est un déplacement dans un seul lot, sous le même identifiant", async () => {
-    await seed('blocs/b1', { ...bloc, ratingCount: 0, ratingSum: 0 });
+    await seed('blocs/b1', bloc);
     const db = user('alice'), toPrivate = db.batch();
     toPrivate.delete(db.doc('blocs/b1'));
     toPrivate.set(db.doc('blocsPrivees/b1'), bloc);
@@ -246,13 +241,6 @@ describe('Blocs privés', () => {
     toPublic.delete(db.doc('blocsPrivees/b1'));
     toPublic.set(db.doc('blocs/b1'), bloc);
     await assertSucceeds(toPublic.commit());
-  });
-  test("un bloc public déjà noté ne peut pas devenir privé", async () => {
-    await seed('blocs/b1', { ...bloc, ratingCount: 3, ratingSum: 6 });
-    const db = user('alice'), batch = db.batch();
-    batch.delete(db.doc('blocs/b1'));
-    batch.set(db.doc('blocsPrivees/b1'), bloc);
-    await assertFails(batch.commit());
   });
   test("un bloc privé n'est pas lisible dans la collection publique", async () => {
     await seed('blocsPrivees/b1', bloc);
@@ -372,106 +360,26 @@ describe('Commune obligatoire', () => {
   });
 });
 
-describe('Notes', () => {
-  const voie = (extra = {}) => ({ authorId: 'alice', name: 'V', ...extra });
-  const vid = uid => `voies__v1__${uid}`;
-  const vote = (uid, value) => ({ kind: 'voies', targetId: 'v1', authorId: uid, value, createdAt: 1, updatedAt: 1 });
-  function cast(uid, value, { count = 1, sum = value, id = vid(uid) } = {}) {
-    const db = user(uid), b = db.batch();
-    b.set(db.doc(`votes/${id}`), vote(uid, value));
-    b.update(db.doc('voies/v1'), { ratingCount: count, ratingSum: sum });
-    return b.commit();
-  }
-  test('un grimpeur vote de 0 à 3 ; le compteur suit', async () => {
-    await seed('voies/v1', voie());
-    await assertSucceeds(cast('bob', 0));
-    await seed('voies/v2', voie());
-    const db = user('carole'), b = db.batch();
-    b.set(db.doc('votes/voies__v2__carole'), { ...vote('carole', 3), targetId: 'v2' });
-    b.update(db.doc('voies/v2'), { ratingCount: 1, ratingSum: 3 });
-    await assertSucceeds(b.commit());
+describe('Notes supprimées', () => {
+  test("la collection votes n'est plus accessible : ni lecture ni écriture, pas même pour l'admin", async () => {
+    await seed('votes/blocs__b1__alice', { kind: 'blocs', targetId: 'b1', authorId: 'alice', value: 2, createdAt: 1, updatedAt: 1 });
+    await assertFails(user('alice').doc('votes/blocs__b1__alice').get());
+    await assertFails(owner().doc('votes/blocs__b1__alice').get());
+    await assertFails(anon().doc('votes/blocs__b1__alice').get());
+    await assertFails(user('bob').doc('votes/blocs__b1__bob').set({ kind: 'blocs', targetId: 'b1', authorId: 'bob', value: 3, createdAt: 1, updatedAt: 1 }));
+    await assertFails(owner().doc('votes/blocs__b1__alice').delete());
   });
-  test('les valeurs −1, 4 et 2,5 sont refusées', async () => {
-    await seed('voies/v1', voie());
-    for (const v of [-1, 4, 2.5]) await assertFails(cast('bob', v));
+  test("un autre grimpeur ne peut plus modifier les compteurs de notes d'un bloc ou d'une voie", async () => {
+    await seed('blocs/b1', { authorId: 'alice', name: 'Bloc', ratingCount: 3, ratingSum: 6 });
+    await seed('voies/v1', { authorId: 'alice', name: 'Voie', ratingCount: 3, ratingSum: 6, methodCount: 0 });
+    await assertFails(user('bob').doc('blocs/b1').update({ ratingCount: 4, ratingSum: 9 }));
+    await assertFails(user('bob').doc('voies/v1').update({ ratingCount: 4, ratingSum: 9 }));
   });
-  test('un invité ne peut pas voter', async () => {
-    await seed('voies/v1', voie());
-    const db = anon(), b = db.batch();
-    b.set(db.doc(`votes/${vid('bob')}`), vote('bob', 2));
-    b.update(db.doc('voies/v1'), { ratingCount: 1, ratingSum: 2 });
-    await assertFails(b.commit());
-  });
-  test("l'auteur ne peut pas noter son propre contenu", async () => {
-    await seed('voies/v1', voie());
-    await assertFails(cast('alice', 3));
-  });
-  test('un second vote du même grimpeur ne compte pas deux fois', async () => {
-    await seed('voies/v1', voie());
-    await assertSucceeds(cast('bob', 2));
-    await assertFails(cast('bob', 3, { count: 2, sum: 5 }));
-    const db = user('bob'), b = db.batch();
-    b.update(db.doc(`votes/${vid('bob')}`), { value: 3 });
-    b.update(db.doc('voies/v1'), { ratingSum: 3 });
-    await assertSucceeds(b.commit());
-  });
-  test('un vote ne peut pas être enregistré sous un autre identifiant', async () => {
-    await seed('voies/v1', voie());
-    await assertFails(cast('bob', 2, { id: 'voies__v1__autre' }));
-    await assertFails(cast('bob', 2, { id: 'libre' }));
-  });
-  test("personne ne peut modifier ni lire le vote d'un autre", async () => {
-    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
-    await seed(`votes/${vid('bob')}`, vote('bob', 2));
-    await assertFails(user('carole').doc(`votes/${vid('bob')}`).get());
-    await assertFails(anon().doc(`votes/${vid('bob')}`).get());
-    await assertFails(user('carole').doc(`votes/${vid('bob')}`).update({ value: 0 }));
-    await assertFails(user('carole').doc(`votes/${vid('bob')}`).delete());
-    await assertSucceeds(user('bob').doc(`votes/${vid('bob')}`).get());
-    await assertSucceeds(owner().doc(`votes/${vid('bob')}`).get());
-  });
-  test("chacun lit son vote même s'il n'existe pas encore, pas celui d'un autre", async () => {
-    await assertSucceeds(user('bob').doc(`votes/${vid('bob')}`).get());
-    await assertFails(user('carole').doc(`votes/${vid('bob')}`).get());
-    await assertFails(user('bob').collection('votes').get());
-  });
-  test('la moyenne ne peut pas être faussée', async () => {
-    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
-    await seed(`votes/${vid('bob')}`, vote('bob', 2));
-    await assertFails(user('carole').doc('voies/v1').update({ ratingCount: 2, ratingSum: 5 }));
-    await assertFails(user('alice').doc('voies/v1').update(trace('alice', { ratingSum: 300 })));
-    await assertFails(owner().doc('voies/v1').update(trace('owner', { ratingSum: 300 })));
-    await assertFails(cast('carole', 1, { count: 2, sum: 90 }));
-    // Retirer son vote exige de retirer aussi sa part du total.
-    await assertFails(user('bob').doc(`votes/${vid('bob')}`).delete());
-    const db = user('bob'), b = db.batch();
-    b.delete(db.doc(`votes/${vid('bob')}`));
-    b.update(db.doc('voies/v1'), { ratingCount: 0, ratingSum: 0 });
-    await assertSucceeds(b.commit());
-  });
-  test('on ne crée pas un contenu avec une note déjà remplie', async () => {
-    await assertFails(user('alice').doc('voies/v9').set({ authorId: 'alice', name: 'V', ratingCount: 9, ratingSum: 27 }));
-    await assertFails(user('alice').doc('blocs/b9').set({ authorId: 'alice', name: 'B', ratingCount: 9, ratingSum: 27 }));
-  });
-  test('un bloc archivé garde sa note mais ne peut plus être noté', async () => {
-    await seed('walls/old', { gymId: 'g1', active: false });
-    await seed('walls/new', { gymId: 'g1', active: true });
-    await seed('blocs/b1', { authorId: 'alice', name: 'B', wallId: 'old', ratingCount: 3, ratingSum: 6 });
-    await seed('blocs/b2', { authorId: 'alice', name: 'B', wallId: 'new' });
-    const go = (bloc, count, sum) => {
-      const db = user('bob'), b = db.batch();
-      b.set(db.doc(`votes/blocs__${bloc}__bob`), { kind: 'blocs', targetId: bloc, authorId: 'bob', value: 2, createdAt: 1, updatedAt: 1 });
-      b.update(db.doc(`blocs/${bloc}`), { ratingCount: count, ratingSum: sum });
-      return b.commit();
-    };
-    await assertFails(go('b1', 4, 8));
-    await assertSucceeds(go('b2', 1, 2));
-  });
-  test("l'admin supprime les votes d'un contenu qu'il supprime", async () => {
-    await seed('voies/v1', voie({ ratingCount: 1, ratingSum: 2 }));
-    await seed(`votes/${vid('bob')}`, vote('bob', 2));
-    await assertSucceeds(owner().collection('votes').where('targetId', '==', 'v1').get());
-    await assertSucceeds(owner().doc(`votes/${vid('bob')}`).delete());
+  test("les anciens compteurs restent figés, même pour l'auteur et l'admin", async () => {
+    await seed('blocs/b1', { authorId: 'alice', name: 'Bloc', ratingCount: 3, ratingSum: 6 });
+    await assertFails(user('alice').doc('blocs/b1').update(trace('alice', { ratingCount: 0, ratingSum: 0 })));
+    await assertFails(owner().doc('blocs/b1').update(trace('owner', { ratingSum: 99 })));
+    await assertSucceeds(user('alice').doc('blocs/b1').update(trace('alice', { name: 'Bloc v2' })));
   });
 });
 

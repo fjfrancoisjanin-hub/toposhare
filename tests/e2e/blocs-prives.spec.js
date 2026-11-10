@@ -1,4 +1,4 @@
-// Blocs privés ou publics : choix à la publication, visibilité réservée à l'auteur, lien direct, changement de visibilité, notes.
+// Blocs privés ou publics : choix à la publication, visibilité réservée à l'auteur, lien direct, changement de visibilité.
 const { test, expect } = require('./fixtures');
 const { ALICE, BOB, login, seed } = require('./helpers');
 
@@ -42,7 +42,6 @@ test('à la publication, public par défaut ; un bloc privé n\'est vu que par s
 
   const bid = await publish(page, `Mon essai ${id}`, { priv: true });
   await expect(page.locator('#dBy')).toContainText('Privé');
-  await expect(page.locator('#dRate .chip')).toHaveCount(0);
   await page.locator('#tabSalles').click();
   await expect(card(page, `Mon essai ${id}`)).toBeVisible();
   await expect(page.locator('.card', { hasText: `Mon essai ${id}` }).locator('.tag')).toContainText('Privé');
@@ -92,20 +91,6 @@ test('le propriétaire d\'un bloc le rend public, puis le replay et la modificat
   // Le lien direct reste le même après le déplacement.
   await cold(bob, `/#/bloc/${bid}`);
   await expect(bob.locator('#dName')).toHaveText(`Projet ${id}`);
-});
-
-test('un bloc public déjà noté ne peut plus devenir privé', async ({ page }, testInfo) => {
-  const id = uid(testInfo);
-  await seedSalle(id);
-  await page.goto(`/#/salle/${id}`);
-  await login(page, ALICE);
-  const me = await page.evaluate(() => BT.user().uid);
-  await seed('blocs', `note-${id}`, { gymId: id, wallId: `w-${id}`, name: `Noté ${id}`, grade: '6b', setter: 'Alice', holds: [{ t: 'start', x: 0.5, y: 0.5 }, { t: 'top', x: 0.5, y: 0.2 }], authorId: me, ratingCount: 3, ratingSum: 8, createdAt: 2 });
-  await card(page, `Noté ${id}`).click();
-  await page.locator('#dEdit').click();
-  await expect(page.locator('#fVisPublic')).toBeChecked();
-  await expect(page.locator('#fVisPrivate')).toBeDisabled();
-  await expect(page.locator('#fVisNote')).toContainText('déjà des notes');
 });
 
 test("l'auteur supprime son bloc privé", async ({ page }, testInfo) => {
