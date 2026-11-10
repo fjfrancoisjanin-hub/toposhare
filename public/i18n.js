@@ -340,7 +340,7 @@
     ["Falaises", "Crags", "Escuelas"],
     ["Pieds dans l'ordre", "Feet in order", "Pies en orden"],
     ["Posez mains et pieds dans l'ordre de l'enchaînement (main, pied, pied, main…). Le replay les déroule dans cet ordre.", "Place hands and feet in the order of the sequence (hand, foot, foot, hand…). The replay plays them in that order.", "Coloca manos y pies en el orden de la secuencia (mano, pie, pie, mano…). La repetición los reproduce en ese orden."],
-    ["Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc vers une main, pointillé jaune vers un pied.", "“Feet in order” box: place hands and feet in the order of the sequence. White line to a hand, yellow dotted line to a foot.", "Casilla «Pies en orden»: coloca manos y pies en el orden de la secuencia. Línea blanca hacia una mano, punteada amarilla hacia un pie."],
+    ["Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "“Feet in order” box: place hands and feet in the order of the sequence. White line between hands, yellow dotted line between feet: never a line between a hand and a foot.", "Casilla «Pies en orden»: coloca manos y pies en el orden de la secuencia. Línea blanca entre las manos, punteada amarilla entre los pies: nunca una línea entre una mano y un pie."],
     [/^Pied (\d+) \/ (\d+)$/, m => `Foot ${m[1]} / ${m[2]}`, m => `Pie ${m[1]} / ${m[2]}`],
     [/^(\d+) pieds? dans l'ordre$/, m => `${m[1]} ${+m[1] > 1 ? "feet" : "foot"} in order`, m => `${m[1]} pie${+m[1] > 1 ? "s" : ""} en orden`],
     ["Ajouter avant", "Add before", "Añadir antes"],

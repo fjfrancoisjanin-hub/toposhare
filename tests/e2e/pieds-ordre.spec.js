@@ -1,10 +1,11 @@
-// Séquences main / pied : « Pieds dans l'ordre » sur les blocs (anciens blocs : pieds imposés), tracé trait plein vers une main, pointillé jaune vers un pied.
+// Séquences main / pied : « Pieds dans l'ordre » sur les blocs (anciens blocs : pieds imposés). Deux tracés séparés : trait blanc entre les mains, pointillé jaune entre les pieds, jamais de trait entre une main et un pied.
 const { test, expect } = require('./fixtures');
 const { ALICE, login, seed } = require('./helpers');
 
 const uid = testInfo => `${testInfo.project.name}-${Date.now()}`;
 const SEQ = [{ t: 'start', x: 0.3, y: 0.85 }, { t: 'hand', x: 0.4, y: 0.65 }, { t: 'foot', x: 0.35, y: 0.75 }, { t: 'foot', x: 0.45, y: 0.7 }, { t: 'hand', x: 0.55, y: 0.45 }, { t: 'top', x: 0.5, y: 0.15 }];
 const footLines = (page, root) => page.locator(`${root} svg line[stroke="var(--h-foot)"]`);
+const handLines = (page, root) => page.locator(`${root} svg line[stroke="#fff"]`);
 
 async function seedSalle(id) {
   await seed('gyms', id, { name: `Salle ${id}`, city: 'Albi', createdAt: 1 });
@@ -28,13 +29,16 @@ test('pieds dans l\'ordre par défaut : le tracé distingue main (trait plein) e
   await login(page, ALICE);
   await page.locator('#tabCreate').click();
   await expect(page.locator('#fSeq')).toBeChecked();
-  // L'éditeur montre déjà le tracé : deux segments vers un pied.
+  // L'éditeur montre déjà les deux tracés : 3 traits entre les mains (départ, main 1, main 2, top), 1 pointillé entre les deux pieds.
+  // Aucun trait ne relie une main à un pied : avec 2 mains entre lesquelles s'intercalent 2 pieds, on n'a pas 5 segments.
   await page.evaluate(h => { state.holds = h.map(x => ({ ...x })); renderEditor(); }, SEQ);
-  await expect(footLines(page, '#editWall')).toHaveCount(2);
+  await expect(handLines(page, '#editWall')).toHaveCount(3);
+  await expect(footLines(page, '#editWall')).toHaveCount(1);
   await page.locator('#tabSalles').click();
   await publish(page, `Séquence ${id}`);
   await expect(page.locator('#dSeq')).toContainText('2 pieds dans l\'ordre');
-  await expect(footLines(page, '#dWall')).toHaveCount(2);
+  await expect(handLines(page, '#dWall')).toHaveCount(3);
+  await expect(footLines(page, '#dWall')).toHaveCount(1);
   await expect(page.locator('#dWall svg')).toContainText('P1');
   await expect(page.locator('#dWall svg')).toContainText('P2');
   expect(await page.evaluate(() => state.blocs[0].seq)).toBe('ordered');
@@ -47,9 +51,14 @@ test('pieds dans l\'ordre par défaut : le tracé distingue main (trait plein) e
   await next(page); await expect(cap).toContainText('Pied 1 / 2');
   await expect(page.locator('#fsWall svg')).toContainText('P1');
   await expect(page.locator('#fsWall svg')).not.toContainText('P2');
+  await expect(footLines(page, '#fsWall')).toHaveCount(0);
+  await expect(handLines(page, '#fsWall')).toHaveCount(1);
   await next(page); await expect(cap).toContainText('Pied 2 / 2');
-  await expect(footLines(page, '#fsWall')).toHaveCount(2);
+  await expect(footLines(page, '#fsWall')).toHaveCount(1);
+  await expect(handLines(page, '#fsWall')).toHaveCount(1);
   await next(page); await expect(cap).toContainText('Move 2 / 2');
+  await expect(handLines(page, '#fsWall')).toHaveCount(2);
+  await expect(footLines(page, '#fsWall')).toHaveCount(1);
   await next(page); await expect(cap).toContainText('Top');
 });
 
@@ -94,7 +103,7 @@ test('un ancien bloc (sans champ) garde ses pieds imposés, et on peut le passer
   await page.locator('#fSeq').check();
   await page.locator('#fSave').click();
   await expect(page.locator('#dSeq')).toContainText('2 pieds dans l\'ordre');
-  await expect(footLines(page, '#dWall')).toHaveCount(2);
+  await expect(footLines(page, '#dWall')).toHaveCount(1);
 });
 
 test('méthode de voie : trait plein vers une main, pointillé jaune vers un pied, dans l\'ordre', async ({ page }, testInfo) => {
@@ -109,8 +118,40 @@ test('méthode de voie : trait plein vers une main, pointillé jaune vers un pie
   await expect(cap).toContainText('Main · move 1 / 4');
   await expect(footLines(page, '#fsWall')).toHaveCount(0);
   await next(page); await expect(cap).toContainText('Pied · move 2 / 4');
+  await expect(footLines(page, '#fsWall')).toHaveCount(0); // premier pied : rien à relier, et jamais depuis la main
+  await next(page); await expect(cap).toContainText('Pied · move 3 / 4');
+  await expect(footLines(page, '#fsWall')).toHaveCount(1); // pied 1 → pied 2
+  await expect(page.locator('#fsWall svg line[stroke="var(--h-hand)"]')).toHaveCount(0);
+  await next(page); await expect(cap).toContainText('Main · move 4 / 4');
   await expect(footLines(page, '#fsWall')).toHaveCount(1);
-  await next(page); await next(page); await expect(cap).toContainText('Main · move 4 / 4');
-  await expect(footLines(page, '#fsWall')).toHaveCount(2);
-  await expect(page.locator('#fsWall svg line[stroke="var(--h-hand)"]')).toHaveCount(1);
+  await expect(page.locator('#fsWall svg line[stroke="var(--h-hand)"]')).toHaveCount(1); // main 1 → main 2, en sautant les pieds
+});
+
+test('deux départs, deux mains, deux pieds, retour à une main puis un pied : deux tracés séparés, jamais de trait main-pied', async ({ page }, testInfo) => {
+  const id = uid(testInfo);
+  await seedSalle(id);
+  await page.goto(`/#/salle/${id}`);
+  await login(page, ALICE);
+  await page.locator('#tabCreate').click();
+  const holds = [
+    { t: 'start', x: 0.25, y: 0.9 }, { t: 'start', x: 0.4, y: 0.9 },
+    { t: 'hand', x: 0.35, y: 0.7 }, { t: 'hand', x: 0.55, y: 0.55 },
+    { t: 'foot', x: 0.3, y: 0.8 }, { t: 'foot', x: 0.45, y: 0.75 },
+    { t: 'hand', x: 0.6, y: 0.35 }, { t: 'foot', x: 0.55, y: 0.55 }, // un pied posé sur la prise de la seconde main
+    { t: 'top', x: 0.5, y: 0.12 },
+  ];
+  await page.evaluate(h => { state.holds = h.map(x => ({ ...x })); renderEditor(); }, holds);
+  // Mains : départs → main 1 → main 2 → main 3 → top = 4 traits. Pieds : pied 1 → pied 2 → pied 3 = 2 pointillés.
+  await expect(handLines(page, '#editWall')).toHaveCount(4);
+  await expect(footLines(page, '#editWall')).toHaveCount(2);
+  // Chaque extrémité d'un pointillé de pied tombe sur un pied, jamais sur une main : on le vérifie sur les coordonnées.
+  const bad = await page.evaluate(() => {
+    const W = 100, svg = document.querySelector('#editWall svg'), feet = state.holds.filter(h => h.t === 'foot'), hands = state.holds.filter(h => h.t === 'hand');
+    const near = (x, y, list) => list.some(h => Math.hypot(h.x * W - x, h.y * W - y) < 9);
+    return [...svg.querySelectorAll('line[stroke="var(--h-foot)"]')].filter(l => {
+      const a = [+l.getAttribute('x1'), +l.getAttribute('y1')], b = [+l.getAttribute('x2'), +l.getAttribute('y2')];
+      return !(near(a[0], a[1], feet) && near(b[0], b[1], feet)) || (near(a[0], a[1], hands) && !near(a[0], a[1], feet));
+    }).length;
+  });
+  expect(bad).toBe(0);
 });
