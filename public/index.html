@@ -36,6 +36,7 @@ img { max-width: 100%; }
   --h-hand: #2F9BFF;
   --h-foot: #FFD21F;
   --h-top: #FF2E9A;
+  --h-nofoot: #E5484D;
   --f-display: "Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -106,6 +107,9 @@ h2 { font-size: 18px; }
 .toolrow { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 8px; }
 .tool, .undo { appearance: none; border: 2px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 12px; padding: 8px 4px; display: grid; justify-items: center; gap: 3px; font: 700 13px var(--f-body); cursor: pointer; }
 .tool[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+/* Pied interdit : seconde ligne pleine largeur sous les quatre outils (5 boutons + Annuler ne tiennent pas à 390 px) ; Annuler occupe les deux lignes. */
+.tool[data-t="nofoot"] { grid-column: 1 / span 4; grid-row: 2; display: flex; justify-content: center; align-items: center; gap: 8px; padding-block: 6px; }
+.toolrow .undo[data-undo] { grid-column: 5; grid-row: 1 / span 2; align-content: center; }
 .tool .dot { width: 18px; height: 18px; border-radius: 50%; border: 3px solid currentColor; }
 .undo { padding-inline: 12px; }
 .undo .ic { font-size: 18px; line-height: 18px; }
@@ -393,6 +397,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
         <span><i style="border-color:var(--h-hand)"></i>Mains, dans l'ordre</span>
         <span><i style="border-color:var(--h-foot)"></i>Pieds</span>
         <span><i style="border-color:var(--h-top)"></i>Top</span>
+        <span id="dLegNoFoot" hidden><i style="border-color:var(--h-nofoot)"></i>Pied interdit</span>
       </div>
       <div class="seq" id="dSeq"></div>
       <p class="desc" id="dDesc"></p>
@@ -523,6 +528,7 @@ const TYPES = {
   start: { label: "Départ", color: "var(--h-start)", r: 34, max: 2 },
   hand:  { label: "Main",   color: "var(--h-hand)",  r: 30 },
   foot:  { label: "Pied",   color: "var(--h-foot)",  r: 22 },
+  nofoot: { label: "Pied interdit", color: "var(--h-nofoot)", r: 22 },
   top:   { label: "Top",    color: "var(--h-top)",   r: 34, max: 2 },
 };
 const FILTERS = [
@@ -587,6 +593,8 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
     rings += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${sw + 5 * k}"/>`
           +  `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${sw}"/>`;
     if (h.t === "start") rings += `<circle cx="${cx}" cy="${cy}" r="${r + 11 * k}" fill="none" stroke="${t.color}" stroke-width="${3 * k}"/>`;
+    // Pied interdit : rond rouge barré, ni numéro ni trait vers les autres prises.
+    if (h.t === "nofoot") { const d = r * 0.72; rings += `<line x1="${cx - d}" y1="${cy + d}" x2="${cx + d}" y2="${cy - d}" stroke="rgba(0,0,0,.6)" stroke-width="${sw + 5 * k}" stroke-linecap="round"/><line x1="${cx - d}" y1="${cy + d}" x2="${cx + d}" y2="${cy - d}" stroke="var(--h-nofoot)" stroke-width="${sw}" stroke-linecap="round"/>`; }
     if (holds.indexOf(h) === mark) rings += markRing(cx, cy, r + 18 * k, k);
     if (hi.includes(h)) badges += `<circle cx="${cx}" cy="${cy}" r="${r + 15 * k}" fill="none" stroke="#fff" stroke-width="${5 * k}"/>`;
     if (mini) continue;
@@ -602,8 +610,8 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid ${mini ? "slice" : "meet"}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Photo du mur avec ${holds.length} prises marquées">${defs}<image href="${esc(BT.img(wall.image))}" width="${W}" height="${H}"/>${shade}${under}${rings}${badges}</svg>`;
 }
 function seqText(holds, ordered = false) {
-  const c = t => holds.filter(h => h.t === t).length, hands = c("hand"), feet = c("foot");
-  return `${hands} move${hands > 1 ? "s" : ""}${feet ? ` · ${feet} pied${feet > 1 ? "s" : ""} ${ordered ? "dans l'ordre" : `imposé${feet > 1 ? "s" : ""}`}` : " · pieds libres"}`;
+  const c = t => holds.filter(h => h.t === t).length, hands = c("hand"), feet = c("foot"), no = c("nofoot");
+  return `${hands} move${hands > 1 ? "s" : ""}${feet ? ` · ${feet} pied${feet > 1 ? "s" : ""} ${ordered ? "dans l'ordre" : `imposé${feet > 1 ? "s" : ""}`}` : " · pieds libres"}${no ? ` · ${no} pied${no > 1 ? "s" : ""} interdit${no > 1 ? "s" : ""}` : ""}`;
 }
 
 /* ---------- pinch / pan / tap surface ---------- */
@@ -802,7 +810,7 @@ function oLong(nx, ny, cx, cy) {
 
 /* ---------- bouton d'aide « ? » : une carte courte par écran, fermable, masquable, retrouvable dans « Mon compte » ---------- */
 const HELP = {
-  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
+  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Outil « Pied interdit » : marquez une prise où le pied est interdit (rond rouge barré). Il ne change ni les mouvements ni les tracés.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
   route: ["Points d'ancrage", ["Touchez chaque point d'ancrage du bas vers le haut, puis le relais.", "Appui long sur un point : le marquer « point de travail » (dégaine sautée à l'enchaînement), le déplacer ou le supprimer."]],
   method: ["Ma méthode", ["Touchez mains et pieds dans l'ordre où vous les prenez.", "Touchez une prise déjà posée pour la reprendre.", "Appui long sur une prise : ajouter un move avant ou après, marquer un repos, la déplacer, la supprimer."]],
 };
@@ -846,7 +854,7 @@ function renderTools() {
   document.querySelectorAll("[data-tools]").forEach(el => { el.innerHTML = html; });
   const c = k => state.holds.filter(h => h.t === k).length;
   const nb = state.insertAt == null ? 0 : state.holds.slice(0, state.insertAt).filter(h => h.t === "hand").length;
-  const counts = `<span>Départ <b>${c("start")}</b></span><span>Moves <b>${c("hand")}</b></span><span>Pieds <b>${c("foot")}</b></span><span>Top <b>${c("top")}</b></span>`
+  const counts = `<span>Départ <b>${c("start")}</b></span><span>Moves <b>${c("hand")}</b></span><span>Pieds <b>${c("foot")}</b></span><span>Top <b>${c("top")}</b></span>${c("nofoot") ? `<span>Interdits <b>${c("nofoot")}</b></span>` : ""}`
     + insBanner(state, nb ? `Prochaine prise insérée après le move ${nb}` : "Prochaine prise insérée au début du bloc") + helpBtn("bloc");
   document.querySelectorAll("[data-counts]").forEach(el => el.innerHTML = counts);
 }
@@ -1074,6 +1082,7 @@ function renderDetail() {
   $("dOld").hidden = !isArchived(b);
   wallEl.innerHTML = wallSVG(w, b.holds || [], { uid: "d", ordered: b.seq === "ordered" }); wallEl.appendChild(btn);
   $("dSeq").textContent = seqText(b.holds || [], b.seq === "ordered");
+  $("dLegNoFoot").hidden = !(b.holds || []).some(h => h.t === "nofoot");
   $("dDesc").textContent = b.desc || ""; $("dDesc").hidden = !b.desc;
   const own = state.me && b.authorId === state.me;
   $("dDel").hidden = !(own || (canManageGym(b.gymId) && !b.isPrivate)) || state.delArmed === b.id; $("dDelOk").hidden = state.delArmed !== b.id; $("dEdit").hidden = !own || isArchived(b); $("dReplay").hidden = !(b.holds || []).length;
@@ -1095,7 +1104,7 @@ function renderBReplay() {
   state.rp = Math.max(0, Math.min(state.rp, steps.length - 1));
   // Pieds imposés (anciens blocs) : tous visibles dès le départ. Pieds dans l'ordre : ils apparaissent à leur tour, comme les mains.
   const st = steps[state.rp], shown = steps.slice(0, state.rp + 1).filter(x => x.kind === "hand" || x.kind === "foot").flatMap(x => x.pts);
-  const vis = holds.filter(h => h.t === "start" || (h.t === "foot" && !ordered) || shown.includes(h) || (h.t === "top" && st.kind === "top"));
+  const vis = holds.filter(h => h.t === "start" || h.t === "nofoot" || (h.t === "foot" && !ordered) || shown.includes(h) || (h.t === "top" && st.kind === "top"));
   $("fsTitle").innerHTML = `${esc(b.name)} <small>${esc(b.grade)}</small>`;
   fsView.set(wallSVG(w, vis, { uid: "br", hi: st.pts, ordered }), w.w / w.h);
   const total = holds.filter(h => h.t === "hand").length, totalFeet = holds.filter(h => h.t === "foot").length;
