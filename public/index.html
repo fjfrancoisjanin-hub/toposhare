@@ -566,19 +566,22 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
   // move order: starts (centroid) → hands in tap order → tops (centroid)
   if (!mini) {
     const cen = arr => arr.length ? { x: arr.reduce((s, h) => s + h.x, 0) / arr.length, y: arr.reduce((s, h) => s + h.y, 0) / arr.length, t: arr[0].t, r: arr.length > 1 ? 0 : 1 } : null;
-    // Pieds dans l'ordre : le tracé passe par les mains et les pieds dans l'ordre de l'enchaînement. Trait blanc vers une main, pointillé vers un pied.
-    const seq = [cen(holds.filter(h => h.t === "start")), ...holds.filter(h => h.t === "hand" || (ordered && h.t === "foot")), cen(holds.filter(h => h.t === "top"))].filter(Boolean);
-    for (let i = 0; i < seq.length - 1; i++) {
-      const [ax, ay] = P(seq[i]), [bx, by] = P(seq[i + 1]);
-      const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy); if (L < 1) continue;
-      const ux = dx / L, uy = dy / L, ra = seq[i].r === 0 ? 4 : R(seq[i]) + 6 * k, rb = R(seq[i + 1]) + 10 * k;
-      if (L <= ra + rb) continue;
+    // Deux tracés qui ne se croisent jamais : un trait blanc relie les mains entre elles (départs, mains dans l'ordre, top) ;
+    // si les pieds sont dans l'ordre, un pointillé jaune relie les pieds entre eux. Jamais de trait entre une main et un pied.
+    const segment = (A, B, foot) => {
+      const [ax, ay] = P(A), [bx, by] = P(B);
+      const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy); if (L < 1) return;
+      const ux = dx / L, uy = dy / L, ra = A.r === 0 ? 4 : R(A) + 6 * k, rb = R(B) + 10 * k;
+      if (L <= ra + rb) return;
       const x1 = ax + ux * ra, y1 = ay + uy * ra, x2 = bx - ux * rb, y2 = by - uy * rb;
       under += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.6)" stroke-width="${8 * k}" stroke-linecap="round"/>`
-             + (ordered && seq[i + 1].t === "foot"
+             + (foot
                ? `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--h-foot)" stroke-width="${4 * k}" stroke-dasharray="${2 * k} ${9 * k}" stroke-linecap="round" marker-end="url(#${uid}f)"/>`
                : `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="${3.5 * k}" stroke-dasharray="${14 * k} ${9 * k}" stroke-linecap="round" marker-end="url(#${uid}a)"/>`);
-    }
+    };
+    const handSeq = [cen(holds.filter(h => h.t === "start")), ...holds.filter(h => h.t === "hand"), cen(holds.filter(h => h.t === "top"))].filter(Boolean);
+    for (let i = 0; i < handSeq.length - 1; i++) segment(handSeq[i], handSeq[i + 1], false);
+    if (ordered) { const feet = holds.filter(h => h.t === "foot"); for (let i = 0; i < feet.length - 1; i++) segment(feet[i], feet[i + 1], true); }
   }
   let n = 0, fn = 0; const occ = {};
   for (const h of holds) {
@@ -802,7 +805,7 @@ function oLong(nx, ny, cx, cy) {
 
 /* ---------- bouton d'aide « ? » : une carte courte par écran, fermable, masquable, retrouvable dans « Mon compte » ---------- */
 const HELP = {
-  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc vers une main, pointillé jaune vers un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
+  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
   route: ["Points d'ancrage", ["Touchez chaque point d'ancrage du bas vers le haut, puis le relais.", "Appui long sur un point : le marquer « point de travail » (dégaine sautée à l'enchaînement), le déplacer ou le supprimer."]],
   method: ["Ma méthode", ["Touchez mains et pieds dans l'ordre où vous les prenez.", "Touchez une prise déjà posée pour la reprendre.", "Appui long sur une prise : ajouter un move avant ou après, marquer un repos, la déplacer, la supprimer."]],
 };
@@ -1579,7 +1582,7 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
   });
   if (!mini) {
     const vis = replay === null ? steps : steps.slice(0, replay + 1);
-    let move = 0, lastHand = null, prevStep = null; const occR = {};
+    let move = 0, lastHand = null, prevStep = null, prevFoot = null; const occR = {};
     vis.forEach((st, i) => {
       const cur = replay !== null && i === replay, past = replay !== null && i < replay;
       const op = past ? .5 : 1;
@@ -1592,14 +1595,11 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
         return;
       }
       const t = OT[st.t] || OT.hand, [cx, cy] = P(st), r = t.r * k; move++;
-      // Tracé dans l'ordre de la méthode : trait plein vers une main, pointillé jaune vers un pied.
-      if (prevStep) {
-        const [px, py] = P(prevStep);
-        flow += st.t === "foot"
-          ? `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-foot)" stroke-width="${4 * k}" stroke-dasharray="${2 * k} ${9 * k}" stroke-linecap="round" opacity="${.9 * op}"/>`
-          : `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`;
-      }
-      prevStep = st; if (st.t === "hand") lastHand = st;
+      // Deux tracés séparés, dans l'ordre de pose : trait plein entre les mains, pointillé jaune entre les pieds. Jamais de trait main-pied.
+      if (st.t === "foot") {
+        if (prevFoot) { const [px, py] = P(prevFoot); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-foot)" stroke-width="${4 * k}" stroke-dasharray="${2 * k} ${9 * k}" stroke-linecap="round" opacity="${.9 * op}"/>`; }
+        prevFoot = st;
+      } else { if (prevStep) { const [px, py] = P(prevStep); flow += `<line x1="${px}" y1="${py}" x2="${cx}" y2="${cy}" stroke="var(--h-hand)" stroke-width="${3 * k}" opacity="${.55 * op}"/>`; } prevStep = st; lastHand = st; }
       rings += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="${10 * k}"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${t.color}" stroke-width="${(cur ? 8 : 5.5) * k}"/>`;
       const oc = occR[st.x + "," + st.y] = (occR[st.x + "," + st.y] ?? -1) + 1;
       const br = 14 * k, bx = cx + r * 0.8 - oc * 1.9 * br, by = cy - r * 0.8, txt = String(st.n ?? move);
