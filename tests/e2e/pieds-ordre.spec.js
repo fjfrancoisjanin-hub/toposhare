@@ -21,6 +21,8 @@ async function publish(page, name, { seq = true } = {}) {
   await expect(page.locator('#dName')).toHaveText(name);
 }
 const next = async page => { await page.locator('#rpNext').click(); };
+// Ces tests vérifient les tracés pas à pas : on y garde le replay « Tout depuis le début » (la fenêtre de 5 prises a ses tests dans replay-fenetre.spec.js).
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => localStorage.setItem('ts-replay-win', 'all')); });
 
 test('pieds dans l\'ordre par défaut : le tracé distingue main (trait plein) et pied (pointillé jaune), et le replay déroule la séquence', async ({ page }, testInfo) => {
   const id = uid(testInfo);
