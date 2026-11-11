@@ -21,7 +21,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install chromium
+      # Bibliothèques et polices système du navigateur : déjà présentes sur l'image du runner pour l'essentiel. Si le réseau du runner
+      # n'atteint pas les miroirs Ubuntu, on ne bloque pas les tests (3 minutes au plus) ; le navigateur, lui, reste obligatoire.
+      - run: npx playwright install-deps chromium
+        timeout-minutes: 3
+        continue-on-error: true
       - run: npm test
       - uses: actions/upload-artifact@v7
         if: failure()

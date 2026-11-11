@@ -563,6 +563,8 @@ const day = t => t ? new Date(t).toLocaleDateString(TS_I18N.locale(), { day: "nu
 const ago = t => { if (!t) return ""; const d = (Date.now() - t) / 864e5; if (d < 1) return "aujourd'hui"; if (d < 2) return "hier"; if (d < 30) return `il y a ${Math.floor(d)} j`; return new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }); };
 
 /* ---------- wall drawing ---------- */
+// Petit « R » (relance : même main que le move de main précédent), en bas à droite de la prise.
+const relanceTag = (x, y, k) => `<rect x="${x - 14 * k}" y="${y - 12 * k}" width="${28 * k}" height="${24 * k}" rx="${7 * k}" fill="#FF6630" stroke="#fff" stroke-width="${2.5 * k}"/><text x="${x}" y="${y}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${17 * k}" fill="#fff">R</text>`;
 function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1, hi = [], ordered = false, fade = [], labels = null } = {}) {
   const W = wall.w, H = wall.h, k = W / 1800, sw = 7 * k;
   const R = h => (TYPES[h.t] || TYPES.hand).r * k;
@@ -606,7 +608,7 @@ function wallSVG(wall, holds, { dim = false, mini = false, uid = "w", mark = -1,
     const b0 = badges.length;
     const br = 17 * k, bx = cx + r * 0.78 - oc * 1.9 * br, by = cy - r * 0.78;
     const badge = (txt, col, ink) => `<circle cx="${bx}" cy="${by}" r="${br}" fill="${col}" stroke="rgba(0,0,0,.6)" stroke-width="${3 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 17 : 21) * k}" fill="${ink}">${txt}</text>`;
-    if (h.t === "hand") badges += badge(String(labels?.get(h) ?? ++n), "var(--h-hand)", "#fff");
+    if (h.t === "hand") { badges += badge(String(labels?.get(h) ?? ++n), "var(--h-hand)", "#fff"); if (h.relance) badges += relanceTag(cx + r * 0.78 - oc * 1.9 * br, cy + r * 0.78, k); }
     else if (h.t === "foot" && ordered) badges += badge("P" + (labels?.get(h) ?? ++fn), "var(--h-foot)", "#0D0F11");
     else if (h.t === "start") badges += badge("D", "var(--h-start)", "#0D0F11");
     else if (h.t === "top") badges += badge("T", "var(--h-top)", "#fff");
@@ -762,6 +764,8 @@ function hmDraw() {
   if (c.src !== "anchors" && (h.t === "hand" || h.t === "foot")) {
     const pair = (act, label) => `<div class="hm-row"><span class="hm-lbl">${label}</span><button type="button" data-hm="${act}:hand">Main</button><button type="button" data-hm="${act}:foot">Pied</button></div>`;
     rows += pair("before", "Ajouter avant") + pair("after", "Ajouter après");
+    // Relance : la même main que le move de main précédent (hors alternance droite / gauche). Possible dès la deuxième main.
+    if (h.t === "hand" && list.slice(0, c.i).some(x => x.t === "hand")) rows += `<button type="button" data-hm="relance">${h.relance ? "Retirer la relance" : "Marquer une relance (même main)"}</button>`;
     rows += `<button type="button" data-hm="swap">${h.t === "hand" ? "Changer en pied" : "Changer en main"}</button>`;
     if (c.src === "steps") rows += `<button type="button" data-hm="rest">${h.rest ? "Retirer le repos" : "Repos ici"}</button>`;
   }
@@ -785,7 +789,8 @@ function hmAct(act) {
     ed.tool = arg; ed.insertAt = a === "before" ? i : i + 1; ed.lastIdx = null; if (ed.insertAt >= list.length) ed.insertAt = null;
     hmClose(); hmRender(c); toast("Touchez l'emplacement du nouveau move"); return;
   }
-  if (a === "swap") h.t = h.t === "hand" ? "foot" : "hand";
+  if (a === "swap") { h.t = h.t === "hand" ? "foot" : "hand"; delete h.relance; }
+  else if (a === "relance") { if (h.relance) delete h.relance; else h.relance = true; }
   else if (a === "rest") { if (h.rest) delete h.rest; else h.rest = true; }
   else if (a === "work") { if (h.work) delete h.work; else h.work = true; }
   else if (a === "del") insRemove(ed, list, i);
@@ -817,9 +822,9 @@ function oLong(nx, ny, cx, cy) {
 
 /* ---------- bouton d'aide « ? » : une carte courte par écran, fermable, masquable, retrouvable dans « Mon compte » ---------- */
 const HELP = {
-  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer.", "Outil « Pied interdit » : marquez une prise où le pied est interdit (rond rouge barré). Il ne change ni les mouvements ni les tracés.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
+  bloc: ["Tracer un bloc", ["Touchez le mur pour poser les prises dans l'ordre : départ, mains, puis le top. Les mains alternent droite et gauche ; une relance (même main) se marque par appui long.", "Touchez une prise déjà posée pour la reprendre : la même prise peut revenir plusieurs fois.", "Appui long sur une prise : ajouter un move avant ou après, la déplacer, la passer de main à pied, la supprimer. Sur une main : marquer une relance (même main que le move précédent), signalée par un R.", "Outil « Pied interdit » : marquez une prise où le pied est interdit (rond rouge barré). Il ne change ni les mouvements ni les tracés.", "Case « Pieds dans l'ordre » : posez mains et pieds dans l'ordre de l'enchaînement. Trait blanc entre les mains, pointillé jaune entre les pieds : jamais de trait entre une main et un pied.", "Pincez pour zoomer, glissez pour déplacer le mur."]],
   route: ["Points d'ancrage", ["Touchez chaque point d'ancrage du bas vers le haut, puis le relais.", "Appui long sur un point : le marquer « point de travail » (dégaine sautée à l'enchaînement), le déplacer ou le supprimer."]],
-  method: ["Ma méthode", ["Touchez mains et pieds dans l'ordre où vous les prenez.", "Touchez une prise déjà posée pour la reprendre.", "Appui long sur une prise : ajouter un move avant ou après, marquer un repos, la déplacer, la supprimer."]],
+  method: ["Ma méthode", ["Touchez mains et pieds dans l'ordre où vous les prenez. Les mains alternent droite et gauche ; une relance (même main) se marque par appui long.", "Touchez une prise déjà posée pour la reprendre.", "Appui long sur une prise : ajouter un move avant ou après, marquer un repos, la déplacer, la supprimer. Sur une main : marquer une relance (même main que le move précédent), signalée par un R."]],
 };
 const helpState = () => { try { return JSON.parse(lsGet("ts-help") || "{}"); } catch { return {}; } };
 const helpSave = h => lsSet("ts-help", JSON.stringify(h));
@@ -1121,7 +1126,7 @@ function renderBReplay() {
   $("fsTitle").innerHTML = `${esc(b.name)} <small>${esc(b.grade)}</small>`;
   fsView.set(wallSVG(w, vis, { uid: "br", hi: st.pts, ordered, fade, labels }), w.w / w.h);
   const total = holds.filter(h => h.t === "hand").length, totalFeet = holds.filter(h => h.t === "foot").length;
-  const label = st.kind === "start" ? `Départ${st.pts.length > 1 ? " · 2 mains" : ""}` : st.kind === "top" ? "Top" : st.kind === "foot" ? `Pied ${st.n} / ${totalFeet}` : `Move ${st.n} / ${total}`;
+  const label = st.kind === "start" ? `Départ${st.pts.length > 1 ? " · 2 mains" : ""}` : st.kind === "top" ? "Top" : st.kind === "foot" ? `Pied ${st.n} / ${totalFeet}` : `Move ${st.n} / ${total}${st.pts[0].relance ? " · Relance (même main)" : ""}`;
   $("rpCap").innerHTML = `${label}<small>étape ${state.rp + 1} / ${steps.length}${st.kind === "start" && !ordered && holds.some(h => h.t === "foot") ? " · pieds imposés en jaune" : ""}</small>`;
   rpChrome(state.rp, steps.length);
 }
@@ -1624,6 +1629,7 @@ function routeSVG(v, anchors, steps, { uid = "r", mini = false, replay = null, p
       const br = 14 * k, bx = cx + r * 0.8 - oc * 1.9 * br, by = cy - r * 0.8, txt = String(st.n ?? move);
       if (st.rest) rings += `<g opacity="${op}"><rect x="${cx - 24 * k}" y="${cy + r + 6 * k}" width="${48 * k}" height="${22 * k}" rx="${11 * k}" fill="#1B2024" stroke="#fff" stroke-width="${2 * k}"/><text x="${cx}" y="${cy + r + 17 * k}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${14 * k}" fill="#fff">zZ</text></g>`;
       rings += `<circle cx="${bx}" cy="${by}" r="${br}" fill="${t.color}" stroke="rgba(0,0,0,.6)" stroke-width="${2.5 * k}"/><text x="${bx}" y="${by}" dy=".35em" text-anchor="middle" font-family="JetBrains Mono, monospace" font-weight="700" font-size="${(txt.length > 1 ? 14 : 17) * k}" fill="${st.t === "foot" ? "#0D0F11" : "#fff"}">${txt}</text></g>`;
+      if (st.t === "hand" && st.relance) rings += `<g opacity="${op}">${relanceTag(cx + r * 0.8 - oc * 1.9 * br, cy + r * 0.8, k)}</g>`;
       if (cur) top += `<circle cx="${cx}" cy="${cy}" r="${r + 14 * k}" fill="none" stroke="rgba(0,0,0,.65)" stroke-width="${11 * k}"/><circle cx="${cx}" cy="${cy}" r="${r + 14 * k}" fill="none" stroke="#FF6630" stroke-width="${6 * k}"/>`;
       if (i === markS) top += markRing(cx, cy, r + 16 * k, k);
     });
@@ -1930,7 +1936,7 @@ function renderOFs() {
     let move = 0; for (let i = 0; i <= state.rp; i++) if (steps[i].t !== "clip") move++;
     const total = steps.filter(s => s.t !== "clip").length;
     let boltNo = 0; if (st && st.t === "clip") { const a = (v.anchors || [])[st.a]; boltNo = a && a.t === "relais" ? "R" : (v.anchors || []).slice(0, st.a + 1).filter(x => x.t !== "relais").length; }
-    $("rpCap").innerHTML = st ? (st.t === "clip" ? `Clip ${boltNo === "R" ? "au relais" : "du point " + boltNo}<small>étape ${state.rp + 1} / ${steps.length}</small>` : `${st.t === "hand" ? "Main" : "Pied"} · move ${move} / ${total}${st.rest ? " · Repos" : ""}<small>étape ${state.rp + 1} / ${steps.length}</small>`) : "";
+    $("rpCap").innerHTML = st ? (st.t === "clip" ? `Clip ${boltNo === "R" ? "au relais" : "du point " + boltNo}<small>étape ${state.rp + 1} / ${steps.length}</small>` : `${st.t === "hand" ? "Main" : "Pied"} · move ${move} / ${total}${st.rest ? " · Repos" : ""}${st.relance ? " · Relance (même main)" : ""}<small>étape ${state.rp + 1} / ${steps.length}</small>`) : "";
     rpChrome(state.rp, steps.length);
   } else {
     $("fsTitle").innerHTML = `${esc(v.name)} <small>${esc(v.grade)}${m ? " · " + esc(m.climber || "") : ""}</small>`;
