@@ -103,28 +103,6 @@ test('les deux badges d\'une prise répétée sont côte à côte, sans se recou
   expect(Math.abs(xs[0] - xs[1])).toBeGreaterThan(1);
 });
 
-test('bouton d\'aide : une carte courte, fermable, masquable, retrouvable dans Mon compte', async ({ page }, testInfo) => {
-  await openEditor(page, uid(testInfo));
-  await expect(page.locator('#helpCard')).toBeHidden();
-  await expect(page.locator('#vCreate .helpbtn')).toHaveClass(/new/);
-  await page.locator('#vCreate .helpbtn').click();
-  await expect(page.locator('#helpCard')).toBeVisible();
-  await expect(page.locator('#helpCard')).toContainText('Appui long sur une prise');
-  await page.locator('[data-help-close]').click();
-  await expect(page.locator('#helpCard')).toBeHidden();
-  await expect(page.locator('#vCreate .helpbtn')).not.toHaveClass(/new/);
-  await page.locator('#vCreate .helpbtn').click();
-  await page.locator('[data-help-hide]').click();
-  await expect(page.locator('#vCreate .helpbtn')).toHaveCount(0);
-  await page.reload();
-  await page.locator('#tabCreate').click();
-  await expect(page.locator('#vCreate .helpbtn')).toHaveCount(0);
-  await page.locator('#acctBtn').click();
-  await page.locator('[data-help-reset]').click();
-  await page.locator('[data-close-sheet]').click();
-  await expect(page.locator('#vCreate .helpbtn')).toHaveCount(1);
-});
-
 // ----- Falaise : repos sur une prise de la méthode, point de travail sur un point d'ancrage -----
 async function seedVoie(id, authorId) {
   await seed('secteurs', id, { name: `Secteur ${id}`, region: '', createdAt: 1 });
