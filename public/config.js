@@ -22,6 +22,10 @@
     appId: "1:795728438485:web:932031c5414351a2f4ee5c",
     measurementId: "G-VD2W4J80Q1",
   };
+  // Domaine de connexion Google : sur toposhare.web.app, le même que l'appli (Hosting sert /__/auth/handler sur chacun de ses domaines).
+  // Avec un autre domaine (betatheque.firebaseapp.com), les navigateurs qui cloisonnent le stockage (Chrome, Safari, Firefox, Android) perdent l'état de la
+  // connexion et affichent « Unable to process request due to missing initial state ». Les autres adresses gardent le domaine historique.
+  PROD.authDomain = location.hostname === "toposhare.web.app" ? "toposhare.web.app" : "betatheque.firebaseapp.com";
   const isProd = PROD_HOSTS.includes(location.hostname);
   window.FIREBASE_CONFIG = isProd ? PROD : TEST;
   window.TS_TEST_ENV = !isProd;

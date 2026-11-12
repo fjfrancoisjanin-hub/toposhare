@@ -34,6 +34,16 @@ for (const host of [
   });
 }
 
+// Connexion Google : même domaine que l'appli sur toposhare.web.app (le stockage cloisonné des navigateurs casse un domaine de connexion différent).
+test('toposhare.web.app se connecte via son propre domaine', () => {
+  assert.equal(load('toposhare.web.app').FIREBASE_CONFIG.authDomain, 'toposhare.web.app');
+});
+for (const host of ['toposhare.firebaseapp.com', 'localhost', '127.0.0.1']) {
+  test(`${host} garde le domaine de connexion historique`, () => {
+    assert.equal(load(host).FIREBASE_CONFIG.authDomain, 'betatheque.firebaseapp.com');
+  });
+}
+
 test('le numéro de PR reste vide dans le dépôt : seule la CI le renseigne', () => {
   assert.equal(load('toposhare.web.app').TS_PREVIEW_PR, '');
 });
