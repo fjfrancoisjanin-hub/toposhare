@@ -27,8 +27,9 @@ test('un invité qui touche ＋ est invité à se connecter', async ({ page }, t
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/bloc/b-${id}`);
-  await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`);
-  await page.locator('#dPlus').click();
+  // Invité, sans cache : l'écran de chargement attend les données (jusqu'à 12 s sur une CI lente).
+  await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`, { timeout: 20000 });
+  await page.locator('#dPlus').click({ timeout: 20000 });
   await expect(page.locator('[data-login-go]')).toBeVisible();
   await expect(page.locator('#sheet')).toContainText('enregistrer dans une playlist');
 });
