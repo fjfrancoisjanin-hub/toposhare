@@ -1,10 +1,10 @@
 // Playlists : des listes de blocs et de voies propres à chaque utilisateur (plusieurs, un même circuit dans plusieurs), un bouton ＋ sur chaque
-// bloc et chaque voie, un écran « Mes playlists » avec les favoris (salles et falaises), renommer, supprimer, retirer.
+// bloc et chaque voie, un écran « Mes carnets » avec les favoris (salles et falaises), renommer, supprimer, retirer.
 const { test, expect } = require('./fixtures');
 const { login, seed } = require('./helpers');
 
 const uid = testInfo => `${testInfo.project.name}-${Date.now()}`;
-// Un compte par test : les playlists sont propres à chaque compte, et les émulateurs gardent les comptes d'un test à l'autre.
+// Un compte par test : les carnets sont propres à chaque compte, et les émulateurs gardent les comptes d'un test à l'autre.
 const who = id => ({ sub: `pl-${id}`, email: `pl-${id}@example.com`, name: 'Grimpeur Test' });
 const HOLDS = [{ t: 'start', x: 0.4, y: 0.8 }, { t: 'hand', x: 0.5, y: 0.5 }, { t: 'top', x: 0.5, y: 0.2 }];
 
@@ -31,10 +31,10 @@ test('un invité qui touche ＋ est invité à se connecter', async ({ page }, t
   await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`, { timeout: 20000 });
   await page.locator('#dPlus').click({ timeout: 20000 });
   await expect(page.locator('[data-login-go]')).toBeVisible();
-  await expect(page.locator('#sheet')).toContainText('enregistrer dans une playlist');
+  await expect(page.locator('#sheet')).toContainText('enregistrer dans un carnet');
 });
 
-test('un bloc se range dans plusieurs playlists, qu\'on crée depuis le ＋ ; on le retire d\'une seule', async ({ page }, testInfo) => {
+test('un bloc se range dans plusieurs carnets, qu\'on crée depuis le ＋ ; on le retire d\'une seule', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/bloc/b-${id}`);
@@ -45,7 +45,7 @@ test('un bloc se range dans plusieurs playlists, qu\'on crée depuis le ＋ ; on
   await expect(page.locator('#dPlus')).toHaveText('✓');
   await expect(page.locator('#toast')).toContainText('Ajouté à « Projets »');
   await createFromSheet(page, 'Échauffement');
-  await expect(page.locator('#dPlus')).toHaveAttribute('aria-label', 'Dans 2 playlists');
+  await expect(page.locator('#dPlus')).toHaveAttribute('aria-label', 'Dans 2 carnets');
   let pls = await docs(page);
   expect(pls.map(p => [p.name, p.items.length]).sort()).toEqual([['Projets', 1], ['Échauffement', 1]].sort());
   expect(pls[0].items[0]).toMatchObject({ type: 'bloc', id: `b-${id}`, name: `Bloc ${id}`, grade: '6a' });
@@ -56,20 +56,23 @@ test('un bloc se range dans plusieurs playlists, qu\'on crée depuis le ＋ ; on
   await page.locator('[data-pl-toggle]', { hasText: 'Projets' }).click();
   await expect(page.locator('[data-pl-toggle]', { hasText: 'Projets' })).toHaveAttribute('aria-pressed', 'false');
   await page.locator('[data-close-sheet]').click();
-  await expect(page.locator('#dPlus')).toHaveAttribute('aria-label', 'Dans 1 playlist');
+  await expect(page.locator('#dPlus')).toHaveAttribute('aria-label', 'Dans 1 carnet');
   pls = await docs(page);
   expect(pls.find(p => p.name === 'Projets').items).toHaveLength(0);
   expect(pls.find(p => p.name === 'Échauffement').items).toHaveLength(1);
 });
 
-test('Mes playlists : lister, ouvrir, retirer un élément, renommer, supprimer (avec confirmation)', async ({ page }, testInfo) => {
+test('Mes carnets : lister, ouvrir, retirer un élément, renommer, supprimer (avec confirmation)', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/bloc/b-${id}`);
   await login(page, who(id));
   await createFromSheet(page, 'Projets');
   await page.locator('#tabHome').click();
-  await expect(page.locator('#hEntryPlaylists')).toContainText('1 playlist');
+  await expect(page.locator('#hEntryPlaylists')).toContainText('1 carnet');
+  // Icône de grimpe (mousqueton dessiné), plus de note de musique ni de mot « playlist ».
+  await expect(page.locator('#hEntryPlaylists svg')).toBeVisible();
+  await expect(page.locator('#hEntryPlaylists')).not.toContainText(/🎵|playlist/i);
   await page.locator('#hEntryPlaylists').click();
   await expect(page.locator('#plsBody [data-pl-open]')).toHaveCount(1);
   await expect(page.locator('#plsBody [data-pl-open]')).toContainText('1 élément');
@@ -86,7 +89,7 @@ test('Mes playlists : lister, ouvrir, retirer un élément, renommer, supprimer 
   await page.locator('[data-pl-open]').click();
   // Retirer, renommer, supprimer.
   await page.locator('[data-pl-rm]').click();
-  await expect(page.locator('#plItems')).toContainText('Cette playlist est vide.');
+  await expect(page.locator('#plItems')).toContainText('Ce carnet est vide.');
   await page.locator('[data-pl-rename]').click();
   await page.locator('#plNameIn').fill('Saison 2026');
   await page.locator('[data-pl-save]').click();
@@ -94,11 +97,11 @@ test('Mes playlists : lister, ouvrir, retirer un élément, renommer, supprimer 
   await page.locator('[data-pl-del]').click();
   await expect(page.locator('[data-pl-del]')).toHaveText('Confirmer la suppression');
   await page.locator('[data-pl-del]').click();
-  await expect(page.locator('#plsBody')).toContainText('Aucune playlist pour l\'instant');
+  await expect(page.locator('#plsBody')).toContainText('Aucun carnet pour l\'instant');
   expect(await docs(page)).toHaveLength(0);
 });
 
-test('une voie se range aussi dans une playlist, et s\'ouvre depuis elle', async ({ page }, testInfo) => {
+test('une voie se range aussi dans un carnet, et s\'ouvre depuis elle', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/voie/v-${id}`);
@@ -118,7 +121,7 @@ test('une voie se range aussi dans une playlist, et s\'ouvre depuis elle', async
   await expect(page.locator('#ovName')).toHaveText(`Voie ${id}`);
 });
 
-test('« Mes playlists » regroupe aussi les favoris : salles et falaises', async ({ page }, testInfo) => {
+test('« Mes carnets » regroupe aussi les favoris : salles et falaises', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/salle/${id}`);
@@ -136,7 +139,7 @@ test('« Mes playlists » regroupe aussi les favoris : salles et falaises', asyn
   await expect(page.locator('[data-hero="secteur"] b')).toHaveText(`Secteur ${id}`);
 });
 
-test('les playlists sont gardées après rechargement, et un invité qui touche l\'entrée est invité à se connecter', async ({ page }, testInfo) => {
+test('les carnets sont gardés après rechargement, et un invité qui touche l\'entrée est invité à se connecter', async ({ page }, testInfo) => {
   const id = uid(testInfo);
   await seedAll(id);
   await page.goto(`/#/bloc/b-${id}`);
@@ -144,7 +147,7 @@ test('les playlists sont gardées après rechargement, et un invité qui touche 
   await createFromSheet(page, 'Projets');
   await page.goto('about:blank');
   await page.goto('/');
-  await expect(page.locator('#hEntryPlaylists')).toContainText('1 playlist');
+  await expect(page.locator('#hEntryPlaylists')).toContainText('1 carnet');
   const guest = await page.context().browser().newContext(testInfo.project.use), gp = await guest.newPage();
   await gp.goto('/');
   await gp.locator('#hEntryPlaylists').click();

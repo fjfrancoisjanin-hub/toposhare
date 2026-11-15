@@ -346,13 +346,13 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
   <!-- PLAYLISTS : favoris et listes de l'utilisateur -->
   <section id="vPlaylists" hidden>
     <div class="gut home">
-      <div class="plhead"><button class="btn ghost small" type="button" data-pls-home>← Accueil</button><h1>Mes playlists</h1></div>
+      <div class="plhead"><button class="btn ghost small" type="button" data-pls-home>← Accueil</button><h1>Mes carnets</h1></div>
       <div id="plsBody" style="display:grid;gap:16px"></div>
     </div>
   </section>
   <section id="vPlaylist" hidden>
     <div class="gut home">
-      <div class="plhead"><button class="btn ghost small" type="button" data-pl-back>← Playlists</button><h1 id="plName"></h1></div>
+      <div class="plhead"><button class="btn ghost small" type="button" data-pl-back>← Carnets</button><h1 id="plName"></h1></div>
       <div id="plItems" style="display:grid;gap:12px"></div>
     </div>
   </section>
@@ -414,7 +414,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
         <h1 id="dName"></h1>
         <div id="dBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div>
       </div>
-      <div class="dright"><button type="button" class="plus" id="dPlus" aria-label="Ajouter à une playlist">＋</button><div class="grade big" id="dGrade"></div></div>
+      <div class="dright"><button type="button" class="plus" id="dPlus" aria-label="Ajouter à un carnet">＋</button><div class="grade big" id="dGrade"></div></div>
     </div>
     <div class="gut" id="dOld" hidden><div class="banner" style="margin:0 0 12px">Ce bloc était tracé sur un ancien mur, démonté depuis. Il reste consultable en archive.</div></div>
     <div class="dwall" id="dWall" role="button" tabindex="0" aria-label="Voir le bloc en plein écran">
@@ -450,7 +450,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
   <section id="oVoie" hidden>
     <div class="gut dhead">
       <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div></div>
-      <div class="dright"><button type="button" class="plus" id="ovPlus" aria-label="Ajouter à une playlist">＋</button><div class="grade big" id="ovGrade"></div></div>
+      <div class="dright"><button type="button" class="plus" id="ovPlus" aria-label="Ajouter à un carnet">＋</button><div class="grade big" id="ovGrade"></div></div>
     </div>
     <div class="gut" id="ovTabs"><div class="filters" id="ovLens" style="padding-top:0"></div><div class="filters" id="ovVues" style="padding-top:0"></div></div>
     <div class="gut" id="ovNoPhoto" hidden><div class="empty"><strong>Pas encore de photo</strong><button class="btn" type="button" data-act-nophoto>Ajouter une vue</button></div></div>
@@ -1352,7 +1352,7 @@ function renderHome() {
   }
   html += `<div class="entries"><button class="entry" type="button" id="hEntrySalles" data-list="salle"><span class="em" aria-hidden="true">🧗</span><b>Salles</b><small>${plural(state.gyms.length, "salle", "salles")}</small></button>
     <button class="entry" type="button" id="hEntryFalaises" data-list="secteur"><span class="em" aria-hidden="true">⛰️</span><b>Falaises</b><small>${plural(state.secteurs.length, "secteur", "secteurs")}</small></button></div>`;
-  html = html.replace(/<\/div>$/, `<button class="entry wide" type="button" id="hEntryPlaylists" data-playlists><span class="em" aria-hidden="true">🎵</span><b>Mes playlists</b><small>${state.me ? plural(state.playlists.length, "playlist", "playlists") : "Connexion pour en créer"}</small></button></div>`);
+  html = html.replace(/<\/div>$/, `<button class="entry wide" type="button" id="hEntryPlaylists" data-playlists><span class="em" aria-hidden="true"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(35 12 12)"><path d="M7 9V8a5 5 0 0 1 10 0v8a5 5 0 0 1-10 0v-1"/><path d="M7 9l3.2 1.2M7 15l3.2-1.2M10.2 10.2v3.6"/></g></svg></span><b>Mes carnets</b><small>${state.me ? plural(state.playlists.length, "carnet", "carnets") : "Connexion pour en créer"}</small></button></div>`);
   if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
   if (firstRun) html += `<button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
   $("hBody").innerHTML = html;
@@ -1476,58 +1476,58 @@ function plCurrent() {
 function renderPlus() {
   const it = plCurrent(), btn = state.view === "detail" ? $("dPlus") : $("ovPlus"); if (!btn) return;
   const n = it && state.me ? plCount(it) : 0;
-  btn.dataset.in = n ? "1" : ""; btn.textContent = n ? "✓" : "＋"; btn.setAttribute("aria-label", n ? `Dans ${plural(n, "playlist", "playlists")}` : "Ajouter à une playlist");
+  btn.dataset.in = n ? "1" : ""; btn.textContent = n ? "✓" : "＋"; btn.setAttribute("aria-label", n ? `Dans ${plural(n, "carnet", "carnets")}` : "Ajouter à un carnet");
 }
 async function plWrite(fn) { try { await fn(); return true; } catch { toast("Enregistrement impossible pour l'instant."); return false; } }
 async function plToggle(plId, it) {
   const p = plById(plId); if (!p) return;
   const items = plHas(p, it) ? p.items.filter(x => !(x.type === it.type && x.id === it.id)) : [...(p.items || []), { ...it, addedAt: Date.now() }];
-  if (items.length > PL_ITEMS_MAX) { toast(`${PL_ITEMS_MAX} éléments au plus par playlist.`); return; }
+  if (items.length > PL_ITEMS_MAX) { toast(`${PL_ITEMS_MAX} éléments au plus par carnet.`); return; }
   const adding = items.length > (p.items || []).length;
   if (await plWrite(() => plCol().doc(plId).update({ items, updatedAt: Date.now() }))) toast(adding ? `Ajouté à « ${p.name} »` : `Retiré de « ${p.name} »`);
 }
 async function plCreate(name, first) {
   name = (name || "").trim().slice(0, 40);
-  if (!name) { toast("Donnez un nom à la playlist."); return null; }
-  if (state.playlists.length >= PL_MAX) { toast(`${PL_MAX} playlists au plus.`); return null; }
+  if (!name) { toast("Donnez un nom au carnet."); return null; }
+  if (state.playlists.length >= PL_MAX) { toast(`${PL_MAX} carnets au plus.`); return null; }
   let ref = null;
   const ok = await plWrite(async () => { ref = await plCol().add({ kind: "playlist", name, items: first ? [{ ...first, addedAt: Date.now() }] : [], createdAt: Date.now(), updatedAt: Date.now() }); });
-  if (ok) toast(first ? `Ajouté à « ${name} »` : "Playlist créée");
+  if (ok) toast(first ? `Ajouté à « ${name} »` : "Carnet créé");
   return ok ? ref.id : null;
 }
-// Feuille « Ajouter à une playlist » : une ligne par playlist (touche = ajoute ou retire), et une zone pour en créer une.
+// Feuille « Ajouter à un carnet » : une ligne par playlist (touche = ajoute ou retire), et une zone pour en créer une.
 function renderPlaylistSheet() {
   const s = $("sheet"), it = state.plTarget; if (!it) return;
   if (!$("plNewName")) {
-    s.innerHTML = `<h2 id="sheetTitle">Ajouter à une playlist</h2>
+    s.innerHTML = `<h2 id="sheetTitle">Ajouter à un carnet</h2>
       <div class="note" style="margin:0"><b>${esc(it.name)}</b> ${esc(it.grade || "")}</div>
       <div id="plSheetList" style="display:grid;gap:8px"></div>
-      <div class="field"><label class="label" for="plNewName">Nouvelle playlist</label><div style="display:flex;gap:8px"><input id="plNewName" maxlength="40" placeholder="ex. Projets de la saison" autocomplete="off" style="flex:1"><button class="btn small" type="button" data-pl-create>Créer et ajouter</button></div></div>
+      <div class="field"><label class="label" for="plNewName">Nouveau carnet</label><div style="display:flex;gap:8px"><input id="plNewName" maxlength="40" placeholder="ex. Projets de la saison" autocomplete="off" style="flex:1"><button class="btn small" type="button" data-pl-create>Créer et ajouter</button></div></div>
       <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
   }
-  $("plSheetList").innerHTML = state.playlists.length ? state.playlists.map(p => `<button class="pltoggle" type="button" data-pl-toggle="${esc(p.id)}" aria-pressed="${plHas(p, it)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><span aria-hidden="true">${plHas(p, it) ? "✓" : "＋"}</span></button>`).join("") : `<div class="note">Aucune playlist pour l'instant : créez la première ci-dessous.</div>`;
+  $("plSheetList").innerHTML = state.playlists.length ? state.playlists.map(p => `<button class="pltoggle" type="button" data-pl-toggle="${esc(p.id)}" aria-pressed="${plHas(p, it)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><span aria-hidden="true">${plHas(p, it) ? "✓" : "＋"}</span></button>`).join("") : `<div class="note">Aucun carnet pour l'instant : créez le premier ci-dessous.</div>`;
 }
 function openPlaylistSheet() {
   const it = plCurrent(); if (!it) return;
-  if (!state.me) { promptLogin("enregistrer dans une playlist"); return; }
+  if (!state.me) { promptLogin("enregistrer dans un carnet"); return; }
   state.plTarget = it; openSheet("playlist");
 }
-// Feuilles « Nouvelle playlist » et « Renommer ».
+// Feuilles « Nouveau carnet » et « Renommer ».
 function renderPlNameSheet() {
   const rename = state.sheet === "plrename", p = rename ? plById(state.plId) : null;
-  $("sheet").innerHTML = `<h2 id="sheetTitle">${rename ? "Renommer la playlist" : "Nouvelle playlist"}</h2>
-    <div class="field"><label class="label" for="plNameIn">Nom de la playlist</label><input id="plNameIn" maxlength="40" value="${esc(p?.name || "")}" placeholder="ex. Projets de la saison" autocomplete="off"></div>
+  $("sheet").innerHTML = `<h2 id="sheetTitle">${rename ? "Renommer le carnet" : "Nouveau carnet"}</h2>
+    <div class="field"><label class="label" for="plNameIn">Nom du carnet</label><input id="plNameIn" maxlength="40" value="${esc(p?.name || "")}" placeholder="ex. Projets de la saison" autocomplete="off"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-pl-save>${rename ? "Enregistrer" : "Créer"}</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>`;
 }
 const plTypeLabel = it => it.type === "voie" ? "Voie" : "Bloc";
-// Écran « Mes playlists » : les favoris (salles et falaises), puis les playlists.
+// Écran « Mes carnets » : les favoris (salles et falaises), puis les playlists.
 function renderPlaylists() {
   const box = $("plsBody");
-  if (!state.me) { box.innerHTML = `<div class="empty"><strong>Vos playlists</strong><span>Connectez-vous pour regrouper vos blocs et vos voies par thème, et les retrouver sur tous vos appareils.</span><button class="btn" type="button" data-pl-login>Se connecter</button></div>`; return; }
+  if (!state.me) { box.innerHTML = `<div class="empty"><strong>Vos carnets</strong><span>Connectez-vous pour regrouper vos blocs et vos voies par thème, et les retrouver sur tous vos appareils.</span><button class="btn" type="button" data-pl-login>Se connecter</button></div>`; return; }
   const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id));
   let html = `<section><div class="label">Favoris</div>${favs.length ? favs.map(f => placeRow(f)).join("") : `<div class="note">Touchez ☆ sur une salle ou une falaise pour la retrouver ici.</div>`}</section>`;
-  html += `<section><div class="label">Mes playlists</div>${state.playlists.length ? state.playlists.map(p => `<button class="gymrow" type="button" data-pl-open="${esc(p.id)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><small>›</small></button>`).join("") : `<div class="note">Aucune playlist pour l'instant. Créez-en une pour regrouper des blocs et des voies par thème.</div>`}</section>
-    <button class="btn" type="button" data-pl-new>＋ Nouvelle playlist</button>`;
+  html += `<section><div class="label">Mes carnets</div>${state.playlists.length ? state.playlists.map(p => `<button class="gymrow" type="button" data-pl-open="${esc(p.id)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><small>›</small></button>`).join("") : `<div class="note">Aucun carnet pour l'instant. Créez-en un pour regrouper des blocs et des voies par thème.</div>`}</section>
+    <button class="btn" type="button" data-pl-new>＋ Nouveau carnet</button>`;
   box.innerHTML = html;
 }
 // Écran d'une playlist : ses blocs et ses voies, à retirer un par un, et les actions renommer / supprimer.
@@ -1536,27 +1536,27 @@ function renderPlaylist() {
   if (!p) { if (state.view === "playlist") openPlaylists(); return; }
   $("plName").textContent = p.name;
   const items = p.items || [];
-  $("plItems").innerHTML = `<div class="plactions"><button class="btn ghost small" type="button" data-pl-rename>Renommer</button><button class="btn danger small" type="button" data-pl-del>${state.plDelArmed === p.id ? "Confirmer la suppression" : "Supprimer la playlist"}</button></div>`
+  $("plItems").innerHTML = `<div class="plactions"><button class="btn ghost small" type="button" data-pl-rename>Renommer</button><button class="btn danger small" type="button" data-pl-del>${state.plDelArmed === p.id ? "Confirmer la suppression" : "Supprimer le carnet"}</button></div>`
     + (items.length ? items.map(it => { const live = it.type === "voie" ? state.allVoies.find(v => v.id === it.id) : state.blocs.find(b => b.id === it.id), name = live?.name || it.name, grade = live?.grade || it.grade;
-      return `<div class="plrow"><button class="gymrow" type="button" data-pl-go="${it.type}:${esc(it.id)}"><span><b>${esc(name)}</b> <small>${[esc(grade || ""), esc(it.placeName || "")].filter(Boolean).join(" · ")}</small></span><small>${plTypeLabel(it)}</small></button><button class="rm" type="button" data-pl-rm="${it.type}:${esc(it.id)}" aria-label="Retirer de la playlist">✕</button></div>`; }).join("")
-      : `<div class="note">Cette playlist est vide.</div>`)
+      return `<div class="plrow"><button class="gymrow" type="button" data-pl-go="${it.type}:${esc(it.id)}"><span><b>${esc(name)}</b> <small>${[esc(grade || ""), esc(it.placeName || "")].filter(Boolean).join(" · ")}</small></span><small>${plTypeLabel(it)}</small></button><button class="rm" type="button" data-pl-rm="${it.type}:${esc(it.id)}" aria-label="Retirer du carnet">✕</button></div>`; }).join("")
+      : `<div class="note">Ce carnet est vide.</div>`)
     + `<div class="note">Pour ajouter un bloc ou une voie : ouvrez-le et touchez ＋.</div>`;
 }
 function openPlaylists() { go("playlists"); }
 function openPlaylist(id) { state.plId = id; state.plDelArmed = null; go("playlist"); }
 document.addEventListener("click", async e => {
-  if (e.target.closest("[data-playlists]")) { if (state.me) openPlaylists(); else promptLogin("créer vos playlists"); return; }
+  if (e.target.closest("[data-playlists]")) { if (state.me) openPlaylists(); else promptLogin("créer vos carnets"); return; }
   if (e.target.closest("#dPlus, #ovPlus")) { openPlaylistSheet(); return; }
   if (e.target.closest("[data-pls-home]")) { go("home"); return; }
   if (e.target.closest("[data-pl-back]")) { openPlaylists(); return; }
-  if (e.target.closest("[data-pl-login]")) { promptLogin("créer vos playlists"); return; }
+  if (e.target.closest("[data-pl-login]")) { promptLogin("créer vos carnets"); return; }
   if (e.target.closest("[data-pl-new]")) { state.sheet = "plnew"; openSheet("plnew"); return; }
   const o = e.target.closest("[data-pl-open]"); if (o) { openPlaylist(o.dataset.plOpen); return; }
   if (e.target.closest("[data-pl-rename]")) { openSheet("plrename"); return; }
   if (e.target.closest("[data-pl-del]")) {
     if (state.plDelArmed !== state.plId) { state.plDelArmed = state.plId; renderPlaylist(); return; }
     const id = state.plId; state.plDelArmed = null;
-    if (await plWrite(() => plCol().doc(id).delete())) { toast("Playlist supprimée"); openPlaylists(); }
+    if (await plWrite(() => plCol().doc(id).delete())) { toast("Carnet supprimé"); openPlaylists(); }
     return;
   }
   const rm = e.target.closest("[data-pl-rm]"); if (rm) { const [type, id] = rm.dataset.plRm.split(/:(.*)/s); const p = plById(state.plId); if (p) await plToggle(p.id, { type, id }); return; }
@@ -1565,8 +1565,8 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("[data-pl-toggle]"); if (t && state.plTarget) { await plToggle(t.dataset.plToggle, state.plTarget); return; }
   if (e.target.closest("[data-pl-create]")) { const id = await plCreate($("plNewName").value, state.plTarget); if (id) { $("plNewName").value = ""; closeSheet(); } return; }
   if (e.target.closest("[data-pl-save]")) {
-    const name = $("plNameIn").value.trim().slice(0, 40); if (!name) { toast("Donnez un nom à la playlist."); return; }
-    if (state.sheet === "plrename") { const id = state.plId; if (await plWrite(() => plCol().doc(id).update({ name, updatedAt: Date.now() }))) { closeSheet(); toast("Playlist renommée"); } }
+    const name = $("plNameIn").value.trim().slice(0, 40); if (!name) { toast("Donnez un nom au carnet."); return; }
+    if (state.sheet === "plrename") { const id = state.plId; if (await plWrite(() => plCol().doc(id).update({ name, updatedAt: Date.now() }))) { closeSheet(); toast("Carnet renommé"); } }
     else { const id = await plCreate(name); if (id) { closeSheet(); openPlaylist(id); } }
   }
 });
