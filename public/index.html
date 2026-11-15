@@ -192,6 +192,18 @@ nav.tabs .tab:not(.plus) { display: flex; flex-direction: column; align-items: c
 nav.tabs .tab .ti { font-size: 18px; line-height: 1; }
 nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12px; }
 .entries { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.entry.wide { grid-column: 1 / -1; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; }
+.entry.wide .em { grid-row: 1 / span 2; margin: 0; }
+.dright { display: flex; gap: 10px; align-items: center; flex: none; }
+.plus { appearance: none; width: 44px; height: 44px; flex: none; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); color: var(--fg); font: 800 22px/1 var(--f-body); cursor: pointer; }
+.plus[data-in="1"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.plrow { display: flex; gap: 8px; align-items: stretch; }
+.plrow .gymrow { flex: 1 1 auto; min-width: 0; }
+.plrow .rm { appearance: none; flex: none; width: 48px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 12px; font-size: 18px; cursor: pointer; }
+.plactions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pltoggle { appearance: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 12px; padding: 12px 14px; cursor: pointer; font: 700 15px var(--f-body); text-align: left; }
+.pltoggle[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pltoggle small { color: var(--muted); font-weight: 500; }
 .entry { appearance: none; display: grid; gap: 2px; justify-items: start; text-align: left; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 16px; padding: 16px 14px; cursor: pointer; font-family: var(--f-body); }
 .entry .em { font-size: 28px; line-height: 1; margin-bottom: 6px; }
 .entry b { font: 800 19px var(--f-display); }
@@ -331,6 +343,20 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
     </div>
   </section>
 
+  <!-- PLAYLISTS : favoris et listes de l'utilisateur -->
+  <section id="vPlaylists" hidden>
+    <div class="gut home">
+      <div class="plhead"><button class="btn ghost small" type="button" data-pls-home>← Accueil</button><h1>Mes playlists</h1></div>
+      <div id="plsBody" style="display:grid;gap:16px"></div>
+    </div>
+  </section>
+  <section id="vPlaylist" hidden>
+    <div class="gut home">
+      <div class="plhead"><button class="btn ghost small" type="button" data-pl-back>← Playlists</button><h1 id="plName"></h1></div>
+      <div id="plItems" style="display:grid;gap:12px"></div>
+    </div>
+  </section>
+
   <!-- LIST -->
   <section id="vList" hidden>
     <div class="gut">
@@ -388,7 +414,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
         <h1 id="dName"></h1>
         <div id="dBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div>
       </div>
-      <div class="grade big" id="dGrade"></div>
+      <div class="dright"><button type="button" class="plus" id="dPlus" aria-label="Ajouter à une playlist">＋</button><div class="grade big" id="dGrade"></div></div>
     </div>
     <div class="gut" id="dOld" hidden><div class="banner" style="margin:0 0 12px">Ce bloc était tracé sur un ancien mur, démonté depuis. Il reste consultable en archive.</div></div>
     <div class="dwall" id="dWall" role="button" tabindex="0" aria-label="Voir le bloc en plein écran">
@@ -424,7 +450,7 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
   <section id="oVoie" hidden>
     <div class="gut dhead">
       <div><h1 id="ovName"></h1><div id="ovBy" style="color:var(--muted);font-size:14px;padding-top:4px"></div></div>
-      <div class="grade big" id="ovGrade"></div>
+      <div class="dright"><button type="button" class="plus" id="ovPlus" aria-label="Ajouter à une playlist">＋</button><div class="grade big" id="ovGrade"></div></div>
     </div>
     <div class="gut" id="ovTabs"><div class="filters" id="ovLens" style="padding-top:0"></div><div class="filters" id="ovVues" style="padding-top:0"></div></div>
     <div class="gut" id="ovNoPhoto" hidden><div class="empty"><strong>Pas encore de photo</strong><button class="btn" type="button" data-act-nophoto>Ajouter une vue</button></div></div>
@@ -550,6 +576,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
+  playlists: [], plId: null, plTarget: null, plDelArmed: null,
   tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, vLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
@@ -1097,6 +1124,7 @@ document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet
 /* ---------- detail ---------- */
 function openDetail(id) { state.current = id; state.delArmed = null; go("detail"); }
 function renderDetail() {
+  renderPlus();
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
   $("dAdminEdit").hidden = !(b && w && isAdmin());
   const wallEl = $("dWall"), btn = wallEl.querySelector(".float");
@@ -1162,6 +1190,8 @@ $("gymBtn").addEventListener("click", () => openSheet(state.mode === "out" ? "se
 function renderSheet() {
   if (state.sheet === "edit") return renderEditSheet();
   if (state.sheet === "newchoice") return renderChoiceSheet();
+  if (state.sheet === "playlist") return renderPlaylistSheet();
+  if (state.sheet === "plnew" || state.sheet === "plrename") return renderPlNameSheet();
   if (state.sheet === "lens") return renderLensSheet();
   // Une mise à jour en direct n'efface pas un formulaire de création en cours.
   if ((state.sheet === "newgym" && $("ngName")) || (state.sheet === "newsector" && $("nsName"))) return;
@@ -1322,6 +1352,7 @@ function renderHome() {
   }
   html += `<div class="entries"><button class="entry" type="button" id="hEntrySalles" data-list="salle"><span class="em" aria-hidden="true">🧗</span><b>Salles</b><small>${plural(state.gyms.length, "salle", "salles")}</small></button>
     <button class="entry" type="button" id="hEntryFalaises" data-list="secteur"><span class="em" aria-hidden="true">⛰️</span><b>Falaises</b><small>${plural(state.secteurs.length, "secteur", "secteurs")}</small></button></div>`;
+  html = html.replace(/<\/div>$/, `<button class="entry wide" type="button" id="hEntryPlaylists" data-playlists><span class="em" aria-hidden="true">🎵</span><b>Mes playlists</b><small>${state.me ? plural(state.playlists.length, "playlist", "playlists") : "Connexion pour en créer"}</small></button></div>`);
   if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
   if (firstRun) html += `<button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
   $("hBody").innerHTML = html;
@@ -1428,14 +1459,126 @@ async function routeFromHash() {
 window.addEventListener("hashchange", () => { if (state.booted) routeFromHash(); });
 function bootRoute() { if (state.booted || !state.loaded || !state.oLoaded) return; state.booted = true; renderHome(); const routed = /^#\/(salle|secteur|voie|bloc)\//.test(location.hash); routeFromHash(); if (!routed) trackScreen(); }
 
+/* ---------- playlists : des listes de blocs et de voies, propres à chaque utilisateur (Firestore, data/users/{uid}) ---------- */
+// Un document par playlist : { kind: "playlist", name, items: [{ type, id, name, grade, placeName }], createdAt, updatedAt }.
+// Le même bloc ou la même voie peut figurer dans plusieurs playlists. Les noms sont recopiés pour s'afficher sans charger les blocs de la salle.
+const PL_MAX = 30, PL_ITEMS_MAX = 200;
+const plCol = () => state.db.collection("data/users/" + state.me);
+const plById = id => state.playlists.find(p => p.id === id);
+const plHas = (p, it) => (p.items || []).some(x => x.type === it.type && x.id === it.id);
+const plCount = it => state.playlists.filter(p => plHas(p, it)).length;
+// Le bloc ou la voie ouvert à l'écran.
+function plCurrent() {
+  if (state.view === "detail") { const b = state.blocs.find(x => x.id === state.current); const g = b && state.gyms.find(x => x.id === b.gymId); return b ? { type: "bloc", id: b.id, name: b.name, grade: b.grade, placeName: g ? g.name : "" } : null; }
+  if (state.view === "ovoie") { const v = voie(), sc = v && state.secteurs.find(x => x.id === v.secteurId); return v ? { type: "voie", id: v.id, name: v.name, grade: v.grade, placeName: sc ? sc.name : "" } : null; }
+  return null;
+}
+function renderPlus() {
+  const it = plCurrent(), btn = state.view === "detail" ? $("dPlus") : $("ovPlus"); if (!btn) return;
+  const n = it && state.me ? plCount(it) : 0;
+  btn.dataset.in = n ? "1" : ""; btn.textContent = n ? "✓" : "＋"; btn.setAttribute("aria-label", n ? `Dans ${plural(n, "playlist", "playlists")}` : "Ajouter à une playlist");
+}
+async function plWrite(fn) { try { await fn(); return true; } catch { toast("Enregistrement impossible pour l'instant."); return false; } }
+async function plToggle(plId, it) {
+  const p = plById(plId); if (!p) return;
+  const items = plHas(p, it) ? p.items.filter(x => !(x.type === it.type && x.id === it.id)) : [...(p.items || []), { ...it, addedAt: Date.now() }];
+  if (items.length > PL_ITEMS_MAX) { toast(`${PL_ITEMS_MAX} éléments au plus par playlist.`); return; }
+  const adding = items.length > (p.items || []).length;
+  if (await plWrite(() => plCol().doc(plId).update({ items, updatedAt: Date.now() }))) toast(adding ? `Ajouté à « ${p.name} »` : `Retiré de « ${p.name} »`);
+}
+async function plCreate(name, first) {
+  name = (name || "").trim().slice(0, 40);
+  if (!name) { toast("Donnez un nom à la playlist."); return null; }
+  if (state.playlists.length >= PL_MAX) { toast(`${PL_MAX} playlists au plus.`); return null; }
+  let ref = null;
+  const ok = await plWrite(async () => { ref = await plCol().add({ kind: "playlist", name, items: first ? [{ ...first, addedAt: Date.now() }] : [], createdAt: Date.now(), updatedAt: Date.now() }); });
+  if (ok) toast(first ? `Ajouté à « ${name} »` : "Playlist créée");
+  return ok ? ref.id : null;
+}
+// Feuille « Ajouter à une playlist » : une ligne par playlist (touche = ajoute ou retire), et une zone pour en créer une.
+function renderPlaylistSheet() {
+  const s = $("sheet"), it = state.plTarget; if (!it) return;
+  if (!$("plNewName")) {
+    s.innerHTML = `<h2 id="sheetTitle">Ajouter à une playlist</h2>
+      <div class="note" style="margin:0"><b>${esc(it.name)}</b> ${esc(it.grade || "")}</div>
+      <div id="plSheetList" style="display:grid;gap:8px"></div>
+      <div class="field"><label class="label" for="plNewName">Nouvelle playlist</label><div style="display:flex;gap:8px"><input id="plNewName" maxlength="40" placeholder="ex. Projets de la saison" autocomplete="off" style="flex:1"><button class="btn small" type="button" data-pl-create>Créer et ajouter</button></div></div>
+      <button class="btn ghost" type="button" data-close-sheet>Fermer</button>`;
+  }
+  $("plSheetList").innerHTML = state.playlists.length ? state.playlists.map(p => `<button class="pltoggle" type="button" data-pl-toggle="${esc(p.id)}" aria-pressed="${plHas(p, it)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><span aria-hidden="true">${plHas(p, it) ? "✓" : "＋"}</span></button>`).join("") : `<div class="note">Aucune playlist pour l'instant : créez la première ci-dessous.</div>`;
+}
+function openPlaylistSheet() {
+  const it = plCurrent(); if (!it) return;
+  if (!state.me) { promptLogin("enregistrer dans une playlist"); return; }
+  state.plTarget = it; openSheet("playlist");
+}
+// Feuilles « Nouvelle playlist » et « Renommer ».
+function renderPlNameSheet() {
+  const rename = state.sheet === "plrename", p = rename ? plById(state.plId) : null;
+  $("sheet").innerHTML = `<h2 id="sheetTitle">${rename ? "Renommer la playlist" : "Nouvelle playlist"}</h2>
+    <div class="field"><label class="label" for="plNameIn">Nom de la playlist</label><input id="plNameIn" maxlength="40" value="${esc(p?.name || "")}" placeholder="ex. Projets de la saison" autocomplete="off"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" type="button" data-pl-save>${rename ? "Enregistrer" : "Créer"}</button><button class="btn ghost" type="button" data-close-sheet>Annuler</button></div>`;
+}
+const plTypeLabel = it => it.type === "voie" ? "Voie" : "Bloc";
+// Écran « Mes playlists » : les favoris (salles et falaises), puis les playlists.
+function renderPlaylists() {
+  const box = $("plsBody");
+  if (!state.me) { box.innerHTML = `<div class="empty"><strong>Vos playlists</strong><span>Connectez-vous pour regrouper vos blocs et vos voies par thème, et les retrouver sur tous vos appareils.</span><button class="btn" type="button" data-pl-login>Se connecter</button></div>`; return; }
+  const favs = lsJson("ts-favs").filter(f => placeOf(f.type, f.id));
+  let html = `<section><div class="label">Favoris</div>${favs.length ? favs.map(f => placeRow(f)).join("") : `<div class="note">Touchez ☆ sur une salle ou une falaise pour la retrouver ici.</div>`}</section>`;
+  html += `<section><div class="label">Mes playlists</div>${state.playlists.length ? state.playlists.map(p => `<button class="gymrow" type="button" data-pl-open="${esc(p.id)}"><span><b>${esc(p.name)}</b> <small>${plural((p.items || []).length, "élément", "éléments")}</small></span><small>›</small></button>`).join("") : `<div class="note">Aucune playlist pour l'instant. Créez-en une pour regrouper des blocs et des voies par thème.</div>`}</section>
+    <button class="btn" type="button" data-pl-new>＋ Nouvelle playlist</button>`;
+  box.innerHTML = html;
+}
+// Écran d'une playlist : ses blocs et ses voies, à retirer un par un, et les actions renommer / supprimer.
+function renderPlaylist() {
+  const p = plById(state.plId);
+  if (!p) { if (state.view === "playlist") openPlaylists(); return; }
+  $("plName").textContent = p.name;
+  const items = p.items || [];
+  $("plItems").innerHTML = `<div class="plactions"><button class="btn ghost small" type="button" data-pl-rename>Renommer</button><button class="btn danger small" type="button" data-pl-del>${state.plDelArmed === p.id ? "Confirmer la suppression" : "Supprimer la playlist"}</button></div>`
+    + (items.length ? items.map(it => { const live = it.type === "voie" ? state.allVoies.find(v => v.id === it.id) : state.blocs.find(b => b.id === it.id), name = live?.name || it.name, grade = live?.grade || it.grade;
+      return `<div class="plrow"><button class="gymrow" type="button" data-pl-go="${it.type}:${esc(it.id)}"><span><b>${esc(name)}</b> <small>${[esc(grade || ""), esc(it.placeName || "")].filter(Boolean).join(" · ")}</small></span><small>${plTypeLabel(it)}</small></button><button class="rm" type="button" data-pl-rm="${it.type}:${esc(it.id)}" aria-label="Retirer de la playlist">✕</button></div>`; }).join("")
+      : `<div class="note">Cette playlist est vide.</div>`)
+    + `<div class="note">Pour ajouter un bloc ou une voie : ouvrez-le et touchez ＋.</div>`;
+}
+function openPlaylists() { go("playlists"); }
+function openPlaylist(id) { state.plId = id; state.plDelArmed = null; go("playlist"); }
+document.addEventListener("click", async e => {
+  if (e.target.closest("[data-playlists]")) { if (state.me) openPlaylists(); else promptLogin("créer vos playlists"); return; }
+  if (e.target.closest("#dPlus, #ovPlus")) { openPlaylistSheet(); return; }
+  if (e.target.closest("[data-pls-home]")) { go("home"); return; }
+  if (e.target.closest("[data-pl-back]")) { openPlaylists(); return; }
+  if (e.target.closest("[data-pl-login]")) { promptLogin("créer vos playlists"); return; }
+  if (e.target.closest("[data-pl-new]")) { state.sheet = "plnew"; openSheet("plnew"); return; }
+  const o = e.target.closest("[data-pl-open]"); if (o) { openPlaylist(o.dataset.plOpen); return; }
+  if (e.target.closest("[data-pl-rename]")) { openSheet("plrename"); return; }
+  if (e.target.closest("[data-pl-del]")) {
+    if (state.plDelArmed !== state.plId) { state.plDelArmed = state.plId; renderPlaylist(); return; }
+    const id = state.plId; state.plDelArmed = null;
+    if (await plWrite(() => plCol().doc(id).delete())) { toast("Playlist supprimée"); openPlaylists(); }
+    return;
+  }
+  const rm = e.target.closest("[data-pl-rm]"); if (rm) { const [type, id] = rm.dataset.plRm.split(/:(.*)/s); const p = plById(state.plId); if (p) await plToggle(p.id, { type, id }); return; }
+  const g = e.target.closest("[data-pl-go]"); if (g) { const [type, id] = g.dataset.plGo.split(/:(.*)/s); location.hash = `#/${type}/${id}`; return; }
+  // Feuilles
+  const t = e.target.closest("[data-pl-toggle]"); if (t && state.plTarget) { await plToggle(t.dataset.plToggle, state.plTarget); return; }
+  if (e.target.closest("[data-pl-create]")) { const id = await plCreate($("plNewName").value, state.plTarget); if (id) { $("plNewName").value = ""; closeSheet(); } return; }
+  if (e.target.closest("[data-pl-save]")) {
+    const name = $("plNameIn").value.trim().slice(0, 40); if (!name) { toast("Donnez un nom à la playlist."); return; }
+    if (state.sheet === "plrename") { const id = state.plId; if (await plWrite(() => plCol().doc(id).update({ name, updatedAt: Date.now() }))) { closeSheet(); toast("Playlist renommée"); } }
+    else { const id = await plCreate(name); if (id) { closeSheet(); openPlaylist(id); } }
+  }
+});
+
 /* ---------- navigation ---------- */
-const VIEWS = { home: "vHome", places: "vPlaces", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+const VIEWS = { home: "vHome", places: "vPlaces", playlists: "vPlaylists", playlist: "vPlaylist", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
-  state.view = v; if (v !== "places") { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
+  state.view = v; if (!["places", "playlists", "playlist"].includes(v)) { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
-  $("gymBtn").hidden = v === "home" || v === "places";
-  $("tabHome").setAttribute("aria-current", v === "home" ? "page" : "false");
+  $("gymBtn").hidden = ["home", "places", "playlists", "playlist"].includes(v);
+  $("tabHome").setAttribute("aria-current", ["home", "playlists", "playlist"].includes(v) ? "page" : "false");
   const inSalles = ["list", "detail", "create"].includes(v) || (v === "places" && state.placesKind === "salle"), inFalaises = ["olist", "ovoie", "oedit"].includes(v) || (v === "places" && state.placesKind === "secteur");
   $("tabSalles").setAttribute("aria-current", inSalles ? "page" : "false");
   $("tabFalaises").setAttribute("aria-current", inFalaises ? "page" : "false");
@@ -1445,6 +1588,8 @@ function go(v) {
   renderHeader();
   if (v === "home") renderHome();
   if (v === "places") renderPlaces();
+  if (v === "playlists") renderPlaylists();
+  if (v === "playlist") renderPlaylist();
   if (v === "olist") renderOList();
   if (v === "ovoie") renderVoie();
   if (v === "oedit") { renderOE(); oView.layout(true); }
@@ -1463,7 +1608,7 @@ function trackScreen() {
   clearTimeout(screenTimer);
   screenTimer = setTimeout(() => {
     const v = state.view, id = v === "detail" ? state.current : v === "ovoie" ? state.voieId : salleMesure();
-    const screen = { home: "/", places: state.placesKind === "secteur" ? "/falaises" : "/salles", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
+    const screen = { home: "/", places: state.placesKind === "secteur" ? "/falaises" : "/salles", playlists: "/playlists", playlist: "/playlist", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
     if (!screen || screen === lastScreen) return;
     lastScreen = screen;
     TS_MESURE.page(screen);
@@ -1693,6 +1838,7 @@ document.addEventListener("click", e => { if (e.target.closest("[data-open-secto
 /* ---------- one route ---------- */
 function selMethod() { return state.oSel === "anchors" ? null : state.methodes.find(m => m.id === state.oSel) || null; }
 function renderVoie() {
+  renderPlus();
   const v = voie();
   if (!v) { $("ovName").textContent = "Voie introuvable"; $("ovBy").textContent = ""; $("ovGrade").textContent = ""; $("ovWall").hidden = true; $("ovMethods").innerHTML = ""; $("ovSeq").textContent = ""; $("ovNote").hidden = true; $("ovActions").innerHTML = ""; return; }
   const lens = longueursOf(v), V = currentVue(v), lenVues = vuesOf(v, currentLen(v).id);
@@ -2372,10 +2518,14 @@ function subscribeRoles() {
 }
 function subscribeDrafts() {
   if (state.unsubDrafts) { state.unsubDrafts(); state.unsubDrafts = null; }
-  state.drafts = [];
+  state.drafts = []; state.playlists = [];
   if (!state.me || !state.db) return;
   state.unsubDrafts = state.db.collection("data/users/" + state.me).onSnapshot(snap => {
-    state.drafts = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.kind === "draft");
+    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    state.drafts = all.filter(d => d.kind === "draft");
+    state.playlists = all.filter(d => d.kind === "playlist").sort((a, b) => (a.name || "").localeCompare(b.name || "", "fr"));
+    renderPlus(); if (state.view === "playlists") renderPlaylists(); if (state.view === "playlist") renderPlaylist(); if (state.view === "home") renderHome();
+    if (state.sheet === "playlist") renderPlaylistSheet();
     if (state.edit.kind === "draft" && !state.drafts.some(d => d.id === state.edit.id)) state.edit = { kind: "new" };
     renderEditorChrome(); if (state.view === "list") renderList();
   }, () => {});

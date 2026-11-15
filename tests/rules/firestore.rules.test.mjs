@@ -557,6 +557,30 @@ describe('Correction des noms', () => {
   });
 });
 
+describe('Playlists', () => {
+  const pl = { kind: 'playlist', name: 'Projets', items: [{ type: 'bloc', id: 'b1', name: 'Bloc', grade: '6a', placeName: 'Altissimo' }], createdAt: 1, updatedAt: 1 };
+  test("alice crée, lit, modifie, renomme et supprime ses playlists", async () => {
+    await assertSucceeds(user('alice').doc('data/users/alice/p1').set(pl));
+    await assertSucceeds(user('alice').doc('data/users/alice/p1').get());
+    await assertSucceeds(user('alice').collection('data/users/alice').get());
+    await assertSucceeds(user('alice').doc('data/users/alice/p1').update({ name: 'Échauffement', items: [], updatedAt: 2 }));
+    await assertSucceeds(user('alice').doc('data/users/alice/p1').delete());
+  });
+  test("bob ne lit, ne crée, ne modifie ni ne supprime les playlists d'alice", async () => {
+    await seed('data/users/alice/p1', pl);
+    await assertFails(user('bob').doc('data/users/alice/p1').get());
+    await assertFails(user('bob').collection('data/users/alice').get());
+    await assertFails(user('bob').doc('data/users/alice/p2').set(pl));
+    await assertFails(user('bob').doc('data/users/alice/p1').update({ name: 'Piratée' }));
+    await assertFails(user('bob').doc('data/users/alice/p1').delete());
+  });
+  test("un invité n'a aucun accès aux playlists", async () => {
+    await seed('data/users/alice/p1', pl);
+    await assertFails(anon().doc('data/users/alice/p1').get());
+    await assertFails(anon().doc('data/users/alice/p2').set(pl));
+  });
+});
+
 describe('Brouillons', () => {
   test('alice lit et écrit ses brouillons', async () => {
     await assertSucceeds(user('alice').doc('data/users/alice/d1').set({ draft: true }));
