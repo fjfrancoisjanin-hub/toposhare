@@ -276,6 +276,8 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
 .acct.lang { font: 800 12px var(--f-mono); letter-spacing: .02em; }
 .langlist { display: grid; gap: 8px; }
 .acct svg { width: 18px; height: 18px; }
+.tlink { appearance: none; justify-self: start; display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; padding: 8px 14px; font: 600 14px var(--f-body); cursor: pointer; }
+.tlink:active { background: var(--surface); }
 .fb-link { appearance: none; border: 0; background: none; color: var(--muted); font: 600 14px var(--f-body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 6px 0 20px; display: block; margin: 0 auto; }
 .splash { position: fixed; inset: 0; z-index: 100; background: #1B2024; color: #ECEEF0; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; padding: 24px; }
 .splash img { width: 132px; height: 132px; border-radius: 30px; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
@@ -349,6 +351,10 @@ nav.tabs .tab.plus { flex-grow: 2; padding-inline: 6px; gap: 6px; font-size: 12p
       <div class="plhead"><button class="btn ghost small" type="button" data-pls-home>← Accueil</button><h1>Mes carnets</h1></div>
       <div id="plsBody" style="display:grid;gap:16px"></div>
     </div>
+  </section>
+  <!-- MINUTEUR DE POUTRE : outil indépendant des salles et des falaises, chargé à la demande (minuteur.js) -->
+  <section id="vTimer" hidden>
+    <div class="gut home"><div id="tmBody"></div></div>
   </section>
   <section id="vPlaylist" hidden>
     <div class="gut home">
@@ -1353,6 +1359,7 @@ function renderHome() {
   html += `<div class="entries"><button class="entry" type="button" id="hEntrySalles" data-list="salle"><span class="em" aria-hidden="true">🧗</span><b>Salles</b><small>${plural(state.gyms.length, "salle", "salles")}</small></button>
     <button class="entry" type="button" id="hEntryFalaises" data-list="secteur"><span class="em" aria-hidden="true">⛰️</span><b>Falaises</b><small>${plural(state.secteurs.length, "secteur", "secteurs")}</small></button></div>`;
   html = html.replace(/<\/div>$/, `<button class="entry wide" type="button" id="hEntryPlaylists" data-playlists><span class="em" aria-hidden="true"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(35 12 12)"><path d="M7 9V8a5 5 0 0 1 10 0v8a5 5 0 0 1-10 0v-1"/><path d="M7 9l3.2 1.2M7 15l3.2-1.2M10.2 10.2v3.6"/></g></svg></span><b>Mes carnets</b><small>${state.me ? plural(state.playlists.length, "carnet", "carnets") : "Connexion pour en créer"}</small></button></div>`);
+  html += `<button class="tlink" type="button" id="hTimer" data-timer><span aria-hidden="true">⏱</span><span>Minuteur poutre</span></button>`;
   if (favs.length) html += `<section><div class="label">Favoris</div>${favs.map(f => placeRow(f)).join("")}</section>`;
   if (firstRun) html += `<button class="fb-link" type="button" data-add-place>Ta salle ou ta falaise n'y est pas ? Ajoute-la</button>`;
   $("hBody").innerHTML = html;
@@ -1542,9 +1549,20 @@ function renderPlaylist() {
       : `<div class="note">Ce carnet est vide.</div>`)
     + `<div class="note">Pour ajouter un bloc ou une voie : ouvrez-le et touchez ＋.</div>`;
 }
+// Minuteur de poutre : le script n'est chargé qu'à la première ouverture, rien ne pèse sur le lancement de l'appli.
+function renderTimer() {
+  const box = $("tmBody"), mount = () => { if (state.view === "timer") window.TSTimer.mount(box, { onHome: () => go("home") }); };
+  if (window.TSTimer) { mount(); return; }
+  box.innerHTML = `<div class="note">Chargement…</div>`;
+  const s = document.createElement("script");
+  s.src = "/minuteur.js"; s.onload = mount;
+  s.onerror = () => { box.innerHTML = `<div class="note">Impossible de charger le minuteur. Vérifiez votre connexion puis réessayez.</div>`; };
+  document.head.appendChild(s);
+}
 function openPlaylists() { go("playlists"); }
 function openPlaylist(id) { state.plId = id; state.plDelArmed = null; go("playlist"); }
 document.addEventListener("click", async e => {
+  if (e.target.closest("[data-timer]")) { go("timer"); return; }
   if (e.target.closest("[data-playlists]")) { if (state.me) openPlaylists(); else promptLogin("créer vos carnets"); return; }
   if (e.target.closest("#dPlus, #ovPlus")) { openPlaylistSheet(); return; }
   if (e.target.closest("[data-pls-home]")) { go("home"); return; }
@@ -1572,13 +1590,13 @@ document.addEventListener("click", async e => {
 });
 
 /* ---------- navigation ---------- */
-const VIEWS = { home: "vHome", places: "vPlaces", playlists: "vPlaylists", playlist: "vPlaylist", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
+const VIEWS = { home: "vHome", places: "vPlaces", playlists: "vPlaylists", playlist: "vPlaylist", timer: "vTimer", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
-  state.view = v; if (!["places", "playlists", "playlist"].includes(v)) { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
+  state.view = v; if (!["places", "playlists", "playlist", "timer"].includes(v)) { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
-  $("gymBtn").hidden = ["home", "places", "playlists", "playlist"].includes(v);
-  $("tabHome").setAttribute("aria-current", ["home", "playlists", "playlist"].includes(v) ? "page" : "false");
+  $("gymBtn").hidden = ["home", "places", "playlists", "playlist", "timer"].includes(v);
+  $("tabHome").setAttribute("aria-current", ["home", "playlists", "playlist", "timer"].includes(v) ? "page" : "false");
   const inSalles = ["list", "detail", "create"].includes(v) || (v === "places" && state.placesKind === "salle"), inFalaises = ["olist", "ovoie", "oedit"].includes(v) || (v === "places" && state.placesKind === "secteur");
   $("tabSalles").setAttribute("aria-current", inSalles ? "page" : "false");
   $("tabFalaises").setAttribute("aria-current", inFalaises ? "page" : "false");
@@ -1588,6 +1606,8 @@ function go(v) {
   renderHeader();
   if (v === "home") renderHome();
   if (v === "places") renderPlaces();
+  if (v !== "timer") window.TSTimer?.leave();
+  if (v === "timer") renderTimer();
   if (v === "playlists") renderPlaylists();
   if (v === "playlist") renderPlaylist();
   if (v === "olist") renderOList();
@@ -1608,7 +1628,7 @@ function trackScreen() {
   clearTimeout(screenTimer);
   screenTimer = setTimeout(() => {
     const v = state.view, id = v === "detail" ? state.current : v === "ovoie" ? state.voieId : salleMesure();
-    const screen = { home: "/", places: state.placesKind === "secteur" ? "/falaises" : "/salles", playlists: "/playlists", playlist: "/playlist", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
+    const screen = { home: "/", places: state.placesKind === "secteur" ? "/falaises" : "/salles", playlists: "/playlists", playlist: "/playlist", timer: "/minuteur", list: `/salle/${id}`, olist: `/secteur/${id}`, detail: `/bloc/${id}`, ovoie: `/voie/${id}`, create: "/nouveau-bloc", oedit: "/edition-voie" }[v];
     if (!screen || screen === lastScreen) return;
     lastScreen = screen;
     TS_MESURE.page(screen);
