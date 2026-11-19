@@ -166,3 +166,57 @@ test('à 390 px, le bouton ＋ tient dans l\'en-tête d\'un bloc ou d\'une voie,
   expect(b.inside).toBe(true);
   expect(b.apart).toBe(true);
 });
+
+test('le bouton retour d\'une fiche ouverte depuis un carnet revient au carnet (bloc et voie), pas à la salle ni au secteur', async ({ page }, testInfo) => {
+  const id = uid(testInfo);
+  await seedAll(id);
+  await page.goto(`/#/bloc/b-${id}`);
+  await login(page, who(id));
+  await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`);
+  await createFromSheet(page, 'Séance');
+  // Voie dans le même carnet.
+  await page.goto(`/#/voie/v-${id}`);
+  await expect(page.locator('#ovName')).toHaveText(`Voie ${id}`);
+  await page.locator('#ovPlus').click();
+  await page.locator('[data-pl-toggle]', { hasText: 'Séance' }).click();
+  await page.locator('[data-close-sheet]').click();
+  const openCarnet = async () => {
+    await page.locator('#tabHome').click();
+    await page.locator('#hEntryPlaylists').click();
+    await page.locator('[data-pl-open]').click();
+    await expect(page.locator('#plName')).toHaveText('Séance');
+  };
+  // Bloc : carnet → fiche → retour = carnet.
+  await openCarnet();
+  await page.locator('[data-pl-go^="bloc:"]').click();
+  await expect(page.locator('#vDetail')).toBeVisible();
+  await page.locator('#backBtn').click();
+  await expect(page.locator('#vPlaylist')).toBeVisible();
+  await expect(page.locator('#plName')).toHaveText('Séance');
+  await expect(page.locator('#vList')).toBeHidden();
+  // Voie : carnet → fiche → retour = carnet (et un second aller-retour fonctionne aussi).
+  for (let i = 0; i < 2; i++) {
+    await page.locator('[data-pl-go^="voie:"]').click();
+    await expect(page.locator('#oVoie')).toBeVisible();
+    await page.locator('#backBtn').click();
+    await expect(page.locator('#vPlaylist')).toBeVisible();
+    await expect(page.locator('#oList')).toBeHidden();
+  }
+  // Témoin : depuis la salle, le retour ramène toujours à la salle ; depuis le secteur, au secteur.
+  await page.locator('#tabHome').click();
+  await page.goto(`/#/salle/${id}`);
+  await expect(page.locator('#vList')).toBeVisible();
+  await page.locator('#vList .card').first().click();
+  await expect(page.locator('#vDetail')).toBeVisible();
+  await page.locator('#backBtn').click();
+  await expect(page.locator('#vList')).toBeVisible();
+  // Après un passage par le carnet, une fiche ouverte depuis la salle revient bien à la salle (le carnet est oublié).
+  await openCarnet();
+  await page.locator('[data-pl-go^="bloc:"]').click();
+  await expect(page.locator('#vDetail')).toBeVisible();
+  await page.locator('#tabSalles').click();
+  await page.locator('#vList .card').first().click();
+  await expect(page.locator('#vDetail')).toBeVisible();
+  await page.locator('#backBtn').click();
+  await expect(page.locator('#vList')).toBeVisible();
+});
