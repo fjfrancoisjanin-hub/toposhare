@@ -220,3 +220,19 @@ test('le bouton retour d\'une fiche ouverte depuis un carnet revient au carnet (
   await page.locator('#backBtn').click();
   await expect(page.locator('#vList')).toBeVisible();
 });
+
+test('en anglais, les comptes et les messages des carnets sont traduits (motifs « N carnets », « Ajouté à »…)', async ({ page }, testInfo) => {
+  const id = uid(testInfo);
+  await seedAll(id);
+  await page.goto(`/#/bloc/b-${id}`);
+  await login(page, who(id));
+  await expect(page.locator('#dName')).toHaveText(`Bloc ${id}`);
+  await page.evaluate(() => TS_I18N.set('en'));
+  await page.locator('#dPlus').click();
+  await page.locator('#plNewName').fill('Projets');
+  await page.locator('[data-pl-create]').click();
+  await expect(page.locator('#toast')).toContainText('Added to “Projets”');
+  await expect(page.locator('#dPlus')).toHaveAttribute('aria-label', 'In 1 notebook');
+  await page.locator('#tabHome').click();
+  await expect(page.locator('#hEntryPlaylists')).toContainText('1 notebook');
+});
