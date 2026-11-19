@@ -582,7 +582,7 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 
 const state = {
   view: "list", filter: "all", gyms: [], walls: [], blocs: [], gymId: lsGet("pan-gym"),
-  playlists: [], plId: null, plTarget: null, plDelArmed: null,
+  playlists: [], plId: null, plTarget: null, plDelArmed: null, viaCarnet: null, fromCarnet: null, inRoute: false,
   tool: "start", holds: [], grade: "6a", mode: "in", secteurs: [], secteurId: lsGet("pan-sect"), voies: [], allVoies: [], methodes: [], vues: [], voieId: null, oSel: "anchors", oe: null, rp: 0, oLoaded: false, vLoaded: false, unsubVoies: null, unsubMeth: null, drafts: [], edit: { kind: "new" }, unsubDrafts: null, ownedGyms: new Set(), unsubRoles: null, current: null, me: null,
   db: null, assets: null, user: null, unsubBlocs: null, loaded: false, fsMode: null, fsDim: false, sheet: null,
 };
@@ -1128,7 +1128,7 @@ $("list").addEventListener("click", e => {
 document.addEventListener("click", e => { if (e.target.closest("[data-open-sheet]")) openSheet(); });
 
 /* ---------- detail ---------- */
-function openDetail(id) { state.current = id; state.delArmed = null; go("detail"); }
+function openDetail(id) { if (state.fromCarnet?.id !== id) state.fromCarnet = null; state.current = id; state.delArmed = null; go("detail"); }
 function renderDetail() {
   renderPlus();
   const b = state.blocs.find(x => x.id === state.current), w = b && wallById(b.wallId);
@@ -1447,6 +1447,7 @@ $("sheet").addEventListener("click", e => { const b = e.target.closest("[data-pi
 // Liens directs : /#/salle/id, /#/secteur/id, /#/voie/id, /#/bloc/id. Un lien n'ouvre que la consultation.
 async function routeFromHash() {
   state.origin = "home";
+  const via = state.viaCarnet; state.viaCarnet = null;      // ouvert depuis un carnet : le retour y reviendra
   const m = location.hash.match(/^#\/(salle|secteur|voie|bloc)\/(.+)$/);
   if (!m) return;
   const [, type, id] = m;
@@ -1459,8 +1460,8 @@ async function routeFromHash() {
     if (!d.exists && type === "bloc" && state.me) { try { d = await state.db.collection("blocsPrivees").doc(id).get(); } catch { return gone(); } }
     if (!d.exists) return gone();
     const x = d.data();
-    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x, _lien: true }); openPlace("secteur", x.secteurId); openVoie(id); }
-    else { if (!placeOf("salle", x.gymId)) return gone(); openPlace("salle", x.gymId); openDetail(id); }
+    if (type === "voie") { if (!placeOf("secteur", x.secteurId)) return gone(); if (!state.allVoies.some(v => v.id === id)) state.allVoies.push({ id, ...x, _lien: true }); state.inRoute = true; try { openPlace("secteur", x.secteurId); openVoie(id); } finally { state.inRoute = false; } state.fromCarnet = via && via.type === "voie" && via.id === id ? via : null; }
+    else { if (!placeOf("salle", x.gymId)) return gone(); state.inRoute = true; try { openPlace("salle", x.gymId); openDetail(id); } finally { state.inRoute = false; } state.fromCarnet = via && via.type === "bloc" && via.id === id ? via : null; }
   } catch { gone(); }
 }
 window.addEventListener("hashchange", () => { if (state.booted) routeFromHash(); });
@@ -1578,7 +1579,7 @@ document.addEventListener("click", async e => {
     return;
   }
   const rm = e.target.closest("[data-pl-rm]"); if (rm) { const [type, id] = rm.dataset.plRm.split(/:(.*)/s); const p = plById(state.plId); if (p) await plToggle(p.id, { type, id }); return; }
-  const g = e.target.closest("[data-pl-go]"); if (g) { const [type, id] = g.dataset.plGo.split(/:(.*)/s); location.hash = `#/${type}/${id}`; return; }
+  const g = e.target.closest("[data-pl-go]"); if (g) { const [type, id] = g.dataset.plGo.split(/:(.*)/s); state.viaCarnet = { plId: state.plId, type, id }; location.hash = `#/${type}/${id}`; return; }
   // Feuilles
   const t = e.target.closest("[data-pl-toggle]"); if (t && state.plTarget) { await plToggle(t.dataset.plToggle, state.plTarget); return; }
   if (e.target.closest("[data-pl-create]")) { const id = await plCreate($("plNewName").value, state.plTarget); if (id) { $("plNewName").value = ""; closeSheet(); } return; }
@@ -1592,6 +1593,7 @@ document.addEventListener("click", async e => {
 /* ---------- navigation ---------- */
 const VIEWS = { home: "vHome", places: "vPlaces", playlists: "vPlaylists", playlist: "vPlaylist", timer: "vTimer", list: "vList", create: "vCreate", detail: "vDetail", olist: "oList", ovoie: "oVoie", oedit: "oEdit" };
 function go(v) {
+  if (!state.inRoute && !["detail", "ovoie", "oedit"].includes(v)) state.fromCarnet = null;   // tout écran qui n'est pas la fiche ouverte depuis le carnet l'oublie
   state.view = v; if (!["places", "playlists", "playlist", "timer"].includes(v)) { state.mode = v.startsWith("o") ? "out" : "in"; lsSet("pan-mode", state.mode); }
   for (const [k, id] of Object.entries(VIEWS)) $(id).hidden = k !== v;
   $("backBtn").hidden = !["detail", "ovoie", "oedit"].includes(v);
@@ -1656,7 +1658,15 @@ $("tabCreate").onclick = () => {
   if (p.type === "secteur") { if (state.secteurId !== p.id) switchSecteur(p.id); startRoute(); }
   else { if (state.gymId !== p.id) switchGym(p.id); go("create"); }
 };
-$("backBtn").onclick = () => { if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
+// Retour depuis une fiche ouverte depuis un carnet : on revient au carnet, pas à la salle ou au secteur.
+function backToCarnet() {
+  const fc = state.fromCarnet;
+  if (!fc || !plById(fc.plId)) return false;
+  const here = state.view === "detail" ? fc.type === "bloc" && fc.id === state.current : state.view === "ovoie" ? fc.type === "voie" && fc.id === state.voieId : false;
+  if (!here) return false;
+  state.fromCarnet = null; openPlaylist(fc.plId); return true;
+}
+$("backBtn").onclick = () => { if (backToCarnet()) return; if (state.view === "oedit") { state.oe?.voieId || state.oe?.id ? go("ovoie") : go("olist"); } else if (state.view === "ovoie") go("olist"); else go("list"); };
 let tt; function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
 
 function renderHeader() {
@@ -1752,6 +1762,7 @@ function subscribeMethods(id) {
   state.unsubMeth = () => { u1(); u2?.(); };
 }
 function openVoie(id, sel) {
+  if (state.fromCarnet?.id !== id) state.fromCarnet = null;
   touchRecent("voie", id);
   if (state.voieId !== id) {
     state.voieId = id; state.methodes = []; state.vues = []; state.vuesLoaded = false; state.ovLen = state.ovVue = null; state.armedAct = null; state.oSel = sel || "anchors";
