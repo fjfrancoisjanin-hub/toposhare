@@ -3,7 +3,7 @@
 // Tous les textes visibles sont en français et passent par i18n.js (traduction à la volée des nœuds de texte).
 // Le temps vient de l'horloge (performance.now), pas du nombre de ticks : un onglet ralenti ne fait pas dériver la séance.
 (function () {
-  const KEY = "ts-timer", KEY_SOUND = "ts-timer-sound";
+  const KEY = "ts-timer", KEY_SOUND = "ts-timer-sound", KEY_PRESETS = "ts-timer-presets", MAX_PRESETS = 20;
   const PREP = 5;                                                   // compte à rebours avant le premier effort (s)
   const DEFAULTS = { effort: 7, rest: 3, reps: 6, sets: 3, setRest: 180 };   // répéteurs 7 s / 3 s × 6, 3 séries
   const FIELDS = [
@@ -34,6 +34,18 @@
 .tm-total b { color: var(--fg); font-size: 20px; }
 .tm-go { font-size: 20px; padding: 16px 18px; }
 .tm-sound { justify-self: start; }
+.tm-pres { display: grid; gap: 8px; }
+.tm-pre { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.tm-pre-load { appearance: none; display: grid; gap: 2px; justify-items: start; text-align: left; min-width: 0; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 14px; padding: 10px 14px; font: inherit; cursor: pointer; }
+.tm-pre-load b { font-size: 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-pre-load small { color: var(--muted); font-size: 13px; }
+.tm-pre-load[aria-current="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tm-pre-del { appearance: none; min-width: 44px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 14px; padding: 0 12px; font: 700 15px var(--f-body); cursor: pointer; }
+.tm-pre-del[data-armed="1"] { color: var(--danger); border-color: var(--danger); }
+.tm-save { display: grid; gap: 8px; }
+.tm-save-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.tm-save input { min-width: 0; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--fg); font: 600 16px var(--f-body); padding: 0 12px; }
+.tm-msg { min-height: 1.2em; color: var(--muted); font-size: 14px; }
 .tm-run { position: fixed; inset: 0; z-index: 60; display: grid; grid-template-rows: auto 1fr auto; padding: max(14px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); color: #fff; background: #3D4650; text-align: center; }
 .tm-run[hidden] { display: none; }
 .tm-run[data-phase="effort"] { background: #D8430F; }
@@ -80,7 +92,26 @@
   }
   const totalSeconds = s => build(s).filter(p => p.kind !== "prep").reduce((a, p) => a + p.dur, 0);
 
-  let root = null, hooks = {}, settings = loadSettings(), sound = lsGet(KEY_SOUND, "1") !== "0";
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const KEYS = FIELDS.map(f => f.k);
+  const sameSettings = (a, b) => KEYS.every(k => a[k] === b[k]);
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  // Séances enregistrées : { id, name, effort, rest, reps, sets, setRest }, sur ce téléphone (localStorage), rien n'est envoyé.
+  function loadPresets() {
+    let raw = []; try { raw = JSON.parse(lsGet(KEY_PRESETS, "[]")); } catch {}
+    if (!Array.isArray(raw)) return [];
+    return raw.slice(0, MAX_PRESETS).map(p => {
+      if (!p || typeof p !== "object") return null;
+      const out = { id: String(p.id || newId()), name: String(p.name || "").slice(0, 30) };
+      for (const f of FIELDS) { const n = Math.round(Number(p[f.k])); if (!Number.isFinite(n)) return null; out[f.k] = clamp(n, f); }
+      return out;
+    }).filter(Boolean);
+  }
+  const savePresets = () => lsSet(KEY_PRESETS, JSON.stringify(presets));
+  const defaultName = s => `${s.effort}/${s.rest} × ${s.reps}${s.sets > 1 ? ` (×${s.sets})` : ""}`;
+  const summary = s => `${s.effort} s / ${s.rest} s × ${s.reps}` + (s.sets > 1 ? ` · ${s.sets} séries${s.setRest > 0 ? ` · ${fmtLong(s.setRest)}` : ""}` : "");
+
+  let root = null, hooks = {}, settings = loadSettings(), presets = loadPresets(), saving = false, armedDel = null, armTimer = 0, msgTimer = 0, sound = lsGet(KEY_SOUND, "1") !== "0";
   let ctx = null, wake = null;
   let run = null;        // { phases, i, start, pausedAt, lastShown, done }
   let timer = 0;
@@ -118,9 +149,11 @@
     root.innerHTML = `<div class="tm" id="tmSetup">
       <div class="plhead"><button class="btn ghost small" type="button" data-tm-home>← Accueil</button><h1>Minuteur poutre</h1></div>
       <p class="tm-hint">Réglez, puis lancez. L'écran reste allumé pendant la séance.</p>
+      <div id="tmPres"></div>
       <div class="tm-card"><div class="label">Une série</div>${group(0)}</div>
       <div class="tm-card"><div class="label">Plusieurs séries</div>${group(1)}</div>
       <div class="tm-total"><span>Durée totale</span><b id="tmTotal"></b></div>
+      <div class="tm-save" id="tmSave"></div>
       <button class="btn tm-go" type="button" id="tmGo">Lancer</button>
     </div>
     <div class="tm-run" id="tmRun" hidden aria-live="off">
@@ -128,8 +161,35 @@
       <div class="mid"><div class="tm-phase" id="tmPhase" aria-live="polite"></div><div class="tm-digits" id="tmDigits" role="timer"></div><div class="tm-next" id="tmNext"></div></div>
       <div class="bottom"><button type="button" id="tmStop">Arrêter</button><button type="button" class="main" id="tmPause">Pause</button></div>
     </div>`;
-    paintTotal(); paintSound();
+    paintTotal(); paintSound(); paintPresets(); paintSave();
   }
+  function paintPresets() {
+    const box = root.querySelector("#tmPres"); if (!box) return;
+    box.innerHTML = presets.length ? `<div class="tm-pres"><div class="label">Mes séances</div>${presets.map(p => `<div class="tm-pre"><button type="button" class="tm-pre-load" data-pre="${esc(p.id)}" aria-current="${sameSettings(p, settings)}"><b class="name" data-nt>${esc(p.name)}</b><small>${summary(p)}</small></button><button type="button" class="tm-pre-del" data-pre-del="${esc(p.id)}" data-armed="${armedDel === p.id ? 1 : ""}" aria-label="Supprimer">${armedDel === p.id ? "Supprimer" : "✕"}</button></div>`).join("")}</div>` : "";
+  }
+  function paintActive() { root.querySelectorAll(".tm-pre-load").forEach(b => { const p = presets.find(x => x.id === b.dataset.pre); b.setAttribute("aria-current", String(!!p && sameSettings(p, settings))); }); }
+  function paintSave(msg = "") {
+    const box = root.querySelector("#tmSave"); if (!box) return;
+    box.innerHTML = saving
+      ? `<div class="tm-save-row"><input id="tmName" maxlength="30" autocomplete="off" placeholder="Nom de la séance" value="${esc(defaultName(settings))}"><button class="btn small" type="button" id="tmSaveOk">Enregistrer</button><button class="btn ghost small" type="button" id="tmSaveNo">Annuler</button></div><div class="tm-msg" id="tmMsg" role="status">${msg}</div>`
+      : `<button class="btn ghost" type="button" id="tmSaveOpen">Enregistrer cette séance</button><div class="tm-msg" id="tmMsg" role="status">${msg}</div>`;
+    if (saving) { const i = box.querySelector("#tmName"); i.focus(); i.select(); }
+  }
+  function flash(msg) { clearTimeout(msgTimer); paintSave(msg); msgTimer = setTimeout(() => { const m = root?.querySelector("#tmMsg"); if (m) m.textContent = ""; }, 2600); }
+  function saveCurrent() {
+    const input = root.querySelector("#tmName"), name = (input?.value || "").trim().slice(0, 30) || defaultName(settings);
+    const same = presets.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (!same && presets.length >= MAX_PRESETS) { flash("20 séances au plus."); return; }
+    if (same) Object.assign(same, { name }, Object.fromEntries(KEYS.map(k => [k, settings[k]])));
+    else presets.push({ id: newId(), name, ...Object.fromEntries(KEYS.map(k => [k, settings[k]])) });
+    savePresets(); saving = false; paintPresets(); flash(same ? "Séance mise à jour" : "Séance enregistrée");
+  }
+  function loadPreset(id) {
+    const p = presets.find(x => x.id === id); if (!p) return;
+    for (const k of KEYS) { settings[k] = p[k]; const i = root.querySelector(`#tm-${k}`); if (i) i.value = p[k]; }
+    lsSet(KEY, JSON.stringify(settings)); paintTotal(); paintActive();
+  }
+  function disarm() { clearTimeout(armTimer); if (armedDel) { armedDel = null; paintPresets(); } }
   function paintTotal() { const el = root.querySelector("#tmTotal"); if (el) el.textContent = fmtLong(totalSeconds(settings)); }
   function paintSound() {
     const b = root.querySelector("#tmSnd"); if (!b) return;
@@ -140,7 +200,7 @@
     settings[k] = clamp(Math.round(v), f);
     lsSet(KEY, JSON.stringify(settings));
     if (input) input.value = settings[k];
-    paintTotal();
+    paintTotal(); paintActive();
   }
 
   // Appui long sur − / ＋ : répétition accélérée (utile pour 180 s). Un clic clavier (detail 0) fait un pas.
@@ -220,6 +280,14 @@
   function onClick(e) {
     const t = e.target.closest("button"); if (!t || !root.contains(t)) return;
     if (t.matches("[data-tm-home]")) { leave(); hooks.onHome?.(); }
+    else if (t.dataset.pre) { loadPreset(t.dataset.pre); disarm(); }
+    else if (t.dataset.preDel) {
+      if (armedDel === t.dataset.preDel) { presets = presets.filter(p => p.id !== armedDel); armedDel = null; savePresets(); paintPresets(); }
+      else { clearTimeout(armTimer); armedDel = t.dataset.preDel; paintPresets(); armTimer = setTimeout(disarm, 3000); }
+    }
+    else if (t.id === "tmSaveOpen") { saving = true; paintSave(); }
+    else if (t.id === "tmSaveNo") { saving = false; paintSave(); }
+    else if (t.id === "tmSaveOk") saveCurrent();
     else if (t.id === "tmGo") start();
     else if (t.id === "tmStop") { if (run) { stopRun(true); } }
     else if (t.id === "tmPause") togglePause();
@@ -248,8 +316,9 @@
       for (const ev of ["pointerup", "pointercancel", "pointerout"]) root.addEventListener(ev, stopHold);
       root.addEventListener("input", onInput);
       root.addEventListener("change", onChange);
+      root.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.id === "tmName") { e.preventDefault(); saveCurrent(); } });
     }
-    hooks = h; settings = loadSettings(); stopRun(false); renderSetup();
+    hooks = h; settings = loadSettings(); presets = loadPresets(); saving = false; armedDel = null; stopRun(false); renderSetup();
   }
 
   window.TSTimer = api;

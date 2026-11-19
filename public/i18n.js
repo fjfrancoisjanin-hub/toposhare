@@ -400,6 +400,13 @@
     ["Plus", "More", "Más"],
     ["Son activé", "Sound on", "Sonido activado"],
     ["Son coupé", "Sound off", "Sonido desactivado"],
+    ["Mes séances", "My sessions", "Mis sesiones"],
+    ["Enregistrer cette séance", "Save this session", "Guardar esta sesión"],
+    ["Nom de la séance", "Session name", "Nombre de la sesión"],
+    ["Séance enregistrée", "Session saved", "Sesión guardada"],
+    ["Séance mise à jour", "Session updated", "Sesión actualizada"],
+    ["20 séances au plus.", "20 sessions at most.", "20 sesiones como máximo."],
+    [/^(\d+) séries?$/, m => `${m[1]} set${+m[1] > 1 ? "s" : ""}`, m => `${m[1]} serie${+m[1] > 1 ? "s" : ""}`],
     ["Impossible de charger le minuteur. Vérifiez votre connexion puis réessayez.", "Couldn't load the timer. Check your connection and try again.", "No se pudo cargar el temporizador. Comprueba tu conexión e inténtalo de nuevo."],
     ["Touchez chaque point d'ancrage du bas vers le haut, puis le relais. Ces repères sont communs à tous les grimpeurs.", "Tap each bolt from bottom to top, then the anchor. These marks are shared by all climbers.", "Toca cada chapa de abajo arriba y luego la reunión. Estas marcas son comunes a todos."],
     ["Appui long sur une prise", "Long-press a hold", "Mantén pulsada una presa"],
@@ -469,7 +476,8 @@
     ["Environnement de test", "Test environment", "Entorno de prueba"],
   ];
   const MAP = { en: new Map(), es: new Map() };
-  for (const [fr, en, es] of E) { MAP.en.set(fr, en); MAP.es.set(fr, es); }
+  const FROM_E = [];   // motifs (expressions régulières) écrits dans E : ajoutés à P plus bas, où ils sont lus
+  for (const e of E) { if (e[0] instanceof RegExp) FROM_E.push(e); else { MAP.en.set(e[0], e[1]); MAP.es.set(e[0], e[2]); } }
 
   const pl = (n, one, many) => (+n > 1 ? many : one);
   const sub = g => look(g) ?? g;
@@ -517,6 +525,7 @@
     [/^Photo de la voie avec (\d+) points et (\d+) étapes$/, m => `Route photo with ${m[1]} bolts and ${m[2]} steps`, m => `Foto de la vía con ${m[1]} chapas y ${m[2]} pasos`],
     [/^ex\. (.+)$/, m => `e.g. ${m[1]}`, m => `ej. ${m[1]}`],
   ];
+  P.push(...FROM_E);
 
   function look(k) {
     if (LANG === "fr") return null;

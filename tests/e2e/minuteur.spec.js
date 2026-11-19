@@ -125,3 +125,94 @@ test('à 390 px : rien ne déborde, ni dans les réglages ni pendant la séance 
   expect(bottom.y + bottom.height).toBeLessThanOrEqual(844);
   await page.locator('#tmStop').click();
 });
+
+test('séances enregistrées : enregistrer, charger, mettre à jour, supprimer, retrouver après rechargement', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await expect(page.locator('#tmPres')).toBeEmpty();
+  // Les réglages de l'exemple : 10 s d'effort, 6 s de repos, 6 répétitions, 3 séries, 60 s entre séries.
+  await set(page, 'effort', 10); await set(page, 'rest', 6); await set(page, 'reps', 6); await set(page, 'sets', 3); await set(page, 'setRest', 60);
+  await page.locator('#tmSaveOpen').click();
+  await expect(page.locator('#tmName')).toHaveValue('10/6 × 6 (×3)');   // nom proposé, modifiable
+  await page.locator('#tmName').fill('Pan Güllich');
+  await page.locator('#tmName').press('Enter');
+  await expect(page.locator('#tmMsg')).toHaveText('Séance enregistrée');
+  const row = page.locator('#tmPres .tm-pre');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('Pan Güllich');
+  await expect(row).toContainText('10 s / 6 s × 6 · 3 séries · 1 min');
+  await expect(page.locator('.tm-pre-load')).toHaveAttribute('aria-current', 'true');
+  // On change les réglages : la séance n'est plus « la courante » ; un tap la recharge.
+  await set(page, 'effort', 7); await set(page, 'sets', 1);
+  await expect(page.locator('.tm-pre-load')).toHaveAttribute('aria-current', 'false');
+  await page.locator('.tm-pre-load').click();
+  for (const [k, v] of [['effort', 10], ['rest', 6], ['reps', 6], ['sets', 3], ['setRest', 60]]) await expect(page.locator(`#tm-${k}`)).toHaveValue(String(v));
+  await expect(page.locator('.tm-pre-load')).toHaveAttribute('aria-current', 'true');
+  // 3 × (6 × 10 s + 5 × 6 s) + 2 × 60 s = 390 s
+  await expect(page.locator('#tmTotal')).toHaveText('6 min 30 s');
+  // Un même nom (majuscules ignorées) met à jour au lieu de dupliquer.
+  await set(page, 'effort', 12);
+  await page.locator('#tmSaveOpen').click();
+  await page.locator('#tmName').fill('pan güllich');
+  await page.locator('#tmSaveOk').click();
+  await expect(page.locator('#tmMsg')).toHaveText('Séance mise à jour');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('12 s / 6 s × 6');
+  // Une seconde séance, au nom proposé ; Annuler n'enregistre rien.
+  await set(page, 'effort', 7); await set(page, 'rest', 3); await set(page, 'sets', 1);
+  await page.locator('#tmSaveOpen').click();
+  await page.locator('#tmSaveNo').click();
+  await expect(row).toHaveCount(1);
+  await page.locator('#tmSaveOpen').click();
+  await page.locator('#tmSaveOk').click();
+  await expect(row).toHaveCount(2);
+  await expect(row.nth(1)).toContainText('7/3 × 6');
+  // À 390 px, rien ne déborde avec des séances.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  // Rechargement : les séances sont toujours là.
+  await page.reload();
+  await page.locator('#hTimer').click();
+  await expect(row).toHaveCount(2);
+  await row.first().locator('.tm-pre-load').click();
+  await expect(page.locator('#tm-effort')).toHaveValue('12');
+  // Supprimer demande une confirmation : un premier tap arme, le second supprime.
+  await row.first().locator('.tm-pre-del').click();
+  await expect(row).toHaveCount(2);
+  await expect(row.first().locator('.tm-pre-del')).toHaveText('Supprimer');
+  await row.first().locator('.tm-pre-del').click();
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('7/3 × 6');
+});
+
+test('une séance enregistrée se lance avec ses réglages', async ({ page }) => {
+  test.setTimeout(45000);
+  await page.addInitScript(() => { if (!localStorage.getItem('ts-timer-presets')) localStorage.setItem('ts-timer-presets', JSON.stringify([{ id: 'p1', name: 'Courte', effort: 1, rest: 0, reps: 1, sets: 2, setRest: 1 }])); });
+  await open(page);
+  await page.locator('.tm-pre-load').click();
+  await expect(page.locator('#tmTotal')).toHaveText('3 s');
+  await page.locator('#tmGo').click();
+  await expect(page.locator('#tmRun')).toHaveAttribute('data-phase', 'effort', { timeout: 9000 });
+  await expect(page.locator('#tmPos')).toContainText('Série 1 / 2');
+  await page.locator('#tmStop').click();
+});
+
+test('20 séances au plus ; en anglais, textes traduits mais pas le nom choisi', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('ts-lang', 'en');
+    if (!localStorage.getItem('ts-timer-presets')) localStorage.setItem('ts-timer-presets', JSON.stringify(Array.from({ length: 20 }, (_, i) => ({ id: `p${i}`, name: i === 0 ? 'Ma séance' : `S${i}`, effort: 7, rest: 3, reps: 6, sets: 3, setRest: 180 }))));
+  });
+  await open(page);
+  await expect(page.locator('#tmPres .label')).toHaveText('My sessions');
+  await expect(page.locator('#tmSaveOpen')).toHaveText('Save this session');
+  await expect(page.locator('.tm-pre').first()).toContainText('Ma séance');            // le nom saisi n'est jamais traduit
+  await expect(page.locator('.tm-pre').first()).toContainText('7 s / 3 s × 6 · 3 sets · 3 min');
+  await page.locator('#tmSaveOpen').click();
+  await expect(page.locator('#tmName')).toHaveAttribute('placeholder', 'Session name');
+  await page.locator('#tmName').fill('Une de trop');
+  await page.locator('#tmSaveOk').click();
+  await expect(page.locator('#tmMsg')).toHaveText('20 sessions at most.');
+  await expect(page.locator('.tm-pre')).toHaveCount(20);
+  await page.evaluate(() => TS_I18N.set('es'));
+  await expect(page.locator('#tmPres .label')).toHaveText('Mis sesiones');
+  await expect(page.locator('.tm-pre').first()).toContainText('3 series');
+});
